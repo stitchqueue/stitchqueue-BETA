@@ -171,7 +171,7 @@ function CalculatorPage() {
       updatedAt: new Date().toISOString(),
     };
 
-    storage.saveProject(newProject);
+    storage.addProject(newProject);
 
     // Increment estimate number in settings
     const updatedSettings = {
