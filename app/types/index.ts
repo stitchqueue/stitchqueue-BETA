@@ -10,11 +10,20 @@ export type MeasurementSystem = "imperial" | "metric";
 
 export type RequestedDateType = "asap" | "no_date" | "specific_date";
 
+export const STAGES: Stage[] = [
+  "Intake",
+  "Estimate",
+  "In Progress",
+  "Invoiced",
+  "Paid/Shipped",
+  "Archived",
+];
+
 export interface Project {
   id: string;
   stage: Stage;
   intakeDate: string;
-  estimateNumber?: number; // NEW - Estimate number assigned when estimate is created
+  estimateNumber?: number;
   requestedDateType: RequestedDateType;
   requestedCompletionDate?: string;
   dueDate?: string;
@@ -99,7 +108,7 @@ export interface Settings {
   taxLabel?: string;
 
   // Estimate Numbering
-  nextEstimateNumber: number; // NEW - starts at 1001, increments with each estimate
+  nextEstimateNumber: number;
 
   // Pricing (PAID tier only)
   pricingRates?: PricingRates;
@@ -112,3 +121,16 @@ export interface Settings {
   // Tier
   isPaidTier: boolean;
 }
+
+export const DEFAULT_SETTINGS: Settings = {
+  measurementSystem: "imperial",
+  currencyCode: "USD",
+  taxRate: 0,
+  taxLabel: "Sales Tax",
+  nextEstimateNumber: 1001,
+  threadOptions: [],
+  battingOptions: [],
+  isPaidTier: false,
+  brandPrimaryColor: "#4e283a",
+  brandSecondaryColor: "#98823a",
+};
