@@ -134,6 +134,56 @@ function CalculatorPage() {
     }).format(amount);
   };
 
+  // NEW - Save estimate with estimate number
+  const handleSaveEstimate = () => {
+    if (!quiltWidth || !quiltLength) {
+      alert("Please enter quilt dimensions");
+      return;
+    }
+
+    if (!settings) {
+      alert("Settings not loaded");
+      return;
+    }
+
+    // Get current estimate number and increment it
+    const currentEstimateNumber = settings.nextEstimateNumber || 1001;
+
+    const newProject = {
+      id: `project-${Date.now()}`,
+      stage: "Estimate" as const,
+      intakeDate: new Date().toISOString().split("T")[0],
+      estimateNumber: currentEstimateNumber,
+      requestedDateType: "no_date" as const,
+      clientFirstName: "Client",
+      clientLastName: "Name",
+      quiltWidth: parseFloat(quiltWidth) || 0,
+      quiltLength: parseFloat(quiltLength) || 0,
+      quiltingType,
+      threadChoice,
+      battingChoice,
+      battingLengthAddition,
+      clientSuppliesBatting,
+      bindingType,
+      notes: [],
+      attachments: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    storage.saveProject(newProject);
+
+    // Increment estimate number in settings
+    const updatedSettings = {
+      ...settings,
+      nextEstimateNumber: currentEstimateNumber + 1,
+    };
+    storage.saveSettings(updatedSettings);
+
+    alert(`Estimate #${currentEstimateNumber} saved!`);
+    router.push("/board");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -457,7 +507,7 @@ function CalculatorPage() {
           {/* Actions */}
           <div className="flex gap-3 mt-6">
             <button
-              onClick={() => router.push("/board")}
+              onClick={handleSaveEstimate}
               className="flex-1 px-4 py-3 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors"
             >
               Save & Go to Board
