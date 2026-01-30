@@ -1,178 +1,137 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import { storage } from "../lib/storage";
-import type { Project, EstimateData } from "../types";
+import type { Settings } from "../types";
 
-export default function CalculatorPage() {
+function CalculatorPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const projectId = searchParams.get("projectId");
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [isPaidTier, setIsPaidTier] = useState(false);
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [formData, setFormData] = useState({
-    quiltWidth: "",
-    quiltLength: "",
-    quiltingType: "standard_e2e",
-    quiltingRate: "0.015",
-    threadCost: "0",
-    battingChoice: "none",
-    battingWidth: "96",
-    battingPricePerInch: "0.50",
-    battingLengthAddition: "4",
-    clientSuppliesBatting: false,
-    bindingType: "no_binding",
-    bindingRatePerInch: "0.10",
-  });
+  // Form state
+  const [quiltWidth, setQuiltWidth] = useState("");
+  const [quiltLength, setQuiltLength] = useState("");
+  const [quiltingType, setQuiltingType] = useState("");
+  const [threadChoice, setThreadChoice] = useState("");
+  const [battingChoice, setBattingChoice] = useState("");
+  const [battingLengthAddition, setBattingLengthAddition] = useState("4");
+  const [clientSuppliesBatting, setClientSuppliesBatting] = useState(false);
+  const [bindingType, setBindingType] = useState("");
+  const [bobbinCount, setBobbinCount] = useState("1");
 
-  const [totals, setTotals] = useState({
-    quiltArea: 0,
-    quiltingTotal: 0,
-    threadTotal: 0,
-    battingLengthNeeded: 0,
-    battingTotal: 0,
-    bindingPerimeter: 0,
-    bindingTotal: 0,
-    subtotal: 0,
-    total: 0,
-  });
+  // Calculated values
+  const [quiltingTotal, setQuiltingTotal] = useState(0);
+  const [threadTotal, setThreadTotal] = useState(0);
+  const [battingTotal, setBattingTotal] = useState(0);
+  const [bindingTotal, setBindingTotal] = useState(0);
+  const [bobbinTotal, setBobbinTotal] = useState(0);
+  const [subtotal, setSubtotal] = useState(0);
+  const [taxAmount, setTaxAmount] = useState(0);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    if (projectId) {
-      const proj = storage.getProjectById(decodeURIComponent(projectId));
-      if (proj) {
-        setProject(proj);
-        // Pre-fill dimensions from project if available
-        if (proj.quiltWidth && proj.quiltLength) {
-          setFormData((prev) => ({
-            ...prev,
-            quiltWidth: String(proj.quiltWidth),
-            quiltLength: String(proj.quiltLength),
-          }));
-        }
-      }
+    const savedSettings = storage.getSettings();
+    setSettings(savedSettings);
+    setIsPaidTier(savedSettings.isPaidTier || false);
+  }, []);
+
+  useEffect(() => {
+    if (settings) {
+      calculateTotals();
     }
-  }, [projectId]);
-
-  useEffect(() => {
-    calculateTotals();
-  }, [formData]);
+  }, [
+    quiltWidth,
+    quiltLength,
+    quiltingType,
+    threadChoice,
+    battingChoice,
+    battingLengthAddition,
+    clientSuppliesBatting,
+    bindingType,
+    bobbinCount,
+    settings,
+  ]);
 
   const calculateTotals = () => {
-    const width = parseFloat(formData.quiltWidth) || 0;
-    const length = parseFloat(formData.quiltLength) || 0;
+    if (!settings) return;
 
-    if (width === 0 || length === 0) {
-      setTotals({
-        quiltArea: 0,
-        quiltingTotal: 0,
-        threadTotal: 0,
-        battingLengthNeeded: 0,
-        battingTotal: 0,
-        bindingPerimeter: 0,
-        bindingTotal: 0,
-        subtotal: 0,
-        total: 0,
-      });
-      return;
+    let quilting = 0;
+    let thread = 0;
+    let batting = 0;
+    let binding = 0;
+    let bobbin = 0;
+
+    // Quilting calculation
+    const w = parseFloat(quiltWidth) || 0;
+    const h = parseFloat(quiltLength) || 0;
+    const area = w * h;
+
+    if (quiltingType && area > 0) {
+      const rate =
+        settings.pricingRates?.[
+          quiltingType as keyof typeof settings.pricingRates
+        ] || 0;
+      quilting = area * rate;
     }
 
-    // Quilt area and quilting cost
-    const area = width * length;
-    const rate = parseFloat(formData.quiltingRate) || 0;
-    const quiltingTotal = area * rate;
-
-    // Thread cost
-    const threadTotal = parseFloat(formData.threadCost) || 0;
+    // Thread calculation
+    if (threadChoice) {
+      const threadOption = settings.threadOptions?.find(
+        (t) => t.name === threadChoice
+      );
+      thread = threadOption?.price || 0;
+    }
 
     // Batting calculation
-    let battingTotal = 0;
-    let battingLengthNeeded = 0;
-
-    if (!formData.clientSuppliesBatting && formData.battingChoice !== "none") {
-      const battingWidth = parseFloat(formData.battingWidth) || 0;
-      const battingAddition = parseFloat(formData.battingLengthAddition) || 0;
-      battingLengthNeeded = length + battingAddition;
-      const battingPricePerInch = parseFloat(formData.battingPricePerInch) || 0;
-      battingTotal = battingLengthNeeded * battingPricePerInch;
+    if (battingChoice && !clientSuppliesBatting) {
+      const battingOption = settings.battingOptions?.find(
+        (b) => b.name === battingChoice
+      );
+      const battingWidth = battingOption?.widthInches || 0;
+      const battingPricePerInch = battingOption?.pricePerInch || 0;
+      const additionInches = parseFloat(battingLengthAddition) || 4;
+      const battingLengthNeeded = h + additionInches;
+      batting = battingLengthNeeded * battingPricePerInch;
     }
 
-    // Binding calculation (per-inch - v2.7)
-    let bindingTotal = 0;
-    let bindingPerimeter = 0;
-
-    if (formData.bindingType !== "no_binding") {
-      bindingPerimeter = (width + length) * 2;
-      const bindingRate = parseFloat(formData.bindingRatePerInch) || 0;
-      bindingTotal = bindingPerimeter * bindingRate;
+    // Binding calculation (per-inch)
+    if (bindingType && w > 0 && h > 0) {
+      const perimeter = (w + h) * 2;
+      if (bindingType === "Top Attached Only") {
+        binding =
+          perimeter * (settings.pricingRates?.bindingTopAttached || 0.1);
+      } else if (bindingType === "Fully Attached") {
+        binding =
+          perimeter * (settings.pricingRates?.bindingFullyAttached || 0.2);
+      }
     }
 
-    // Totals
-    const subtotal = quiltingTotal + threadTotal + battingTotal + bindingTotal;
-    const total = subtotal;
+    // Bobbin calculation
+    const bobbins = parseInt(bobbinCount) || 0;
+    bobbin = bobbins * (settings.bobbinPrice || 0);
 
-    setTotals({
-      quiltArea: area,
-      quiltingTotal,
-      threadTotal,
-      battingLengthNeeded,
-      battingTotal,
-      bindingPerimeter,
-      bindingTotal,
-      subtotal,
-      total,
-    });
+    const sub = quilting + thread + batting + binding + bobbin;
+    const tax = sub * ((settings.taxRate || 0) / 100);
+    const tot = sub + tax;
+
+    setQuiltingTotal(quilting);
+    setThreadTotal(thread);
+    setBattingTotal(batting);
+    setBindingTotal(binding);
+    setBobbinTotal(bobbin);
+    setSubtotal(sub);
+    setTaxAmount(tax);
+    setTotal(tot);
   };
 
-  const saveEstimate = () => {
-    if (!project) {
-      alert(
-        "No project selected. Please create a project first from the intake form."
-      );
-      return;
-    }
-
-    if (totals.total === 0) {
-      alert("Please enter quilt dimensions to create an estimate.");
-      return;
-    }
-
-    const estimateData: EstimateData = {
-      quiltWidth: parseFloat(formData.quiltWidth),
-      quiltLength: parseFloat(formData.quiltLength),
-      quiltArea: totals.quiltArea,
-      quiltingType: formData.quiltingType,
-      quiltingRate: parseFloat(formData.quiltingRate),
-      quiltingTotal: totals.quiltingTotal,
-      threadCost: parseFloat(formData.threadCost),
-      battingChoice: formData.battingChoice,
-      battingWidth: parseFloat(formData.battingWidth),
-      battingPricePerInch: parseFloat(formData.battingPricePerInch),
-      battingLengthAddition: parseFloat(formData.battingLengthAddition),
-      battingLengthNeeded: totals.battingLengthNeeded,
-      battingTotal: totals.battingTotal,
-      clientSuppliesBatting: formData.clientSuppliesBatting,
-      bindingType: formData.bindingType,
-      bindingRatePerInch: parseFloat(formData.bindingRatePerInch),
-      bindingPerimeter: totals.bindingPerimeter,
-      bindingTotal: totals.bindingTotal,
-      subtotal: totals.subtotal,
-      total: totals.total,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Update project with estimate and move to Estimate stage
-    storage.updateProject(project.id, {
-      estimateData,
-      stage: "Estimate",
-      quiltWidth: parseFloat(formData.quiltWidth),
-      quiltLength: parseFloat(formData.quiltLength),
-    });
-
-    alert("Estimate saved!");
-    router.push(`/project/${encodeURIComponent(project.id)}`);
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount);
   };
 
   return (
@@ -180,381 +139,354 @@ export default function CalculatorPage() {
       <Header />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-plum">Pricing Calculator</h2>
-            {project && (
-              <p className="text-sm text-muted mt-1">
-                For: {project.clientFirstName} {project.clientLastName}
-              </p>
-            )}
+            <h1 className="text-2xl font-bold text-plum">Pricing Calculator</h1>
+            <p className="text-sm text-muted mt-1">
+              Create estimate for new project
+            </p>
           </div>
           <button
-            onClick={() =>
-              project
-                ? router.push(`/project/${encodeURIComponent(project.id)}`)
-                : router.push("/")
-            }
-            className="px-4 py-2 border border-line rounded-xl hover:bg-gray-50"
+            onClick={() => router.push("/")}
+            className="px-4 py-2 border border-line rounded-xl hover:bg-white transition-colors"
           >
-            Cancel
+            Back
           </button>
         </div>
 
-        {!project && (
-          <div className="bg-gold/10 border border-gold/30 rounded-xl p-4 mb-6">
-            <p className="text-sm font-bold text-gold">
-              ⚠️ No project selected. Create a project from the intake form
-              first, then create an estimate from the project page.
-            </p>
+        {/* Tier Toggle */}
+        <div className="bg-white border border-line rounded-card p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-bold text-sm">
+                Tier: {isPaidTier ? "PAID" : "FREE"}
+              </div>
+              <div className="text-xs text-muted mt-1">
+                {isPaidTier
+                  ? "Settings auto-populate"
+                  : "Manual entry required"}
+              </div>
+            </div>
+            <button
+              onClick={() => setIsPaidTier(!isPaidTier)}
+              className="px-4 py-2 bg-plum text-white rounded-xl text-sm font-bold"
+            >
+              Toggle Tier
+            </button>
           </div>
-        )}
-
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Left Column - Inputs */}
-          <div className="space-y-6">
-            {/* Quilt Dimensions */}
-            <div className="bg-white border border-line rounded-card p-6">
-              <h3 className="font-bold text-plum mb-4">Quilt Dimensions</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Width (inches)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.quiltWidth}
-                    onChange={(e) =>
-                      setFormData({ ...formData, quiltWidth: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Length (inches)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.quiltLength}
-                    onChange={(e) =>
-                      setFormData({ ...formData, quiltLength: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
-                </div>
-              </div>
-              {totals.quiltArea > 0 && (
-                <div className="mt-3 text-sm text-muted">
-                  Area: {totals.quiltArea.toFixed(2)} sq in
-                </div>
-              )}
-            </div>
-
-            {/* Quilting */}
-            <div className="bg-white border border-line rounded-card p-6">
-              <h3 className="font-bold text-plum mb-4">Quilting</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Quilting Type
-                  </label>
-                  <select
-                    value={formData.quiltingType}
-                    onChange={(e) =>
-                      setFormData({ ...formData, quiltingType: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  >
-                    <option value="light_e2e">Light Edge to Edge</option>
-                    <option value="standard_e2e">Standard Edge to Edge</option>
-                    <option value="light_custom">Light Custom</option>
-                    <option value="custom">Custom</option>
-                    <option value="dense_custom">Dense Custom</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Rate per sq in ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    value={formData.quiltingRate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, quiltingRate: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Thread */}
-            <div className="bg-white border border-line rounded-card p-6">
-              <h3 className="font-bold text-plum mb-4">Thread</h3>
+          {!isPaidTier && (
+            <div className="mt-3 p-3 bg-gold/10 rounded-xl text-xs">
+              <div className="font-bold mb-1">FREE Tier Note:</div>
               <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Thread Cost ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.threadCost}
-                  onChange={(e) =>
-                    setFormData({ ...formData, threadCost: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
+                You'll manually enter pricing for each estimate. Upgrade to PAID
+                to save rates and auto-populate.
               </div>
             </div>
+          )}
+        </div>
 
-            {/* Batting */}
-            <div className="bg-white border border-line rounded-card p-6">
-              <h3 className="font-bold text-plum mb-4">Batting</h3>
+        {/* Calculator Form */}
+        <div className="bg-white border border-line rounded-card p-6">
+          <h2 className="text-lg font-bold text-plum mb-4">Project Details</h2>
 
-              <div className="mb-4">
-                <label className="flex items-center gap-3 p-3 border border-line rounded-xl cursor-pointer hover:bg-gray-50">
-                  <input
-                    type="checkbox"
-                    checked={formData.clientSuppliesBatting}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        clientSuppliesBatting: e.target.checked,
-                      })
-                    }
-                  />
-                  <div>
-                    <div className="font-bold text-sm">
-                      Client Supplies Batting
-                    </div>
-                    <div className="text-xs text-muted">
-                      Batting cost will be $0
-                    </div>
-                  </div>
-                </label>
+          {/* Quilt Dimensions */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-muted mb-2">
+              Quilt Dimensions (inches)
+            </label>
+            <div className="flex gap-3">
+              <input
+                type="number"
+                placeholder="Width"
+                value={quiltWidth}
+                onChange={(e) => setQuiltWidth(e.target.value)}
+                className="flex-1 px-4 py-2 border border-line rounded-xl"
+              />
+              <span className="flex items-center text-muted font-bold">×</span>
+              <input
+                type="number"
+                placeholder="Length"
+                value={quiltLength}
+                onChange={(e) => setQuiltLength(e.target.value)}
+                className="flex-1 px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
+            {quiltWidth && quiltLength && (
+              <div className="mt-2 text-xs text-muted">
+                Area:{" "}
+                {(parseFloat(quiltWidth) * parseFloat(quiltLength)).toFixed(0)}{" "}
+                sq in
               </div>
+            )}
+          </div>
 
-              {!formData.clientSuppliesBatting && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-bold text-muted mb-2">
-                      Batting Type
-                    </label>
-                    <select
-                      value={formData.battingChoice}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          battingChoice: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2 border border-line rounded-xl"
-                    >
-                      <option value="none">None</option>
-                      <option value="cotton">Cotton</option>
-                      <option value="poly">Polyester</option>
-                      <option value="wool">Wool</option>
-                      <option value="blend">Blend</option>
-                    </select>
-                  </div>
+          {/* Quilting Type */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-muted mb-2">
+              Quilting Type
+            </label>
+            {isPaidTier && settings?.pricingRates ? (
+              <select
+                value={quiltingType}
+                onChange={(e) => setQuiltingType(e.target.value)}
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              >
+                <option value="">Select quilting type...</option>
+                <option value="lightE2E">
+                  Light Edge-to-Edge (${settings.pricingRates.lightE2E || 0}/sq
+                  in)
+                </option>
+                <option value="standardE2E">
+                  Standard Edge-to-Edge ($
+                  {settings.pricingRates.standardE2E || 0}/sq in)
+                </option>
+                <option value="lightCustom">
+                  Light Custom (${settings.pricingRates.lightCustom || 0}/sq in)
+                </option>
+                <option value="custom">
+                  Custom (${settings.pricingRates.custom || 0}/sq in)
+                </option>
+                <option value="denseCustom">
+                  Dense Custom (${settings.pricingRates.denseCustom || 0}/sq in)
+                </option>
+              </select>
+            ) : (
+              <input
+                type="text"
+                placeholder="Enter quilting type manually"
+                value={quiltingType}
+                onChange={(e) => setQuiltingType(e.target.value)}
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            )}
+          </div>
 
-                  {formData.battingChoice !== "none" && (
-                    <>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-bold text-muted mb-2">
-                            Width (in)
-                          </label>
-                          <input
-                            type="number"
-                            value={formData.battingWidth}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                battingWidth: e.target.value,
-                              })
-                            }
-                            className="w-full px-4 py-2 border border-line rounded-xl"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-bold text-muted mb-2">
-                            Price/inch ($)
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formData.battingPricePerInch}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                battingPricePerInch: e.target.value,
-                              })
-                            }
-                            className="w-full px-4 py-2 border border-line rounded-xl"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-muted mb-2">
-                          Length Addition (inches)
-                        </label>
-                        <select
-                          value={formData.battingLengthAddition}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              battingLengthAddition: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-2 border border-line rounded-xl"
-                        >
-                          <option value="2">2"</option>
-                          <option value="4">4"</option>
-                          <option value="6">6"</option>
-                          <option value="8">8"</option>
-                        </select>
-                      </div>
-                    </>
-                  )}
+          {/* Thread */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-muted mb-2">
+              Thread
+            </label>
+            {isPaidTier &&
+            settings?.threadOptions &&
+            settings.threadOptions.length > 0 ? (
+              <select
+                value={threadChoice}
+                onChange={(e) => setThreadChoice(e.target.value)}
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              >
+                <option value="">Select thread...</option>
+                {settings.threadOptions.map((t) => (
+                  <option key={t.name} value={t.name}>
+                    {t.name} (${t.price})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                placeholder="Enter thread choice manually"
+                value={threadChoice}
+                onChange={(e) => setThreadChoice(e.target.value)}
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            )}
+          </div>
+
+          {/* Client Supplies Batting Toggle */}
+          <div className="mb-6">
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={clientSuppliesBatting}
+                onChange={(e) => setClientSuppliesBatting(e.target.checked)}
+                className="w-5 h-5 rounded border-line"
+              />
+              <div>
+                <div className="text-sm font-bold text-plum">
+                  Client Supplies Own Batting
                 </div>
-              )}
-            </div>
+                <div className="text-xs text-muted">
+                  Batting cost will be $0
+                </div>
+              </div>
+            </label>
+          </div>
 
-            {/* Binding */}
-            <div className="bg-white border border-line rounded-card p-6">
-              <h3 className="font-bold text-plum mb-4">Binding (Per-Inch)</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Binding Type
-                  </label>
+          {/* Batting */}
+          {!clientSuppliesBatting && (
+            <>
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-muted mb-2">
+                  Batting
+                </label>
+                {isPaidTier &&
+                settings?.battingOptions &&
+                settings.battingOptions.length > 0 ? (
                   <select
-                    value={formData.bindingType}
-                    onChange={(e) => {
-                      const newType = e.target.value;
-                      let newRate = "0";
-                      if (newType === "top_attached") newRate = "0.10";
-                      if (newType === "fully_attached") newRate = "0.20";
-                      setFormData({
-                        ...formData,
-                        bindingType: newType,
-                        bindingRatePerInch: newRate,
-                      });
-                    }}
+                    value={battingChoice}
+                    onChange={(e) => setBattingChoice(e.target.value)}
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   >
-                    <option value="no_binding">No Binding</option>
-                    <option value="top_attached">Top Attached Only</option>
-                    <option value="fully_attached">Fully Attached</option>
+                    <option value="">Select batting...</option>
+                    {settings.battingOptions.map((b) => (
+                      <option key={`${b.name}-${b.widthInches}`} value={b.name}>
+                        {b.name} - {b.widthInches}" wide (${b.pricePerInch}/in)
+                      </option>
+                    ))}
                   </select>
-                </div>
-
-                {formData.bindingType !== "no_binding" && (
-                  <div>
-                    <label className="block text-sm font-bold text-muted mb-2">
-                      Rate per inch ($)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.bindingRatePerInch}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bindingRatePerInch: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2 border border-line rounded-xl"
-                    />
-                    {totals.bindingPerimeter > 0 && (
-                      <div className="mt-2 text-sm text-muted">
-                        Perimeter: {totals.bindingPerimeter.toFixed(2)} inches
-                      </div>
-                    )}
-                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Enter batting choice manually"
+                    value={battingChoice}
+                    onChange={(e) => setBattingChoice(e.target.value)}
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
                 )}
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-muted mb-2">
+                  Batting Length Addition
+                </label>
+                <select
+                  value={battingLengthAddition}
+                  onChange={(e) => setBattingLengthAddition(e.target.value)}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                >
+                  <option value="2">2 inches</option>
+                  <option value="4">4 inches (recommended)</option>
+                  <option value="6">6 inches</option>
+                  <option value="8">8 inches</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {/* Binding */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-muted mb-2">
+              Binding
+            </label>
+            <select
+              value={bindingType}
+              onChange={(e) => setBindingType(e.target.value)}
+              className="w-full px-4 py-2 border border-line rounded-xl"
+            >
+              <option value="">Select binding...</option>
+              <option value="No Binding">No Binding ($0)</option>
+              <option value="Top Attached Only">
+                Top Attached Only ($
+                {settings?.pricingRates?.bindingTopAttached || 0.1}/in)
+              </option>
+              <option value="Fully Attached">
+                Fully Attached ($
+                {settings?.pricingRates?.bindingFullyAttached || 0.2}/in)
+              </option>
+            </select>
+          </div>
+
+          {/* Bobbins */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-muted mb-2">
+              Bobbins
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={bobbinCount}
+              onChange={(e) => setBobbinCount(e.target.value)}
+              className="w-full px-4 py-2 border border-line rounded-xl"
+            />
+          </div>
+
+          {/* Pricing Summary */}
+          <div className="border-t border-line pt-6 mt-6">
+            <h3 className="text-lg font-bold text-plum mb-4">Estimate</h3>
+
+            <div className="space-y-2 mb-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">Quilting</span>
+                <span className="font-bold">
+                  {formatCurrency(quiltingTotal)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">Thread</span>
+                <span className="font-bold">{formatCurrency(threadTotal)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">Batting</span>
+                <span className="font-bold">
+                  {formatCurrency(battingTotal)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">Binding</span>
+                <span className="font-bold">
+                  {formatCurrency(bindingTotal)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">Bobbins</span>
+                <span className="font-bold">{formatCurrency(bobbinTotal)}</span>
+              </div>
+            </div>
+
+            <div className="border-t border-line pt-3 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">Subtotal</span>
+                <span className="font-bold">{formatCurrency(subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">
+                  Tax ({settings?.taxRate || 0}%)
+                </span>
+                <span className="font-bold">{formatCurrency(taxAmount)}</span>
+              </div>
+              <div className="flex justify-between text-lg border-t border-line pt-3">
+                <span className="font-bold text-plum">Total</span>
+                <span className="font-bold text-plum">
+                  {formatCurrency(total)}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Right Column - Estimate Preview */}
-          <div>
-            <div className="bg-white border border-line rounded-card p-6 sticky top-24">
-              <h3 className="font-bold text-plum mb-4">Estimate</h3>
-
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between pb-3 border-b border-line">
-                  <span className="text-muted">Quilting</span>
-                  <span className="font-medium">
-                    ${totals.quiltingTotal.toFixed(2)}
-                  </span>
-                </div>
-
-                {totals.threadTotal > 0 && (
-                  <div className="flex justify-between pb-3 border-b border-line">
-                    <span className="text-muted">Thread</span>
-                    <span className="font-medium">
-                      ${totals.threadTotal.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-
-                {totals.battingTotal > 0 && (
-                  <div className="flex justify-between pb-3 border-b border-line">
-                    <span className="text-muted">
-                      Batting ({totals.battingLengthNeeded.toFixed(0)}")
-                    </span>
-                    <span className="font-medium">
-                      ${totals.battingTotal.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-
-                {formData.clientSuppliesBatting && (
-                  <div className="flex justify-between pb-3 border-b border-line">
-                    <span className="text-muted">
-                      Batting (Client Supplied)
-                    </span>
-                    <span className="font-medium">$0.00</span>
-                  </div>
-                )}
-
-                {totals.bindingTotal > 0 && (
-                  <div className="flex justify-between pb-3 border-b border-line">
-                    <span className="text-muted">
-                      Binding ({totals.bindingPerimeter.toFixed(0)}" × $
-                      {formData.bindingRatePerInch})
-                    </span>
-                    <span className="font-medium">
-                      ${totals.bindingTotal.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex justify-between pt-3 text-lg font-bold">
-                  <span className="text-plum">Total</span>
-                  <span className="text-plum">${totals.total.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="mt-6 pt-6 border-t border-line">
-                <button
-                  onClick={saveEstimate}
-                  disabled={!project || totals.total === 0}
-                  className="w-full px-6 py-3 bg-plum text-white rounded-xl hover:bg-plum/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Save Estimate
-                </button>
-              </div>
-            </div>
+          {/* Actions */}
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={() => router.push("/board")}
+              className="flex-1 px-4 py-3 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors"
+            >
+              Save & Go to Board
+            </button>
+            <button
+              onClick={() => alert("Preview invoice coming soon!")}
+              className="flex-1 px-4 py-3 border-2 border-gold text-gold rounded-xl font-bold hover:bg-gold hover:text-white transition-colors"
+            >
+              Preview Invoice
+            </button>
           </div>
         </div>
       </main>
     </div>
   );
 }
+
+function CalculatorPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
+      <CalculatorPage />
+    </Suspense>
+  );
+}
+
+export default CalculatorPageWrapper;
