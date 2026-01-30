@@ -136,6 +136,8 @@ function CalculatorPage() {
 
   // NEW - Save estimate with estimate number
   const handleSaveEstimate = () => {
+    console.log("handleSaveEstimate called!");
+
     if (!quiltWidth || !quiltLength) {
       alert("Please enter quilt dimensions");
       return;
