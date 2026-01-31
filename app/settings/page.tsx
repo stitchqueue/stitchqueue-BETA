@@ -3,7 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
-import { storage } from "../lib/storage";
+import {
+  storage,
+  getCurrentUser,
+  hasOrganization,
+  DEFAULT_SETTINGS,
+} from "../lib/storage";
 import type { Settings, ThreadOption, BattingOption } from "../types";
 import { COUNTRY_OPTIONS } from "../types";
 
@@ -21,10 +26,14 @@ const formatPhoneNumber = (value: string): string => {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [settings, setSettings] = useState<Settings>(storage.getSettings());
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "business" | "pricing" | "thread" | "batting" | "data"
   >("business");
+
   // Thread state
   const [newThreadName, setNewThreadName] = useState("");
   const [newThreadPrice, setNewThreadPrice] = useState("");
@@ -47,32 +56,51 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    const s = storage.getSettings();
-    setSettings(s);
-    setRateStrings({
-      lightE2E: s.pricingRates?.lightE2E?.toString() || "",
-      standardE2E: s.pricingRates?.standardE2E?.toString() || "",
-      lightCustom: s.pricingRates?.lightCustom?.toString() || "",
-      custom: s.pricingRates?.custom?.toString() || "",
-      denseCustom: s.pricingRates?.denseCustom?.toString() || "",
-      bindingTopAttached: s.pricingRates?.bindingTopAttached?.toString() || "",
-      bindingFullyAttached:
-        s.pricingRates?.bindingFullyAttached?.toString() || "",
-      bobbinPrice: s.bobbinPrice?.toString() || "",
-    });
-  }, []);
+    const init = async () => {
+      try {
+        // Check authentication
+        const hasOrg = await hasOrganization();
+        if (!hasOrg) {
+          router.push("/");
+          return;
+        }
+        setIsAuthenticated(true);
+
+        // Load settings
+        const s = await storage.getSettings();
+        setSettings(s);
+        setRateStrings({
+          lightE2E: s.pricingRates?.lightE2E?.toString() || "",
+          standardE2E: s.pricingRates?.standardE2E?.toString() || "",
+          lightCustom: s.pricingRates?.lightCustom?.toString() || "",
+          custom: s.pricingRates?.custom?.toString() || "",
+          denseCustom: s.pricingRates?.denseCustom?.toString() || "",
+          bindingTopAttached:
+            s.pricingRates?.bindingTopAttached?.toString() || "",
+          bindingFullyAttached:
+            s.pricingRates?.bindingFullyAttached?.toString() || "",
+          bobbinPrice: s.bobbinPrice?.toString() || "",
+        });
+      } catch (error) {
+        console.error("Error loading settings:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
+  }, [router]);
 
   const handleRateChange = (field: keyof typeof rateStrings, value: string) => {
     setRateStrings((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleRateBlur = (field: keyof typeof rateStrings) => {
+  const handleRateBlur = async (field: keyof typeof rateStrings) => {
     const value = parseFloat(rateStrings[field]) || 0;
 
     if (field === "bobbinPrice") {
       const updated = { ...settings, bobbinPrice: value };
       setSettings(updated);
-      storage.saveSettings(updated);
+      await storage.saveSettings(updated);
     } else {
       const updated = {
         ...settings,
@@ -82,18 +110,18 @@ export default function SettingsPage() {
         },
       };
       setSettings(updated);
-      storage.saveSettings(updated);
+      await storage.saveSettings(updated);
     }
   };
 
-  const handlePhoneChange = (value: string) => {
+  const handlePhoneChange = async (value: string) => {
     const formatted = formatPhoneNumber(value);
     const updated = { ...settings, phone: formatted };
     setSettings(updated);
-    storage.saveSettings(updated);
+    await storage.saveSettings(updated);
   };
 
-  const handleAddThread = () => {
+  const handleAddThread = async () => {
     if (!newThreadName || !newThreadPrice) {
       alert("Please enter thread name and price");
       return;
@@ -111,12 +139,12 @@ export default function SettingsPage() {
     };
 
     setSettings(updated);
-    storage.saveSettings(updated);
+    await storage.saveSettings(updated);
     setNewThreadName("");
     setNewThreadPrice("");
   };
 
-  const handleDeleteThread = (name: string) => {
+  const handleDeleteThread = async (name: string) => {
     if (!confirm(`Delete thread option "${name}"?`)) return;
 
     const updated = {
@@ -125,10 +153,10 @@ export default function SettingsPage() {
     };
 
     setSettings(updated);
-    storage.saveSettings(updated);
+    await storage.saveSettings(updated);
   };
 
-  const handleSetDefaultThread = (name: string) => {
+  const handleSetDefaultThread = async (name: string) => {
     const updated = {
       ...settings,
       threadOptions: settings.threadOptions.map((t) => ({
@@ -138,10 +166,10 @@ export default function SettingsPage() {
     };
 
     setSettings(updated);
-    storage.saveSettings(updated);
+    await storage.saveSettings(updated);
   };
 
-  const handleAddBatting = () => {
+  const handleAddBatting = async () => {
     if (!newBattingName || !newBattingWidth || !newBattingPrice) {
       alert("Please enter batting name, width, and price per inch");
       return;
@@ -160,13 +188,13 @@ export default function SettingsPage() {
     };
 
     setSettings(updated);
-    storage.saveSettings(updated);
+    await storage.saveSettings(updated);
     setNewBattingName("");
     setNewBattingWidth("");
     setNewBattingPrice("");
   };
 
-  const handleDeleteBatting = (name: string, width: number) => {
+  const handleDeleteBatting = async (name: string, width: number) => {
     if (!confirm(`Delete batting option "${name}" (${width}")?`)) return;
 
     const updated = {
@@ -177,10 +205,10 @@ export default function SettingsPage() {
     };
 
     setSettings(updated);
-    storage.saveSettings(updated);
+    await storage.saveSettings(updated);
   };
 
-  const handleSetDefaultBatting = (name: string, width: number) => {
+  const handleSetDefaultBatting = async (name: string, width: number) => {
     const updated = {
       ...settings,
       battingOptions: settings.battingOptions.map((b) => ({
@@ -190,11 +218,11 @@ export default function SettingsPage() {
     };
 
     setSettings(updated);
-    storage.saveSettings(updated);
+    await storage.saveSettings(updated);
   };
 
-  const handleExportCSV = () => {
-    const projects = storage.getProjects();
+  const handleExportCSV = async () => {
+    const projects = await storage.getProjects();
 
     const headers = [
       "ID",
@@ -270,7 +298,7 @@ export default function SettingsPage() {
     window.location.reload();
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -280,22 +308,60 @@ export default function SettingsPage() {
     }
 
     const reader = new FileReader();
-    reader.onload = (event: ProgressEvent<FileReader>) => {
+    reader.onload = async (event: ProgressEvent<FileReader>) => {
       const updated = {
         ...settings,
         logoUrl: event.target?.result as string,
       };
       setSettings(updated);
-      storage.saveSettings(updated);
+      await storage.saveSettings(updated);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleRemoveLogo = () => {
+  const handleRemoveLogo = async () => {
     const updated = { ...settings, logoUrl: "" };
     setSettings(updated);
-    storage.saveSettings(updated);
+    await storage.saveSettings(updated);
   };
+
+  const handleFieldChange = async (field: keyof Settings, value: any) => {
+    const updated = { ...settings, [field]: value };
+    setSettings(updated);
+    await storage.saveSettings(updated);
+  };
+
+  const handlePricingRatesChange = async (field: string, value: any) => {
+    const updated = {
+      ...settings,
+      pricingRates: {
+        ...settings.pricingRates,
+        [field]: value,
+      },
+    };
+    setSettings(updated);
+    await storage.saveSettings(updated);
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="max-w-6xl mx-auto px-4 py-8">
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-plum"></div>
+            <span className="ml-3 text-muted">Loading settings...</span>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -330,13 +396,13 @@ export default function SettingsPage() {
               </div>
             </div>
             <button
-              onClick={() => {
+              onClick={async () => {
                 const updated = {
                   ...settings,
                   isPaidTier: !settings.isPaidTier,
                 };
                 setSettings(updated);
-                storage.saveSettings(updated);
+                await storage.saveSettings(updated);
               }}
               className="px-4 py-2 bg-plum text-white rounded-xl text-sm font-bold"
             >
@@ -426,20 +492,14 @@ export default function SettingsPage() {
                 <input
                   type="text"
                   value={settings.businessName || ""}
-                  onChange={(e) => {
-                    const updated = {
-                      ...settings,
-                      businessName: e.target.value,
-                    };
-                    setSettings(updated);
-                    storage.saveSettings(updated);
-                  }}
+                  onChange={(e) =>
+                    handleFieldChange("businessName", e.target.value)
+                  }
                   placeholder="Stitched By Susan"
                   className="w-full px-4 py-2 border border-line rounded-xl"
                 />
               </div>
 
-              {/* Address Fields */}
               <div>
                 <label className="block text-sm font-bold text-muted mb-2">
                   Street Address
@@ -447,11 +507,7 @@ export default function SettingsPage() {
                 <input
                   type="text"
                   value={settings.street || ""}
-                  onChange={(e) => {
-                    const updated = { ...settings, street: e.target.value };
-                    setSettings(updated);
-                    storage.saveSettings(updated);
-                  }}
+                  onChange={(e) => handleFieldChange("street", e.target.value)}
                   placeholder="123 Main Street"
                   className="w-full px-4 py-2 border border-line rounded-xl"
                 />
@@ -465,11 +521,7 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     value={settings.city || ""}
-                    onChange={(e) => {
-                      const updated = { ...settings, city: e.target.value };
-                      setSettings(updated);
-                      storage.saveSettings(updated);
-                    }}
+                    onChange={(e) => handleFieldChange("city", e.target.value)}
                     placeholder="Spokane"
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
@@ -481,11 +533,7 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     value={settings.state || ""}
-                    onChange={(e) => {
-                      const updated = { ...settings, state: e.target.value };
-                      setSettings(updated);
-                      storage.saveSettings(updated);
-                    }}
+                    onChange={(e) => handleFieldChange("state", e.target.value)}
                     placeholder="WA"
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
@@ -497,14 +545,9 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     value={settings.postalCode || ""}
-                    onChange={(e) => {
-                      const updated = {
-                        ...settings,
-                        postalCode: e.target.value,
-                      };
-                      setSettings(updated);
-                      storage.saveSettings(updated);
-                    }}
+                    onChange={(e) =>
+                      handleFieldChange("postalCode", e.target.value)
+                    }
                     placeholder="99201"
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
@@ -515,11 +558,9 @@ export default function SettingsPage() {
                   </label>
                   <select
                     value={settings.country || "United States"}
-                    onChange={(e) => {
-                      const updated = { ...settings, country: e.target.value };
-                      setSettings(updated);
-                      storage.saveSettings(updated);
-                    }}
+                    onChange={(e) =>
+                      handleFieldChange("country", e.target.value)
+                    }
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   >
                     {COUNTRY_OPTIONS.map((country) => (
@@ -539,11 +580,7 @@ export default function SettingsPage() {
                   <input
                     type="email"
                     value={settings.email || ""}
-                    onChange={(e) => {
-                      const updated = { ...settings, email: e.target.value };
-                      setSettings(updated);
-                      storage.saveSettings(updated);
-                    }}
+                    onChange={(e) => handleFieldChange("email", e.target.value)}
                     placeholder="susan@stitchedbysusan.com"
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
@@ -569,11 +606,7 @@ export default function SettingsPage() {
                 <input
                   type="url"
                   value={settings.website || ""}
-                  onChange={(e) => {
-                    const updated = { ...settings, website: e.target.value };
-                    setSettings(updated);
-                    storage.saveSettings(updated);
-                  }}
+                  onChange={(e) => handleFieldChange("website", e.target.value)}
                   placeholder="https://stitchedbysusan.com"
                   className="w-full px-4 py-2 border border-line rounded-xl"
                 />
@@ -622,27 +655,17 @@ export default function SettingsPage() {
                     <input
                       type="color"
                       value={settings.brandPrimaryColor || "#4e283a"}
-                      onChange={(e) => {
-                        const updated = {
-                          ...settings,
-                          brandPrimaryColor: e.target.value,
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      onChange={(e) =>
+                        handleFieldChange("brandPrimaryColor", e.target.value)
+                      }
                       className="h-10 w-20 border border-line rounded-xl cursor-pointer"
                     />
                     <input
                       type="text"
                       value={settings.brandPrimaryColor || "#4e283a"}
-                      onChange={(e) => {
-                        const updated = {
-                          ...settings,
-                          brandPrimaryColor: e.target.value,
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      onChange={(e) =>
+                        handleFieldChange("brandPrimaryColor", e.target.value)
+                      }
                       placeholder="#4e283a"
                       className="flex-1 px-4 py-2 border border-line rounded-xl font-mono text-sm"
                     />
@@ -656,27 +679,17 @@ export default function SettingsPage() {
                     <input
                       type="color"
                       value={settings.brandSecondaryColor || "#98823a"}
-                      onChange={(e) => {
-                        const updated = {
-                          ...settings,
-                          brandSecondaryColor: e.target.value,
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      onChange={(e) =>
+                        handleFieldChange("brandSecondaryColor", e.target.value)
+                      }
                       className="h-10 w-20 border border-line rounded-xl cursor-pointer"
                     />
                     <input
                       type="text"
                       value={settings.brandSecondaryColor || "#98823a"}
-                      onChange={(e) => {
-                        const updated = {
-                          ...settings,
-                          brandSecondaryColor: e.target.value,
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      onChange={(e) =>
+                        handleFieldChange("brandSecondaryColor", e.target.value)
+                      }
                       placeholder="#98823a"
                       className="flex-1 px-4 py-2 border border-line rounded-xl font-mono text-sm"
                     />
@@ -693,14 +706,9 @@ export default function SettingsPage() {
                     <input
                       type="radio"
                       checked={settings.measurementSystem === "imperial"}
-                      onChange={() => {
-                        const updated = {
-                          ...settings,
-                          measurementSystem: "imperial" as const,
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      onChange={() =>
+                        handleFieldChange("measurementSystem", "imperial")
+                      }
                       className="w-4 h-4"
                     />
                     <span className="text-sm">Imperial (inches)</span>
@@ -709,14 +717,9 @@ export default function SettingsPage() {
                     <input
                       type="radio"
                       checked={settings.measurementSystem === "metric"}
-                      onChange={() => {
-                        const updated = {
-                          ...settings,
-                          measurementSystem: "metric" as const,
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      onChange={() =>
+                        handleFieldChange("measurementSystem", "metric")
+                      }
                       className="w-4 h-4"
                     />
                     <span className="text-sm">Metric (centimeters)</span>
@@ -730,14 +733,9 @@ export default function SettingsPage() {
                 </label>
                 <select
                   value={settings.currencyCode || "USD"}
-                  onChange={(e) => {
-                    const updated = {
-                      ...settings,
-                      currencyCode: e.target.value,
-                    };
-                    setSettings(updated);
-                    storage.saveSettings(updated);
-                  }}
+                  onChange={(e) =>
+                    handleFieldChange("currencyCode", e.target.value)
+                  }
                   className="w-full px-4 py-2 border border-line rounded-xl"
                 >
                   <option value="USD">USD - US Dollar ($)</option>
@@ -759,14 +757,12 @@ export default function SettingsPage() {
                     max="100"
                     step="0.01"
                     value={settings.taxRate || 0}
-                    onChange={(e) => {
-                      const updated = {
-                        ...settings,
-                        taxRate: parseFloat(e.target.value) || 0,
-                      };
-                      setSettings(updated);
-                      storage.saveSettings(updated);
-                    }}
+                    onChange={(e) =>
+                      handleFieldChange(
+                        "taxRate",
+                        parseFloat(e.target.value) || 0
+                      )
+                    }
                     placeholder="8.5"
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
@@ -778,11 +774,9 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     value={settings.taxLabel || "Sales Tax"}
-                    onChange={(e) => {
-                      const updated = { ...settings, taxLabel: e.target.value };
-                      setSettings(updated);
-                      storage.saveSettings(updated);
-                    }}
+                    onChange={(e) =>
+                      handleFieldChange("taxLabel", e.target.value)
+                    }
                     placeholder="Sales Tax"
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
@@ -801,14 +795,12 @@ export default function SettingsPage() {
                     type="number"
                     min="1"
                     value={settings.nextEstimateNumber || 1001}
-                    onChange={(e) => {
-                      const updated = {
-                        ...settings,
-                        nextEstimateNumber: parseInt(e.target.value) || 1001,
-                      };
-                      setSettings(updated);
-                      storage.saveSettings(updated);
-                    }}
+                    onChange={(e) =>
+                      handleFieldChange(
+                        "nextEstimateNumber",
+                        parseInt(e.target.value) || 1001
+                      )
+                    }
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
                   <p className="text-xs text-muted">
@@ -839,10 +831,10 @@ export default function SettingsPage() {
                   the calculator
                 </p>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const updated = { ...settings, isPaidTier: true };
                     setSettings(updated);
-                    storage.saveSettings(updated);
+                    await storage.saveSettings(updated);
                   }}
                   className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
                 >
@@ -1020,10 +1012,10 @@ export default function SettingsPage() {
                   Upgrade to PAID tier to save thread options
                 </p>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const updated = { ...settings, isPaidTier: true };
                     setSettings(updated);
-                    storage.saveSettings(updated);
+                    await storage.saveSettings(updated);
                   }}
                   className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
                 >
@@ -1127,10 +1119,10 @@ export default function SettingsPage() {
                   Upgrade to PAID tier to save batting options
                 </p>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const updated = { ...settings, isPaidTier: true };
                     setSettings(updated);
-                    storage.saveSettings(updated);
+                    await storage.saveSettings(updated);
                   }}
                   className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
                 >

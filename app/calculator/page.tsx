@@ -1,12 +1,28 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import { storage } from "../lib/storage";
+import { supabase } from "../lib/supabase";
+import {
+  validateEstimate,
+  getFieldError,
+  hasFieldError,
+  scrollToFirstError,
+  type ValidationError,
+} from "../lib/validation";
+import {
+  FormField,
+  ValidatedInput,
+  ValidatedSelect,
+  FormErrorSummary,
+  ValidationToast,
+  SuccessToast,
+} from "../components/FormField";
 import type { Settings, Project } from "../types";
 
-function CalculatorPage() {
+function CalculatorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = searchParams.get("projectId");
@@ -15,6 +31,14 @@ function CalculatorPage() {
   const [nextEstimateNumber, setNextEstimateNumber] = useState<number>(1001);
   const [existingProject, setExistingProject] = useState<Project | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Validation state
+  const [errors, setErrors] = useState<ValidationError[]>([]);
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   // Form state
   const [clientFirstName, setClientFirstName] = useState("");
@@ -45,7 +69,9 @@ function CalculatorPage() {
   const [bobbinCount, setBobbinCount] = useState("1");
 
   // Deposit state
-  const [depositType, setDepositType] = useState<"percent" | "flat">("percent");
+  const [depositType, setDepositType] = useState<"percentage" | "flat">(
+    "percentage"
+  );
   const [depositValue, setDepositValue] = useState("");
   const [depositReceivedToday, setDepositReceivedToday] = useState(false);
   const [depositPaymentMethod, setDepositPaymentMethod] = useState("Cash");
@@ -93,73 +119,81 @@ function CalculatorPage() {
   const handlePhoneChange = (value: string) => {
     const formatted = formatPhoneNumber(value);
     setClientPhone(formatted);
+    // Clear phone error when user types
+    if (hasFieldError(errors, "Phone")) {
+      setErrors(errors.filter((e) => e.field.toLowerCase() !== "phone"));
+    }
+  };
+
+  // Clear field error when user types
+  const clearFieldError = (fieldName: string) => {
+    if (hasFieldError(errors, fieldName)) {
+      setErrors(
+        errors.filter((e) => e.field.toLowerCase() !== fieldName.toLowerCase())
+      );
+    }
   };
 
   useEffect(() => {
-    const savedSettings = storage.getSettings();
-    setSettings(savedSettings);
-    setNextEstimateNumber(savedSettings.nextEstimateNumber || 1001);
+    const loadData = async () => {
+      // Check auth
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
 
-    // Load existing project if projectId provided
-    if (projectId) {
-      const project = storage.getProjectById(decodeURIComponent(projectId));
-      if (project) {
-        setExistingProject(project);
-        setIsEditMode(true);
+      const savedSettings = await storage.getSettings();
+      setSettings(savedSettings);
+      setNextEstimateNumber(savedSettings.nextEstimateNumber || 1001);
 
-        // Pre-fill form with project data
-        setClientFirstName(project.clientFirstName || "");
-        setClientLastName(project.clientLastName || "");
-        setClientEmail(project.clientEmail || "");
-        setClientPhone(project.clientPhone || "");
-        setClientStreet(project.clientStreet || "");
-        setClientCity(project.clientCity || "");
-        setClientState(project.clientState || "");
-        setClientPostalCode(project.clientPostalCode || "");
-        setClientCountry(project.clientCountry || "United States");
-        setQuiltWidth(project.quiltWidth?.toString() || "");
-        setQuiltLength(project.quiltLength?.toString() || "");
-        setDescription(project.description || "");
-        setRequestedDateType(project.requestedDateType || "no_date");
-        setRequestedCompletionDate(project.requestedCompletionDate || "");
-        setQuiltingType(project.quiltingType || "");
-        setThreadChoice(project.threadChoice || "");
-        setBattingChoice(project.battingChoice || "");
-        setBattingLengthAddition(project.battingLengthAddition || "4");
-        setClientSuppliesBatting(project.clientSuppliesBatting || false);
-        setBindingType(project.bindingType || "");
+      // Load existing project if projectId provided
+      if (projectId) {
+        const project = await storage.getProjectById(
+          decodeURIComponent(projectId)
+        );
+        if (project) {
+          setExistingProject(project);
+          setIsEditMode(true);
 
-        // If project already has estimate number, use it
-        if (project.estimateNumber) {
-          setNextEstimateNumber(project.estimateNumber);
+          // Pre-fill form with project data
+          setClientFirstName(project.clientFirstName || "");
+          setClientLastName(project.clientLastName || "");
+          setClientEmail(project.clientEmail || "");
+          setClientPhone(project.clientPhone || "");
+          setClientStreet(project.clientStreet || "");
+          setClientCity(project.clientCity || "");
+          setClientState(project.clientState || "");
+          setClientPostalCode(project.clientPostalCode || "");
+          setClientCountry(project.clientCountry || "United States");
+          setQuiltWidth(project.quiltWidth?.toString() || "");
+          setQuiltLength(project.quiltLength?.toString() || "");
+          setDescription(project.description || "");
+          setRequestedDateType(project.requestedDateType || "no_date");
+          setRequestedCompletionDate(project.requestedCompletionDate || "");
+          setQuiltingType(project.quiltingType || "");
+          setThreadChoice(project.threadChoice || "");
+          setBattingChoice(project.battingChoice || "");
+          setBattingLengthAddition(project.battingLengthAddition || "4");
+          setClientSuppliesBatting(project.clientSuppliesBatting || false);
+          setBindingType(project.bindingType || "");
+
+          // If project already has estimate number, use it
+          if (project.estimateNumber) {
+            setNextEstimateNumber(project.estimateNumber);
+          }
         }
       }
-    }
-  }, [projectId]);
 
-  useEffect(() => {
-    if (settings) {
-      calculateTotals();
-    }
-  }, [
-    quiltWidth,
-    quiltLength,
-    quiltingType,
-    quiltingRateManual,
-    threadChoice,
-    threadPriceManual,
-    battingChoice,
-    battingPriceManual,
-    battingLengthAddition,
-    clientSuppliesBatting,
-    bindingType,
-    bobbinCount,
-    depositType,
-    depositValue,
-    settings,
-  ]);
+      setLoading(false);
+    };
 
-  const calculateTotals = () => {
+    loadData();
+  }, [projectId, router]);
+
+  const calculateTotals = useCallback(() => {
     if (!settings) return;
 
     let quilting = 0;
@@ -179,7 +213,7 @@ function CalculatorPage() {
           settings.pricingRates?.[
             quiltingType as keyof typeof settings.pricingRates
           ] || 0;
-        quilting = area * rate;
+        quilting = area * (typeof rate === "number" ? rate : 0);
       } else if (quiltingRateManual) {
         quilting = area * (parseFloat(quiltingRateManual) || 0);
       }
@@ -235,7 +269,7 @@ function CalculatorPage() {
     let deposit = 0;
     const depVal = parseFloat(depositValue) || 0;
     if (depVal > 0) {
-      if (depositType === "percent") {
+      if (depositType === "percentage") {
         deposit = tot * (depVal / 100);
       } else {
         deposit = depVal;
@@ -253,7 +287,33 @@ function CalculatorPage() {
     setTotal(tot);
     setDepositAmount(deposit);
     setBalanceDue(balance);
-  };
+  }, [
+    settings,
+    quiltWidth,
+    quiltLength,
+    quiltingType,
+    quiltingRateManual,
+    threadChoice,
+    threadPriceManual,
+    battingChoice,
+    battingPriceManual,
+    battingLengthAddition,
+    clientSuppliesBatting,
+    bindingType,
+    bobbinCount,
+    depositType,
+    depositValue,
+    isPaidTier,
+    hasQuiltingRates,
+    hasThreadOptions,
+    hasBattingOptions,
+  ]);
+
+  useEffect(() => {
+    if (settings) {
+      calculateTotals();
+    }
+  }, [settings, calculateTotals]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -262,192 +322,210 @@ function CalculatorPage() {
     }).format(amount);
   };
 
-  const handleSaveEstimate = () => {
-    if (!quiltWidth || !quiltLength) {
-      alert("Please enter quilt dimensions");
+  const handleSaveEstimate = async () => {
+    // Validate form
+    const validationResult = validateEstimate({
+      clientFirstName,
+      clientLastName,
+      clientEmail,
+      clientPhone,
+      clientStreet,
+      clientCity,
+      clientState,
+      clientPostalCode,
+      quiltWidth,
+      quiltLength,
+      requestedDateType,
+      requestedCompletionDate,
+    });
+
+    if (!validationResult.isValid) {
+      setErrors(validationResult.errors);
+      setShowErrorToast(true);
+      scrollToFirstError(validationResult.errors);
       return;
     }
 
-    if (!clientFirstName || !clientLastName) {
-      alert("Please enter client name");
-      return;
-    }
+    // Clear any previous errors
+    setErrors([]);
 
     if (!settings) {
       alert("Settings not loaded");
       return;
     }
 
-    // Debug log - remove after testing
-    console.log(
-      "Saving with date:",
-      requestedDateType,
-      requestedCompletionDate
-    );
+    setSaving(true);
 
-    const today = new Date().toISOString().split("T")[0];
+    try {
+      const today = new Date().toISOString().split("T")[0];
 
-    // Use existing estimate number if editing, otherwise get next number
-    const estimateNumber =
-      isEditMode && existingProject?.estimateNumber
-        ? existingProject.estimateNumber
-        : settings.nextEstimateNumber || 1001;
+      // Use existing estimate number if editing, otherwise get next number
+      const estimateNumber =
+        isEditMode && existingProject?.estimateNumber
+          ? existingProject.estimateNumber
+          : settings.nextEstimateNumber || 1001;
 
-    const estimateData = {
-      quiltArea: (parseFloat(quiltWidth) || 0) * (parseFloat(quiltLength) || 0),
-      quiltingRate:
-        isPaidTier && hasQuiltingRates && quiltingType
-          ? settings.pricingRates?.[
-              quiltingType as keyof typeof settings.pricingRates
-            ] || 0
-          : parseFloat(quiltingRateManual) || 0,
-      quiltingTotal,
-      threadCost: threadTotal,
-      battingLengthNeeded:
-        (parseFloat(quiltLength) || 0) +
-        (parseFloat(battingLengthAddition) || 4),
-      battingTotal,
-      clientSuppliesBatting,
-      bindingPerimeter:
-        ((parseFloat(quiltWidth) || 0) + (parseFloat(quiltLength) || 0)) * 2,
-      bindingRatePerInch:
-        bindingType === "Top Attached Only"
-          ? settings.pricingRates?.bindingTopAttached || 0.1
-          : bindingType === "Fully Attached"
-          ? settings.pricingRates?.bindingFullyAttached || 0.2
-          : 0,
-      bindingTotal,
-      bobbinCount: parseInt(bobbinCount) || 0,
-      bobbinPrice: settings.bobbinPrice || 0,
-      bobbinTotal,
-      subtotal,
-      taxRate: settings.taxRate || 0,
-      taxAmount,
-      total,
-      depositType,
-      depositPercent:
-        depositType === "percent" ? parseFloat(depositValue) || 0 : undefined,
-      depositFlat:
-        depositType === "flat" ? parseFloat(depositValue) || 0 : undefined,
-      depositAmount,
-      balanceDue,
-      createdAt:
-        existingProject?.estimateData?.createdAt || new Date().toISOString(),
-    };
-
-    // Build the project object with ALL current form values
-    const projectData = {
-      stage: "Estimate" as const,
-      estimateNumber,
-      clientFirstName,
-      clientLastName,
-      clientEmail: clientEmail || undefined,
-      clientPhone: clientPhone || undefined,
-      clientStreet: clientStreet || undefined,
-      clientCity: clientCity || undefined,
-      clientState: clientState || undefined,
-      clientPostalCode: clientPostalCode || undefined,
-      clientCountry: clientCountry || undefined,
-      description: description || undefined,
-      cardLabel: description?.substring(0, 50) || undefined,
-      quiltWidth: parseFloat(quiltWidth) || 0,
-      quiltLength: parseFloat(quiltLength) || 0,
-      requestedDateType,
-      requestedCompletionDate:
-        requestedDateType === "specific_date"
-          ? requestedCompletionDate
-          : undefined,
-      quiltingType:
-        isPaidTier && hasQuiltingRates
-          ? quiltingType
-          : quiltingType || "Manual Entry",
-      threadChoice:
-        isPaidTier && hasThreadOptions
-          ? threadChoice
-          : threadChoice || "Manual Entry",
-      battingChoice:
-        isPaidTier && hasBattingOptions
-          ? battingChoice
-          : battingChoice || "Manual Entry",
-      battingLengthAddition,
-      clientSuppliesBatting,
-      bindingType,
-      depositType,
-      depositPercentage:
-        depositType === "percent" ? parseFloat(depositValue) || 0 : undefined,
-      depositAmount,
-      depositPaid: depositReceivedToday && depositAmount > 0,
-      depositPaidDate:
-        depositReceivedToday && depositAmount > 0 ? today : undefined,
-      depositPaidMethod:
-        depositReceivedToday && depositAmount > 0
-          ? depositPaymentMethod
-          : undefined,
-      depositPaidAmount:
-        depositReceivedToday && depositAmount > 0 ? depositAmount : undefined,
-      estimateData,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (isEditMode && existingProject) {
-      // UPDATE existing project - spread existingProject first, then override with form values
-      const updatedProject: Project = {
-        ...existingProject,
-        ...projectData,
+      const estimateData = {
+        quiltArea:
+          (parseFloat(quiltWidth) || 0) * (parseFloat(quiltLength) || 0),
+        quiltingRate:
+          isPaidTier && hasQuiltingRates && quiltingType
+            ? settings.pricingRates?.[
+                quiltingType as keyof typeof settings.pricingRates
+              ] || 0
+            : parseFloat(quiltingRateManual) || 0,
+        quiltingTotal,
+        threadCost: threadTotal,
+        battingLengthNeeded:
+          (parseFloat(quiltLength) || 0) +
+          (parseFloat(battingLengthAddition) || 4),
+        battingTotal,
+        clientSuppliesBatting,
+        bindingPerimeter:
+          ((parseFloat(quiltWidth) || 0) + (parseFloat(quiltLength) || 0)) * 2,
+        bindingRatePerInch:
+          bindingType === "Top Attached Only"
+            ? settings.pricingRates?.bindingTopAttached || 0.1
+            : bindingType === "Fully Attached"
+            ? settings.pricingRates?.bindingFullyAttached || 0.2
+            : 0,
+        bindingTotal,
+        bobbinCount: parseInt(bobbinCount) || 0,
+        bobbinPrice: settings.bobbinPrice || 0,
+        bobbinTotal,
+        subtotal,
+        taxRate: settings.taxRate || 0,
+        taxAmount,
+        total,
+        depositType,
+        depositPercent:
+          depositType === "percentage"
+            ? parseFloat(depositValue) || 0
+            : undefined,
+        depositFlat:
+          depositType === "flat" ? parseFloat(depositValue) || 0 : undefined,
+        depositAmount,
+        balanceDue,
+        createdAt:
+          existingProject?.estimateData?.createdAt || new Date().toISOString(),
       };
 
-      // Debug log
-      console.log(
-        "Updating project:",
-        updatedProject.requestedDateType,
-        updatedProject.requestedCompletionDate
-      );
+      // Build the project object with ALL current form values
+      const projectData = {
+        stage: "Estimate" as const,
+        estimateNumber,
+        clientFirstName,
+        clientLastName,
+        clientEmail: clientEmail || undefined,
+        clientPhone: clientPhone || undefined,
+        clientStreet: clientStreet || undefined,
+        clientCity: clientCity || undefined,
+        clientState: clientState || undefined,
+        clientPostalCode: clientPostalCode || undefined,
+        clientCountry: clientCountry || undefined,
+        description: description || undefined,
+        cardLabel: description?.substring(0, 50) || undefined,
+        quiltWidth: parseFloat(quiltWidth) || 0,
+        quiltLength: parseFloat(quiltLength) || 0,
+        requestedDateType,
+        requestedCompletionDate:
+          requestedDateType === "specific_date"
+            ? requestedCompletionDate
+            : undefined,
+        quiltingType:
+          isPaidTier && hasQuiltingRates
+            ? quiltingType
+            : quiltingType || "Manual Entry",
+        threadChoice:
+          isPaidTier && hasThreadOptions
+            ? threadChoice
+            : threadChoice || "Manual Entry",
+        battingChoice:
+          isPaidTier && hasBattingOptions
+            ? battingChoice
+            : battingChoice || "Manual Entry",
+        battingLengthAddition,
+        clientSuppliesBatting,
+        bindingType: bindingType || undefined,
+        depositType: depositAmount > 0 ? depositType : undefined,
+        depositPercentage:
+          depositType === "percentage" && depositAmount > 0
+            ? parseFloat(depositValue) || 0
+            : undefined,
+        depositAmount: depositAmount > 0 ? depositAmount : undefined,
+        depositPaid: depositReceivedToday && depositAmount > 0,
+        depositPaidDate:
+          depositReceivedToday && depositAmount > 0 ? today : undefined,
+        depositPaidMethod:
+          depositReceivedToday && depositAmount > 0
+            ? depositPaymentMethod
+            : undefined,
+        depositPaidAmount:
+          depositReceivedToday && depositAmount > 0 ? depositAmount : undefined,
+        estimateData,
+        updatedAt: new Date().toISOString(),
+      };
 
-      // FIX: Pass both id and updates to updateProject
-      storage.updateProject(updatedProject.id, updatedProject);
+      if (isEditMode && existingProject) {
+        // UPDATE existing project
+        await storage.updateProject(existingProject.id, projectData);
 
-      // Only increment estimate number if this project didn't already have one
-      if (!existingProject.estimateNumber) {
-        const updatedSettings = {
-          ...settings,
+        // Only increment estimate number if this project didn't already have one
+        if (!existingProject.estimateNumber) {
+          await storage.updateSettings({
+            nextEstimateNumber: estimateNumber + 1,
+          });
+        }
+
+        const depositMsg =
+          depositReceivedToday && depositAmount > 0
+            ? ` Deposit of ${formatCurrency(depositAmount)} recorded.`
+            : "";
+        setSuccessMessage(`Estimate #${estimateNumber} updated!${depositMsg}`);
+      } else {
+        // CREATE new project
+        const newProject: Project = {
+          id: crypto.randomUUID(),
+          intakeDate: today,
+          notes: [],
+          createdAt: new Date().toISOString(),
+          ...projectData,
+        } as Project;
+
+        await storage.addProject(newProject);
+
+        await storage.updateSettings({
           nextEstimateNumber: estimateNumber + 1,
-        };
-        storage.saveSettings(updatedSettings);
+        });
+
+        const depositMsg =
+          depositReceivedToday && depositAmount > 0
+            ? ` Deposit of ${formatCurrency(depositAmount)} recorded.`
+            : "";
+        setSuccessMessage(`Estimate #${estimateNumber} saved!${depositMsg}`);
       }
 
-      const depositMsg =
-        depositReceivedToday && depositAmount > 0
-          ? ` Deposit of ${formatCurrency(depositAmount)} recorded.`
-          : "";
-      alert(`Estimate #${estimateNumber} updated!${depositMsg}`);
-    } else {
-      // CREATE new project
-      const newProject: Project = {
-        id: `project-${Date.now()}`,
-        intakeDate: today,
-        notes: [],
-        attachments: [],
-        createdAt: new Date().toISOString(),
-        ...projectData,
-      };
+      setShowSuccessToast(true);
 
-      storage.addProject(newProject);
-
-      const updatedSettings = {
-        ...settings,
-        nextEstimateNumber: estimateNumber + 1,
-      };
-      storage.saveSettings(updatedSettings);
-
-      const depositMsg =
-        depositReceivedToday && depositAmount > 0
-          ? ` Deposit of ${formatCurrency(depositAmount)} recorded.`
-          : "";
-      alert(`Estimate #${estimateNumber} saved!${depositMsg}`);
+      // Navigate after brief delay to show success
+      setTimeout(() => {
+        router.push("/board");
+      }, 1500);
+    } catch (error) {
+      console.error("Error saving estimate:", error);
+      alert("Error saving estimate. Please try again.");
+    } finally {
+      setSaving(false);
     }
-
-    router.push("/board");
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted">Loading calculator...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -458,7 +536,7 @@ function CalculatorPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-plum">
-              {isEditMode ? "Create Estimate" : "New Estimate"}
+              {isEditMode ? "Edit Estimate" : "New Estimate"}
             </h1>
             <p className="text-sm text-muted mt-1">
               {isEditMode ? (
@@ -484,7 +562,7 @@ function CalculatorPage() {
         </div>
 
         {/* Tier Status */}
-        <div className="bg-white border border-line rounded-card p-4 mb-6">
+        <div className="bg-white border border-line rounded-xl p-4 mb-6">
           <div className="flex items-center justify-between">
             <div>
               <div className="font-bold text-sm">
@@ -525,118 +603,152 @@ function CalculatorPage() {
           )}
         </div>
 
+        {/* Error Summary */}
+        <FormErrorSummary errors={errors} />
+
         {/* Calculator Form */}
-        <div className="bg-white border border-line rounded-card p-6">
+        <div className="bg-white border border-line rounded-xl p-6">
           {/* Client Information Section */}
           <h2 className="text-lg font-bold text-plum mb-4">
             Client Information
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block text-sm font-bold text-muted mb-2">
-                First Name *
-              </label>
-              <input
+            <FormField
+              label="First Name"
+              error={getFieldError(errors, "First name")}
+              required
+            >
+              <ValidatedInput
                 type="text"
                 value={clientFirstName}
-                onChange={(e) => setClientFirstName(e.target.value)}
+                onChange={(e) => {
+                  setClientFirstName(e.target.value);
+                  clearFieldError("First name");
+                }}
                 placeholder="Jane"
-                className="w-full px-4 py-2 border border-line rounded-xl"
+                hasError={hasFieldError(errors, "First name")}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-muted mb-2">
-                Last Name *
-              </label>
-              <input
+            </FormField>
+            <FormField
+              label="Last Name"
+              error={getFieldError(errors, "Last name")}
+              required
+            >
+              <ValidatedInput
                 type="text"
                 value={clientLastName}
-                onChange={(e) => setClientLastName(e.target.value)}
+                onChange={(e) => {
+                  setClientLastName(e.target.value);
+                  clearFieldError("Last name");
+                }}
                 placeholder="Doe"
-                className="w-full px-4 py-2 border border-line rounded-xl"
+                hasError={hasFieldError(errors, "Last name")}
               />
-            </div>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block text-sm font-bold text-muted mb-2">
-                Email
-              </label>
-              <input
+            <FormField
+              label="Email"
+              error={getFieldError(errors, "Email")}
+              required
+            >
+              <ValidatedInput
                 type="email"
                 value={clientEmail}
-                onChange={(e) => setClientEmail(e.target.value)}
+                onChange={(e) => {
+                  setClientEmail(e.target.value);
+                  clearFieldError("Email");
+                }}
                 placeholder="jane@example.com"
-                className="w-full px-4 py-2 border border-line rounded-xl"
+                hasError={hasFieldError(errors, "Email")}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-muted mb-2">
-                Phone
-              </label>
-              <input
+            </FormField>
+            <FormField
+              label="Phone"
+              error={getFieldError(errors, "Phone")}
+              required
+            >
+              <ValidatedInput
                 type="tel"
                 value={clientPhone}
                 onChange={(e) => handlePhoneChange(e.target.value)}
                 placeholder="509-555-1234"
-                className="w-full px-4 py-2 border border-line rounded-xl"
+                hasError={hasFieldError(errors, "Phone")}
               />
-            </div>
+            </FormField>
           </div>
 
           {/* Address Fields */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-muted mb-2">
-              Street Address
-            </label>
-            <input
+          <FormField
+            label="Street Address"
+            error={getFieldError(errors, "Street address")}
+            required
+            className="mb-6"
+          >
+            <ValidatedInput
               type="text"
               value={clientStreet}
-              onChange={(e) => setClientStreet(e.target.value)}
+              onChange={(e) => {
+                setClientStreet(e.target.value);
+                clearFieldError("Street address");
+              }}
               placeholder="123 Main Street"
-              className="w-full px-4 py-2 border border-line rounded-xl"
+              hasError={hasFieldError(errors, "Street address")}
             />
-          </div>
+          </FormField>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="col-span-2 md:col-span-1">
-              <label className="block text-sm font-bold text-muted mb-2">
-                City
-              </label>
-              <input
+            <FormField
+              label="City"
+              error={getFieldError(errors, "City")}
+              required
+              className="col-span-2 md:col-span-1"
+            >
+              <ValidatedInput
                 type="text"
                 value={clientCity}
-                onChange={(e) => setClientCity(e.target.value)}
+                onChange={(e) => {
+                  setClientCity(e.target.value);
+                  clearFieldError("City");
+                }}
                 placeholder="Spokane"
-                className="w-full px-4 py-2 border border-line rounded-xl"
+                hasError={hasFieldError(errors, "City")}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-muted mb-2">
-                State/Province
-              </label>
-              <input
+            </FormField>
+            <FormField
+              label="State/Province"
+              error={getFieldError(errors, "State/Province")}
+              required
+            >
+              <ValidatedInput
                 type="text"
                 value={clientState}
-                onChange={(e) => setClientState(e.target.value)}
+                onChange={(e) => {
+                  setClientState(e.target.value);
+                  clearFieldError("State/Province");
+                }}
                 placeholder="WA"
-                className="w-full px-4 py-2 border border-line rounded-xl"
+                hasError={hasFieldError(errors, "State/Province")}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-muted mb-2">
-                Postal Code
-              </label>
-              <input
+            </FormField>
+            <FormField
+              label="Postal Code"
+              error={getFieldError(errors, "Postal code")}
+              required
+            >
+              <ValidatedInput
                 type="text"
                 value={clientPostalCode}
-                onChange={(e) => setClientPostalCode(e.target.value)}
+                onChange={(e) => {
+                  setClientPostalCode(e.target.value);
+                  clearFieldError("Postal code");
+                }}
                 placeholder="99201"
-                className="w-full px-4 py-2 border border-line rounded-xl"
+                hasError={hasFieldError(errors, "Postal code")}
               />
-            </div>
+            </FormField>
             <div>
               <label className="block text-sm font-bold text-muted mb-2">
                 Country
@@ -716,12 +828,20 @@ function CalculatorPage() {
               </button>
             </div>
             {requestedDateType === "specific_date" && (
-              <input
-                type="date"
-                value={requestedCompletionDate}
-                onChange={(e) => setRequestedCompletionDate(e.target.value)}
-                className="w-full px-4 py-2 border border-line rounded-xl"
-              />
+              <FormField
+                label=""
+                error={getFieldError(errors, "Completion date")}
+              >
+                <ValidatedInput
+                  type="date"
+                  value={requestedCompletionDate}
+                  onChange={(e) => {
+                    setRequestedCompletionDate(e.target.value);
+                    clearFieldError("Completion date");
+                  }}
+                  hasError={hasFieldError(errors, "Completion date")}
+                />
+              </FormField>
             )}
             {requestedDateType === "asap" && (
               <p className="text-xs text-red-600 mt-1">
@@ -733,24 +853,44 @@ function CalculatorPage() {
           {/* Quilt Dimensions */}
           <div className="mb-6">
             <label className="block text-sm font-bold text-muted mb-2">
-              Quilt Dimensions (inches) *
+              Quilt Dimensions (inches) <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-3">
-              <input
-                type="number"
-                placeholder="Width"
-                value={quiltWidth}
-                onChange={(e) => setQuiltWidth(e.target.value)}
-                className="flex-1 px-4 py-2 border border-line rounded-xl"
-              />
+              <div className="flex-1">
+                <ValidatedInput
+                  type="number"
+                  placeholder="Width"
+                  value={quiltWidth}
+                  onChange={(e) => {
+                    setQuiltWidth(e.target.value);
+                    clearFieldError("Quilt width");
+                  }}
+                  hasError={hasFieldError(errors, "Quilt width")}
+                />
+                {hasFieldError(errors, "Quilt width") && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {getFieldError(errors, "Quilt width")}
+                  </p>
+                )}
+              </div>
               <span className="flex items-center text-muted font-bold">×</span>
-              <input
-                type="number"
-                placeholder="Length"
-                value={quiltLength}
-                onChange={(e) => setQuiltLength(e.target.value)}
-                className="flex-1 px-4 py-2 border border-line rounded-xl"
-              />
+              <div className="flex-1">
+                <ValidatedInput
+                  type="number"
+                  placeholder="Length"
+                  value={quiltLength}
+                  onChange={(e) => {
+                    setQuiltLength(e.target.value);
+                    clearFieldError("Quilt length");
+                  }}
+                  hasError={hasFieldError(errors, "Quilt length")}
+                />
+                {hasFieldError(errors, "Quilt length") && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {getFieldError(errors, "Quilt length")}
+                  </p>
+                )}
+              </div>
             </div>
             {quiltWidth && quiltLength && (
               <div className="mt-2 text-xs text-muted">
@@ -775,32 +915,39 @@ function CalculatorPage() {
                 className="w-full px-4 py-2 border border-line rounded-xl"
               >
                 <option value="">Select quilting type...</option>
-                {settings?.pricingRates?.lightE2E > 0 && (
-                  <option value="lightE2E">
-                    Light Edge-to-Edge (${settings.pricingRates.lightE2E}/sq in)
-                  </option>
-                )}
-                {settings?.pricingRates?.standardE2E > 0 && (
-                  <option value="standardE2E">
-                    Standard Edge-to-Edge (${settings.pricingRates.standardE2E}
-                    /sq in)
-                  </option>
-                )}
-                {settings?.pricingRates?.lightCustom > 0 && (
-                  <option value="lightCustom">
-                    Light Custom (${settings.pricingRates.lightCustom}/sq in)
-                  </option>
-                )}
-                {settings?.pricingRates?.custom > 0 && (
-                  <option value="custom">
-                    Custom (${settings.pricingRates.custom}/sq in)
-                  </option>
-                )}
-                {settings?.pricingRates?.denseCustom > 0 && (
-                  <option value="denseCustom">
-                    Dense Custom (${settings.pricingRates.denseCustom}/sq in)
-                  </option>
-                )}
+                {settings?.pricingRates?.lightE2E !== undefined &&
+                  settings.pricingRates.lightE2E > 0 && (
+                    <option value="lightE2E">
+                      Light Edge-to-Edge (${settings.pricingRates.lightE2E}/sq
+                      in)
+                    </option>
+                  )}
+                {settings?.pricingRates?.standardE2E !== undefined &&
+                  settings.pricingRates.standardE2E > 0 && (
+                    <option value="standardE2E">
+                      Standard Edge-to-Edge ($
+                      {settings.pricingRates.standardE2E}
+                      /sq in)
+                    </option>
+                  )}
+                {settings?.pricingRates?.lightCustom !== undefined &&
+                  settings.pricingRates.lightCustom > 0 && (
+                    <option value="lightCustom">
+                      Light Custom (${settings.pricingRates.lightCustom}/sq in)
+                    </option>
+                  )}
+                {settings?.pricingRates?.custom !== undefined &&
+                  settings.pricingRates.custom > 0 && (
+                    <option value="custom">
+                      Custom (${settings.pricingRates.custom}/sq in)
+                    </option>
+                  )}
+                {settings?.pricingRates?.denseCustom !== undefined &&
+                  settings.pricingRates.denseCustom > 0 && (
+                    <option value="denseCustom">
+                      Dense Custom (${settings.pricingRates.denseCustom}/sq in)
+                    </option>
+                  )}
               </select>
             ) : (
               <div className="space-y-2">
@@ -991,9 +1138,9 @@ function CalculatorPage() {
             <div className="flex gap-2 mb-3">
               <button
                 type="button"
-                onClick={() => setDepositType("percent")}
+                onClick={() => setDepositType("percentage")}
                 className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                  depositType === "percent"
+                  depositType === "percentage"
                     ? "bg-gold text-white"
                     : "bg-white border border-line text-muted hover:border-gold"
                 }`}
@@ -1016,12 +1163,12 @@ function CalculatorPage() {
             <div className="flex gap-3 items-center">
               <div className="relative flex-1">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-bold">
-                  {depositType === "percent" ? "%" : "$"}
+                  {depositType === "percentage" ? "%" : "$"}
                 </span>
                 <input
                   type="text"
                   inputMode="decimal"
-                  placeholder={depositType === "percent" ? "50" : "100.00"}
+                  placeholder={depositType === "percentage" ? "50" : "100.00"}
                   value={depositValue}
                   onChange={(e) => setDepositValue(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-line rounded-xl"
@@ -1198,37 +1345,60 @@ function CalculatorPage() {
           <div className="flex gap-3 mt-6">
             <button
               onClick={handleSaveEstimate}
-              className="flex-1 px-4 py-3 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors"
+              disabled={saving}
+              className={`flex-1 px-4 py-3 bg-plum text-white rounded-xl font-bold transition-colors ${
+                saving ? "opacity-50 cursor-not-allowed" : "hover:bg-plum/90"
+              }`}
             >
-              {isEditMode
-                ? `Update Estimate #${nextEstimateNumber}`
-                : `Save Estimate #${nextEstimateNumber}`}
-            </button>
-            <button
-              onClick={() => {
-                if (
-                  !quiltWidth ||
-                  !quiltLength ||
-                  !clientFirstName ||
-                  !clientLastName
-                ) {
-                  alert("Please fill in required fields first");
-                  return;
-                }
-                alert("Preview invoice coming soon!");
-              }}
-              className="flex-1 px-4 py-3 border-2 border-gold text-gold rounded-xl font-bold hover:bg-gold hover:text-white transition-colors"
-            >
-              Preview Invoice
+              {saving ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg
+                    className="animate-spin h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Saving...
+                </span>
+              ) : isEditMode ? (
+                `Update Estimate #${nextEstimateNumber}`
+              ) : (
+                `Save Estimate #${nextEstimateNumber}`
+              )}
             </button>
           </div>
         </div>
       </main>
+
+      {/* Toast Notifications */}
+      <ValidationToast
+        show={showErrorToast}
+        message="Please fix the errors above"
+        onClose={() => setShowErrorToast(false)}
+      />
+      <SuccessToast
+        show={showSuccessToast}
+        message={successMessage}
+        onClose={() => setShowSuccessToast(false)}
+      />
     </div>
   );
 }
 
-function CalculatorPageWrapper() {
+export default function CalculatorPage() {
   return (
     <Suspense
       fallback={
@@ -1237,9 +1407,7 @@ function CalculatorPageWrapper() {
         </div>
       }
     >
-      <CalculatorPage />
+      <CalculatorContent />
     </Suspense>
   );
 }
-
-export default CalculatorPageWrapper;

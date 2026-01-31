@@ -14,12 +14,36 @@ export default function InvoicePage() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const proj = storage.getProjectById(decodeURIComponent(projectId));
-    setProject(proj || null);
-    setSettings(storage.getSettings());
-  }, [projectId]);
+    const loadData = async () => {
+      try {
+        // Check authentication first
+        const hasOrg = await storage.hasOrganization();
+        if (!hasOrg) {
+          router.push("/");
+          return;
+        }
+        setIsAuthenticated(true);
+
+        // Load project and settings
+        const [proj, savedSettings] = await Promise.all([
+          storage.getProjectById(decodeURIComponent(projectId)),
+          storage.getSettings(),
+        ]);
+        setProject(proj || null);
+        setSettings(savedSettings);
+      } catch (error) {
+        console.error("Error loading invoice data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [projectId, router]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -90,11 +114,30 @@ export default function InvoicePage() {
     window.print();
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-plum mx-auto mb-4"></div>
+          <p className="text-muted">Loading invoice...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted">Redirecting...</div>
+      </div>
+    );
+  }
+
   if (!project || !settings) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <p className="text-muted mb-4">Loading invoice...</p>
+          <p className="text-muted mb-4">Invoice not found.</p>
           <button
             onClick={() => router.back()}
             className="px-4 py-2 border border-line rounded-xl hover:bg-white"

@@ -1,12 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import { storage } from "../lib/storage";
-import { generateId, getTodayDate, generateProjectId } from "../lib/utils";
-import type { Project } from "../types";
-import { COUNTRY_OPTIONS } from "../types";
+import { generateId, getTodayDate } from "../lib/utils";
+import {
+  validateIntake,
+  getFieldError,
+  hasFieldError,
+  scrollToFirstError,
+  ValidationError,
+} from "../lib/validation";
+import {
+  FormField,
+  ValidatedInput,
+  ValidatedSelect,
+  ValidatedTextarea,
+  FormErrorSummary,
+  ValidationToast,
+  SuccessToast,
+} from "../components/FormField";
+import type { Project, Settings } from "../types";
+import { COUNTRY_OPTIONS, DEFAULT_SETTINGS } from "../types";
 
 // Phone formatting helper
 const formatPhoneNumber = (value: string): string => {
@@ -22,6 +38,17 @@ const formatPhoneNumber = (value: string): string => {
 
 export default function IntakePage() {
   const router = useRouter();
+
+  // Settings state (for thread/batting options)
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  // Validation state
+  const [errors, setErrors] = useState<ValidationError[]>([]);
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+  // Form state
   const [formData, setFormData] = useState({
     clientFirstName: "",
     clientLastName: "",
@@ -55,29 +82,109 @@ export default function IntakePage() {
 
   const [showBackingWarning, setShowBackingWarning] = useState(false);
 
+  // Load settings on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const savedSettings = await storage.getSettings();
+        setSettings(savedSettings);
+      } catch (error) {
+        console.error("Error loading settings:", error);
+      } finally {
+        setSettingsLoaded(true);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  // Check if we have thread/batting options
+  const hasThreadOptions =
+    settings.threadOptions && settings.threadOptions.length > 0;
+  const hasBattingOptions =
+    settings.battingOptions && settings.battingOptions.length > 0;
+
+  // Update form data helper
+  const updateFormData = (field: string, value: string | boolean) => {
+    setFormData({ ...formData, [field]: value });
+    // Clear field error when user types
+    clearFieldError(field);
+  };
+
+  // Clear field error helper
+  const clearFieldError = (fieldName: string) => {
+    // Map form field names to validation field names
+    const fieldMap: Record<string, string> = {
+      clientFirstName: "First name",
+      clientLastName: "Last name",
+      clientStreet: "Street address",
+      clientCity: "City",
+      clientState: "State/Province",
+      clientPostalCode: "Postal code",
+      clientCountry: "Country",
+      clientEmail: "Email",
+      clientPhone: "Phone",
+      quiltWidth: "Quilt width",
+      quiltLength: "Quilt length",
+      quiltingType: "Quilting type",
+      requestedCompletionDate: "Completion date",
+      qualityDisclaimerAccepted: "qualityDisclaimerAccepted",
+      competitionCreditAccepted: "competitionCreditAccepted",
+    };
+
+    const validationFieldName = fieldMap[fieldName] || fieldName;
+
+    if (hasFieldError(errors, validationFieldName)) {
+      setErrors(
+        errors.filter(
+          (e) => e.field.toLowerCase() !== validationFieldName.toLowerCase()
+        )
+      );
+    }
+  };
+
   const handlePhoneChange = (value: string) => {
     const formatted = formatPhoneNumber(value);
     setFormData({ ...formData, clientPhone: formatted });
+    clearFieldError("clientPhone");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate agreements
-    if (
-      !formData.qualityDisclaimerAccepted ||
-      !formData.competitionCreditAccepted
-    ) {
-      alert("Please accept all required agreements to continue.");
+    // Validate the form
+    const validationResult = validateIntake({
+      clientFirstName: formData.clientFirstName,
+      clientLastName: formData.clientLastName,
+      clientStreet: formData.clientStreet,
+      clientCity: formData.clientCity,
+      clientState: formData.clientState,
+      clientPostalCode: formData.clientPostalCode,
+      clientCountry: formData.clientCountry,
+      clientPhone: formData.clientPhone,
+      clientEmail: formData.clientEmail,
+      quiltWidth: formData.quiltWidth,
+      quiltLength: formData.quiltLength,
+      quiltingType: formData.quiltingType,
+      requestedDateType: formData.requestedDateType,
+      requestedCompletionDate: formData.requestedCompletionDate,
+      qualityDisclaimerAccepted: formData.qualityDisclaimerAccepted,
+      competitionCreditAccepted: formData.competitionCreditAccepted,
+    });
+
+    if (!validationResult.isValid) {
+      setErrors(validationResult.errors);
+      setShowErrorToast(true);
+      scrollToFirstError(validationResult.errors);
       return;
     }
 
+    // Clear any previous errors
+    setErrors([]);
+
     const intakeDate = getTodayDate();
-    const id = generateProjectId(
-      formData.clientFirstName,
-      formData.clientLastName,
-      intakeDate
-    );
+
+    // Use UUID for Supabase compatibility
+    const id = crypto.randomUUID();
 
     const newProject: Project = {
       id,
@@ -118,8 +225,13 @@ export default function IntakePage() {
       updatedAt: new Date().toISOString(),
     };
 
-    storage.addProject(newProject);
-    router.push("/");
+    await storage.addProject(newProject);
+
+    // Show success message and navigate
+    setShowSuccessToast(true);
+    setTimeout(() => {
+      router.push("/");
+    }, 1500);
   };
 
   // Check backing size warning
@@ -152,6 +264,9 @@ export default function IntakePage() {
           </button>
         </div>
 
+        {/* Error Summary */}
+        <FormErrorSummary errors={errors} />
+
         <form
           onSubmit={handleSubmit}
           className="bg-white border border-line rounded-card p-6 space-y-6"
@@ -161,339 +276,317 @@ export default function IntakePage() {
             <h3 className="font-bold text-plum mb-4">Client Information</h3>
             <div className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    First Name *
-                  </label>
-                  <input
+                <FormField
+                  label="First Name"
+                  required
+                  error={getFieldError(errors, "First name")}
+                >
+                  <ValidatedInput
                     type="text"
-                    required
                     value={formData.clientFirstName}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        clientFirstName: e.target.value,
-                      })
+                      updateFormData("clientFirstName", e.target.value)
                     }
-                    className="w-full px-4 py-2 border border-line rounded-xl"
+                    hasError={hasFieldError(errors, "First name")}
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Last Name *
-                  </label>
-                  <input
+                </FormField>
+
+                <FormField
+                  label="Last Name"
+                  required
+                  error={getFieldError(errors, "Last name")}
+                >
+                  <ValidatedInput
                     type="text"
-                    required
                     value={formData.clientLastName}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        clientLastName: e.target.value,
-                      })
+                      updateFormData("clientLastName", e.target.value)
                     }
-                    className="w-full px-4 py-2 border border-line rounded-xl"
+                    hasError={hasFieldError(errors, "Last name")}
                   />
-                </div>
+                </FormField>
               </div>
 
               {/* Address Fields */}
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Street Address *
-                </label>
-                <input
+              <FormField
+                label="Street Address"
+                required
+                error={getFieldError(errors, "Street address")}
+              >
+                <ValidatedInput
                   type="text"
-                  required
                   value={formData.clientStreet}
                   onChange={(e) =>
-                    setFormData({ ...formData, clientStreet: e.target.value })
+                    updateFormData("clientStreet", e.target.value)
                   }
                   placeholder="123 Main Street"
-                  className="w-full px-4 py-2 border border-line rounded-xl"
+                  hasError={hasFieldError(errors, "Street address")}
                 />
-              </div>
+              </FormField>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    City *
-                  </label>
-                  <input
-                    type="text"
+                  <FormField
+                    label="City"
                     required
-                    value={formData.clientCity}
-                    onChange={(e) =>
-                      setFormData({ ...formData, clientCity: e.target.value })
-                    }
-                    placeholder="Spokane"
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
+                    error={getFieldError(errors, "City")}
+                  >
+                    <ValidatedInput
+                      type="text"
+                      value={formData.clientCity}
+                      onChange={(e) =>
+                        updateFormData("clientCity", e.target.value)
+                      }
+                      placeholder="Spokane"
+                      hasError={hasFieldError(errors, "City")}
+                    />
+                  </FormField>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    State/Province *
-                  </label>
-                  <input
+
+                <FormField
+                  label="State/Province"
+                  required
+                  error={getFieldError(errors, "State/Province")}
+                >
+                  <ValidatedInput
                     type="text"
-                    required
                     value={formData.clientState}
                     onChange={(e) =>
-                      setFormData({ ...formData, clientState: e.target.value })
+                      updateFormData("clientState", e.target.value)
                     }
                     placeholder="WA"
-                    className="w-full px-4 py-2 border border-line rounded-xl"
+                    hasError={hasFieldError(errors, "State/Province")}
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Postal Code *
-                  </label>
-                  <input
+                </FormField>
+
+                <FormField
+                  label="Postal Code"
+                  required
+                  error={getFieldError(errors, "Postal code")}
+                >
+                  <ValidatedInput
                     type="text"
-                    required
                     value={formData.clientPostalCode}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        clientPostalCode: e.target.value,
-                      })
+                      updateFormData("clientPostalCode", e.target.value)
                     }
                     placeholder="99201"
-                    className="w-full px-4 py-2 border border-line rounded-xl"
+                    hasError={hasFieldError(errors, "Postal code")}
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Country *
-                  </label>
-                  <select
-                    required
+                </FormField>
+
+                <FormField
+                  label="Country"
+                  required
+                  error={getFieldError(errors, "Country")}
+                >
+                  <ValidatedSelect
                     value={formData.clientCountry}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        clientCountry: e.target.value,
-                      })
+                      updateFormData("clientCountry", e.target.value)
                     }
-                    className="w-full px-4 py-2 border border-line rounded-xl"
+                    hasError={hasFieldError(errors, "Country")}
                   >
                     {COUNTRY_OPTIONS.map((country) => (
                       <option key={country} value={country}>
                         {country}
                       </option>
                     ))}
-                  </select>
-                </div>
+                  </ValidatedSelect>
+                </FormField>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Phone *
-                  </label>
-                  <input
+                <FormField
+                  label="Phone"
+                  required
+                  error={getFieldError(errors, "Phone")}
+                >
+                  <ValidatedInput
                     type="tel"
-                    required
                     value={formData.clientPhone}
                     onChange={(e) => handlePhoneChange(e.target.value)}
                     placeholder="509-828-2945"
-                    className="w-full px-4 py-2 border border-line rounded-xl"
+                    hasError={hasFieldError(errors, "Phone")}
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Email *
-                  </label>
-                  <input
+                </FormField>
+
+                <FormField
+                  label="Email"
+                  required
+                  error={getFieldError(errors, "Email")}
+                >
+                  <ValidatedInput
                     type="email"
-                    required
                     value={formData.clientEmail}
                     onChange={(e) =>
-                      setFormData({ ...formData, clientEmail: e.target.value })
+                      updateFormData("clientEmail", e.target.value)
                     }
-                    className="w-full px-4 py-2 border border-line rounded-xl"
+                    hasError={hasFieldError(errors, "Email")}
                   />
-                </div>
+                </FormField>
               </div>
             </div>
           </div>
 
           {/* Date Options */}
           <div>
-            <label className="block text-sm font-bold text-muted mb-2">
-              Requested Completion Date *
-            </label>
-            <div className="space-y-3">
-              <label className="flex items-start gap-3 p-3 border border-line rounded-xl cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  name="dateType"
-                  value="asap"
-                  checked={formData.requestedDateType === "asap"}
-                  onChange={(e) =>
-                    setFormData({ ...formData, requestedDateType: "asap" })
-                  }
-                  className="mt-1"
-                />
-                <div>
-                  <div className="font-bold">
-                    ASAP <span className="text-due">PRIORITY</span>
+            <FormField
+              label="Requested Completion Date"
+              required
+              error={getFieldError(errors, "Completion date")}
+            >
+              <div className="space-y-3">
+                <label className="flex items-start gap-3 p-3 border border-line rounded-xl cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="dateType"
+                    value="asap"
+                    checked={formData.requestedDateType === "asap"}
+                    onChange={() => {
+                      updateFormData("requestedDateType", "asap");
+                      clearFieldError("requestedCompletionDate");
+                    }}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-bold">
+                      ASAP <span className="text-red-500">PRIORITY</span>
+                    </div>
+                    <div className="text-sm text-muted">
+                      Rush priority — I need this ASAP
+                    </div>
                   </div>
-                  <div className="text-sm text-muted">
-                    Rush priority — I need this ASAP
-                  </div>
-                </div>
-              </label>
+                </label>
 
-              <label className="flex items-start gap-3 p-3 border border-line rounded-xl cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  name="dateType"
-                  value="no_date"
-                  checked={formData.requestedDateType === "no_date"}
-                  onChange={(e) =>
-                    setFormData({ ...formData, requestedDateType: "no_date" })
-                  }
-                  className="mt-1"
-                />
-                <div>
-                  <div className="font-bold">No Set Date</div>
-                  <div className="text-sm text-muted">
-                    Quilter will assign based on their schedule
+                <label className="flex items-start gap-3 p-3 border border-line rounded-xl cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="dateType"
+                    value="no_date"
+                    checked={formData.requestedDateType === "no_date"}
+                    onChange={() => {
+                      updateFormData("requestedDateType", "no_date");
+                      clearFieldError("requestedCompletionDate");
+                    }}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-bold">No Set Date</div>
+                    <div className="text-sm text-muted">
+                      Quilter will assign based on their schedule
+                    </div>
                   </div>
-                </div>
-              </label>
+                </label>
 
-              <label className="flex items-start gap-3 p-3 border border-line rounded-xl cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  name="dateType"
-                  value="specific_date"
-                  checked={formData.requestedDateType === "specific_date"}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      requestedDateType: "specific_date",
-                    })
-                  }
-                  className="mt-1"
-                />
-                <div className="flex-1">
-                  <div className="font-bold">Select a Date</div>
-                  <div className="text-sm text-muted mb-2">
-                    I have a specific deadline in mind
+                <label className="flex items-start gap-3 p-3 border border-line rounded-xl cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="dateType"
+                    value="specific_date"
+                    checked={formData.requestedDateType === "specific_date"}
+                    onChange={() =>
+                      updateFormData("requestedDateType", "specific_date")
+                    }
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <div className="font-bold">Select a Date</div>
+                    <div className="text-sm text-muted mb-2">
+                      I have a specific deadline in mind
+                    </div>
+                    {formData.requestedDateType === "specific_date" && (
+                      <ValidatedInput
+                        type="date"
+                        value={formData.requestedCompletionDate}
+                        onChange={(e) =>
+                          updateFormData(
+                            "requestedCompletionDate",
+                            e.target.value
+                          )
+                        }
+                        hasError={hasFieldError(errors, "Completion date")}
+                      />
+                    )}
                   </div>
-                  {formData.requestedDateType === "specific_date" && (
-                    <input
-                      type="date"
-                      value={formData.requestedCompletionDate}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          requestedCompletionDate: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2 border border-line rounded-xl"
-                    />
-                  )}
-                </div>
-              </label>
-            </div>
+                </label>
+              </div>
+            </FormField>
           </div>
 
           {/* Quilt Details */}
           <div>
             <h3 className="font-bold text-plum mb-4">Quilt Details</h3>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Quilt Description
-                </label>
-                <textarea
+              <FormField label="Quilt Description">
+                <ValidatedTextarea
                   value={formData.description}
                   onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
+                    updateFormData("description", e.target.value)
                   }
                   rows={3}
-                  className="w-full px-4 py-2 border border-line rounded-xl"
                   placeholder="e.g., Queen wedding quilt, hand-pieced, double ring pattern"
                 />
-              </div>
+              </FormField>
 
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Quilt Top Size * (Width × Length in inches)
-                  </label>
+                <FormField
+                  label="Quilt Top Size (Width × Length in inches)"
+                  required
+                  error={
+                    getFieldError(errors, "Quilt width") ||
+                    getFieldError(errors, "Quilt length")
+                  }
+                >
                   <div className="flex gap-2 items-center">
-                    <input
+                    <ValidatedInput
                       type="number"
                       step="0.01"
-                      required
                       value={formData.quiltWidth}
                       onChange={(e) => {
-                        setFormData({
-                          ...formData,
-                          quiltWidth: e.target.value,
-                        });
+                        updateFormData("quiltWidth", e.target.value);
                         setTimeout(checkBackingSize, 100);
                       }}
                       placeholder="Width"
-                      className="flex-1 px-4 py-2 border border-line rounded-xl"
+                      hasError={hasFieldError(errors, "Quilt width")}
                     />
                     <span className="text-muted">×</span>
-                    <input
+                    <ValidatedInput
                       type="number"
                       step="0.01"
-                      required
                       value={formData.quiltLength}
                       onChange={(e) => {
-                        setFormData({
-                          ...formData,
-                          quiltLength: e.target.value,
-                        });
+                        updateFormData("quiltLength", e.target.value);
                         setTimeout(checkBackingSize, 100);
                       }}
                       placeholder="Length"
-                      className="flex-1 px-4 py-2 border border-line rounded-xl"
+                      hasError={hasFieldError(errors, "Quilt length")}
                     />
                   </div>
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Backing Size (Width × Length in inches)
-                  </label>
+                <FormField label="Backing Size (Width × Length in inches)">
                   <div className="flex gap-2 items-center">
-                    <input
+                    <ValidatedInput
                       type="number"
                       step="0.01"
                       value={formData.backingWidth}
                       onChange={(e) => {
-                        setFormData({
-                          ...formData,
-                          backingWidth: e.target.value,
-                        });
+                        updateFormData("backingWidth", e.target.value);
                         setTimeout(checkBackingSize, 100);
                       }}
                       placeholder="Width"
-                      className="flex-1 px-4 py-2 border border-line rounded-xl"
                     />
                     <span className="text-muted">×</span>
-                    <input
+                    <ValidatedInput
                       type="number"
                       step="0.01"
                       value={formData.backingLength}
                       onChange={(e) => {
-                        setFormData({
-                          ...formData,
-                          backingLength: e.target.value,
-                        });
+                        updateFormData("backingLength", e.target.value);
                         setTimeout(checkBackingSize, 100);
                       }}
                       placeholder="Length"
-                      className="flex-1 px-4 py-2 border border-line rounded-xl"
                     />
                   </div>
                   {showBackingWarning && (
@@ -502,38 +595,34 @@ export default function IntakePage() {
                       total per dimension)
                     </div>
                   )}
-                </div>
+                </FormField>
               </div>
 
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Seam Direction
-                </label>
-                <select
+              <FormField label="Seam Direction">
+                <ValidatedSelect
                   value={formData.seamDirection}
                   onChange={(e) =>
-                    setFormData({ ...formData, seamDirection: e.target.value })
+                    updateFormData("seamDirection", e.target.value)
                   }
-                  className="w-full px-4 py-2 border border-line rounded-xl"
                 >
                   <option value="">Select...</option>
                   <option value="horizontal">Horizontal</option>
                   <option value="vertical">Vertical</option>
                   <option value="quilter_choice">Quilter's Choice</option>
-                </select>
-              </div>
+                </ValidatedSelect>
+              </FormField>
 
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Quilting Type *
-                </label>
-                <select
-                  required
+              <FormField
+                label="Quilting Type"
+                required
+                error={getFieldError(errors, "Quilting type")}
+              >
+                <ValidatedSelect
                   value={formData.quiltingType}
                   onChange={(e) =>
-                    setFormData({ ...formData, quiltingType: e.target.value })
+                    updateFormData("quiltingType", e.target.value)
                   }
-                  className="w-full px-4 py-2 border border-line rounded-xl"
+                  hasError={hasFieldError(errors, "Quilting type")}
                 >
                   <option value="">Select...</option>
                   <option value="light_e2e">Light Edge to Edge</option>
@@ -541,8 +630,8 @@ export default function IntakePage() {
                   <option value="light_custom">Light Custom</option>
                   <option value="custom">Custom</option>
                   <option value="dense_custom">Dense Custom</option>
-                </select>
-              </div>
+                </ValidatedSelect>
+              </FormField>
             </div>
           </div>
 
@@ -550,34 +639,44 @@ export default function IntakePage() {
           <div>
             <h3 className="font-bold text-plum mb-4">Thread</h3>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Thread Choice
-                </label>
-                <input
-                  type="text"
-                  value={formData.threadChoice}
-                  onChange={(e) =>
-                    setFormData({ ...formData, threadChoice: e.target.value })
-                  }
-                  placeholder="e.g., White, Cream, Match fabric"
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Thread Notes
-                </label>
-                <textarea
+              <FormField label="Thread Choice">
+                {hasThreadOptions ? (
+                  <ValidatedSelect
+                    value={formData.threadChoice}
+                    onChange={(e) =>
+                      updateFormData("threadChoice", e.target.value)
+                    }
+                  >
+                    <option value="">Select thread...</option>
+                    {settings.threadOptions.map((thread) => (
+                      <option key={thread.name} value={thread.name}>
+                        {thread.name}
+                      </option>
+                    ))}
+                    <option value="other">Other (see notes)</option>
+                  </ValidatedSelect>
+                ) : (
+                  <ValidatedInput
+                    type="text"
+                    value={formData.threadChoice}
+                    onChange={(e) =>
+                      updateFormData("threadChoice", e.target.value)
+                    }
+                    placeholder="e.g., White, Cream, Match fabric"
+                  />
+                )}
+              </FormField>
+
+              <FormField label="Thread Notes">
+                <ValidatedTextarea
                   value={formData.threadNotes}
                   onChange={(e) =>
-                    setFormData({ ...formData, threadNotes: e.target.value })
+                    updateFormData("threadNotes", e.target.value)
                   }
                   rows={2}
                   placeholder="Any special thread requirements or preferences"
-                  className="w-full px-4 py-2 border border-line rounded-xl"
                 />
-              </div>
+              </FormField>
             </div>
           </div>
 
@@ -585,20 +684,36 @@ export default function IntakePage() {
           <div>
             <h3 className="font-bold text-plum mb-4">Batting</h3>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Batting Choice
-                </label>
-                <input
-                  type="text"
-                  value={formData.battingChoice}
-                  onChange={(e) =>
-                    setFormData({ ...formData, battingChoice: e.target.value })
-                  }
-                  placeholder="e.g., Cotton, Polyester, Wool, Blend"
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
-              </div>
+              <FormField label="Batting Choice">
+                {hasBattingOptions ? (
+                  <ValidatedSelect
+                    value={formData.battingChoice}
+                    onChange={(e) =>
+                      updateFormData("battingChoice", e.target.value)
+                    }
+                  >
+                    <option value="">Select batting...</option>
+                    {settings.battingOptions.map((batting) => (
+                      <option
+                        key={`${batting.name}-${batting.widthInches}`}
+                        value={batting.name}
+                      >
+                        {batting.name} ({batting.widthInches}" wide)
+                      </option>
+                    ))}
+                    <option value="other">Other (see notes)</option>
+                  </ValidatedSelect>
+                ) : (
+                  <ValidatedInput
+                    type="text"
+                    value={formData.battingChoice}
+                    onChange={(e) =>
+                      updateFormData("battingChoice", e.target.value)
+                    }
+                    placeholder="e.g., Cotton, Polyester, Wool, Blend"
+                  />
+                )}
+              </FormField>
 
               <div>
                 <label className="flex items-center gap-3 p-3 border border-line rounded-xl cursor-pointer hover:bg-gray-50">
@@ -606,10 +721,7 @@ export default function IntakePage() {
                     type="checkbox"
                     checked={formData.clientSuppliesBatting}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        clientSuppliesBatting: e.target.checked,
-                      })
+                      updateFormData("clientSuppliesBatting", e.target.checked)
                     }
                   />
                   <div>
@@ -628,36 +740,27 @@ export default function IntakePage() {
           {/* Binding */}
           <div>
             <h3 className="font-bold text-plum mb-4">Binding</h3>
-            <div>
-              <label className="block text-sm font-bold text-muted mb-2">
-                Binding Type
-              </label>
-              <select
+            <FormField label="Binding Type">
+              <ValidatedSelect
                 value={formData.bindingType}
-                onChange={(e) =>
-                  setFormData({ ...formData, bindingType: e.target.value })
-                }
-                className="w-full px-4 py-2 border border-line rounded-xl"
+                onChange={(e) => updateFormData("bindingType", e.target.value)}
               >
                 <option value="">Select...</option>
                 <option value="no_binding">No Binding</option>
                 <option value="top_attached">Top Attached Only</option>
                 <option value="fully_attached">Fully Attached</option>
-              </select>
-            </div>
+              </ValidatedSelect>
+            </FormField>
           </div>
 
           {/* Notes */}
           <div>
             <h3 className="font-bold text-plum mb-4">Notes</h3>
-            <textarea
+            <ValidatedTextarea
               value={formData.notes}
-              onChange={(e) =>
-                setFormData({ ...formData, notes: e.target.value })
-              }
+              onChange={(e) => updateFormData("notes", e.target.value)}
               rows={3}
               placeholder="Any special instructions, concerns, or additional information"
-              className="w-full px-4 py-2 border border-line rounded-xl"
             />
           </div>
 
@@ -671,10 +774,7 @@ export default function IntakePage() {
                     type="checkbox"
                     checked={formData.photoReleaseGranted}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        photoReleaseGranted: e.target.checked,
-                      })
+                      updateFormData("photoReleaseGranted", e.target.checked)
                     }
                     className="mt-1"
                   />
@@ -695,10 +795,10 @@ export default function IntakePage() {
                       type="checkbox"
                       checked={formData.photoReleaseKeepPrivate}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          photoReleaseKeepPrivate: e.target.checked,
-                        })
+                        updateFormData(
+                          "photoReleaseKeepPrivate",
+                          e.target.checked
+                        )
                       }
                       className="mt-1"
                     />
@@ -710,50 +810,95 @@ export default function IntakePage() {
                 )}
               </div>
 
-              <label className="flex items-start gap-3 p-4 border border-line rounded-xl cursor-pointer hover:bg-gray-50">
+              <label
+                className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer hover:bg-gray-50 ${
+                  hasFieldError(errors, "qualityDisclaimerAccepted")
+                    ? "border-red-300 bg-red-50"
+                    : "border-line"
+                }`}
+              >
                 <input
                   type="checkbox"
-                  required
                   checked={formData.qualityDisclaimerAccepted}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      qualityDisclaimerAccepted: e.target.checked,
-                    })
-                  }
-                  className="mt-1"
-                />
-                <div>
-                  <div className="font-bold text-sm">Quality Disclaimer *</div>
-                  <div className="text-xs text-muted mt-1">
-                    I understand that quilting may reveal imperfections in
-                    piecing, fabric choices, or construction that were not
-                    visible before quilting
-                  </div>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 p-4 border border-line rounded-xl cursor-pointer hover:bg-gray-50">
-                <input
-                  type="checkbox"
-                  required
-                  checked={formData.competitionCreditAccepted}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      competitionCreditAccepted: e.target.checked,
-                    })
+                    updateFormData(
+                      "qualityDisclaimerAccepted",
+                      e.target.checked
+                    )
                   }
                   className="mt-1"
                 />
                 <div>
                   <div className="font-bold text-sm">
-                    Show & Competition Credit *
+                    Quality Disclaimer <span className="text-red-500">*</span>
+                  </div>
+                  <div className="text-xs text-muted mt-1">
+                    I understand that quilting may reveal imperfections in
+                    piecing, fabric choices, or construction that were not
+                    visible before quilting
+                  </div>
+                  {hasFieldError(errors, "qualityDisclaimerAccepted") && (
+                    <div className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <svg
+                        className="w-3 h-3 flex-shrink-0"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      {getFieldError(errors, "qualityDisclaimerAccepted")}
+                    </div>
+                  )}
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer hover:bg-gray-50 ${
+                  hasFieldError(errors, "competitionCreditAccepted")
+                    ? "border-red-300 bg-red-50"
+                    : "border-line"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={formData.competitionCreditAccepted}
+                  onChange={(e) =>
+                    updateFormData(
+                      "competitionCreditAccepted",
+                      e.target.checked
+                    )
+                  }
+                  className="mt-1"
+                />
+                <div>
+                  <div className="font-bold text-sm">
+                    Show & Competition Credit{" "}
+                    <span className="text-red-500">*</span>
                   </div>
                   <div className="text-xs text-muted mt-1">
                     I agree to give credit to the quilter if entering this quilt
                     in shows or competitions
                   </div>
+                  {hasFieldError(errors, "competitionCreditAccepted") && (
+                    <div className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <svg
+                        className="w-3 h-3 flex-shrink-0"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      {getFieldError(errors, "competitionCreditAccepted")}
+                    </div>
+                  )}
                 </div>
               </label>
             </div>
@@ -777,6 +922,18 @@ export default function IntakePage() {
           </div>
         </form>
       </main>
+
+      {/* Toast Notifications */}
+      <ValidationToast
+        show={showErrorToast}
+        message="Please fix the errors above"
+        onClose={() => setShowErrorToast(false)}
+      />
+      <SuccessToast
+        show={showSuccessToast}
+        message="Project saved successfully!"
+        onClose={() => setShowSuccessToast(false)}
+      />
     </div>
   );
 }

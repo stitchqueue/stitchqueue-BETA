@@ -39,6 +39,8 @@ export interface Project {
   requestedDateType: RequestedDateType;
   requestedCompletionDate?: string;
   dueDate?: string;
+  // Order index for manual sorting within a stage
+  orderIndex?: number;
   clientFirstName: string;
   clientLastName: string;
   clientEmail?: string;
