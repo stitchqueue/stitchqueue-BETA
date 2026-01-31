@@ -5,6 +5,19 @@ import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import { storage } from "../lib/storage";
 import type { Settings, ThreadOption, BattingOption } from "../types";
+import { COUNTRY_OPTIONS } from "../types";
+
+// Phone formatting helper
+const formatPhoneNumber = (value: string): string => {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length <= 3) {
+    return digits;
+  } else if (digits.length <= 6) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  } else {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  }
+};
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -12,7 +25,6 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<
     "business" | "pricing" | "thread" | "batting" | "data"
   >("business");
-
   // Thread state
   const [newThreadName, setNewThreadName] = useState("");
   const [newThreadPrice, setNewThreadPrice] = useState("");
@@ -22,13 +34,63 @@ export default function SettingsPage() {
   const [newBattingWidth, setNewBattingWidth] = useState("");
   const [newBattingPrice, setNewBattingPrice] = useState("");
 
+  // Pricing rate string states (to allow typing decimals)
+  const [rateStrings, setRateStrings] = useState({
+    lightE2E: "",
+    standardE2E: "",
+    lightCustom: "",
+    custom: "",
+    denseCustom: "",
+    bindingTopAttached: "",
+    bindingFullyAttached: "",
+    bobbinPrice: "",
+  });
+
   useEffect(() => {
-    setSettings(storage.getSettings());
+    const s = storage.getSettings();
+    setSettings(s);
+    setRateStrings({
+      lightE2E: s.pricingRates?.lightE2E?.toString() || "",
+      standardE2E: s.pricingRates?.standardE2E?.toString() || "",
+      lightCustom: s.pricingRates?.lightCustom?.toString() || "",
+      custom: s.pricingRates?.custom?.toString() || "",
+      denseCustom: s.pricingRates?.denseCustom?.toString() || "",
+      bindingTopAttached: s.pricingRates?.bindingTopAttached?.toString() || "",
+      bindingFullyAttached:
+        s.pricingRates?.bindingFullyAttached?.toString() || "",
+      bobbinPrice: s.bobbinPrice?.toString() || "",
+    });
   }, []);
 
-  const handleSaveSettings = () => {
-    storage.saveSettings(settings);
-    alert("Settings saved!");
+  const handleRateChange = (field: keyof typeof rateStrings, value: string) => {
+    setRateStrings((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleRateBlur = (field: keyof typeof rateStrings) => {
+    const value = parseFloat(rateStrings[field]) || 0;
+
+    if (field === "bobbinPrice") {
+      const updated = { ...settings, bobbinPrice: value };
+      setSettings(updated);
+      storage.saveSettings(updated);
+    } else {
+      const updated = {
+        ...settings,
+        pricingRates: {
+          ...settings.pricingRates,
+          [field]: value,
+        },
+      };
+      setSettings(updated);
+      storage.saveSettings(updated);
+    }
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const formatted = formatPhoneNumber(value);
+    const updated = { ...settings, phone: formatted };
+    setSettings(updated);
+    storage.saveSettings(updated);
   };
 
   const handleAddThread = () => {
@@ -141,6 +203,11 @@ export default function SettingsPage() {
       "Client Last Name",
       "Email",
       "Phone",
+      "Street",
+      "City",
+      "State",
+      "Postal Code",
+      "Country",
       "Intake Date",
       "Due Date",
       "Description",
@@ -157,6 +224,11 @@ export default function SettingsPage() {
       p.clientLastName,
       p.clientEmail || "",
       p.clientPhone || "",
+      p.clientStreet || "",
+      p.clientCity || "",
+      p.clientState || "",
+      p.clientPostalCode || "",
+      p.clientCountry || "",
       p.intakeDate,
       p.dueDate || "",
       p.description || "",
@@ -208,10 +280,10 @@ export default function SettingsPage() {
     }
 
     const reader = new FileReader();
-    reader.onload = (event: any) => {
+    reader.onload = (event: ProgressEvent<FileReader>) => {
       const updated = {
         ...settings,
-        logoUrl: event.target.result,
+        logoUrl: event.target?.result as string,
       };
       setSettings(updated);
       storage.saveSettings(updated);
@@ -230,7 +302,6 @@ export default function SettingsPage() {
       <Header />
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-plum">Settings</h1>
@@ -246,7 +317,6 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        {/* Tier Badge */}
         <div className="bg-white border border-line rounded-card p-4 mb-6">
           <div className="flex items-center justify-between">
             <div>
@@ -279,7 +349,7 @@ export default function SettingsPage() {
               <div className="font-bold mb-2">PAID Tier Features ($19/mo):</div>
               <ul className="space-y-1 ml-4 list-disc">
                 <li>Save pricing rates (auto-populate calculator)</li>
-                <li>Save thread & batting options</li>
+                <li>Save thread and batting options</li>
                 <li>Email estimates/invoices</li>
                 <li>Branded client intake form</li>
                 <li>Multi-user access (up to 5 users)</li>
@@ -289,7 +359,6 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 mb-6 border-b border-line overflow-x-auto">
           <button
             onClick={() => setActiveTab("business")}
@@ -343,369 +412,422 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        {/* Business Info Tab */}
         {activeTab === "business" && (
           <div className="bg-white border border-line rounded-card p-6 space-y-6">
-            <div>
-              <h2 className="text-lg font-bold text-plum mb-4">
-                Business Information
-              </h2>
+            <h2 className="text-lg font-bold text-plum mb-4">
+              Business Information
+            </h2>
 
-              <div className="space-y-4">
-                {/* Business Name */}
-                <div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-muted mb-2">
+                  Business Name
+                </label>
+                <input
+                  type="text"
+                  value={settings.businessName || ""}
+                  onChange={(e) => {
+                    const updated = {
+                      ...settings,
+                      businessName: e.target.value,
+                    };
+                    setSettings(updated);
+                    storage.saveSettings(updated);
+                  }}
+                  placeholder="Stitched By Susan"
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+              </div>
+
+              {/* Address Fields */}
+              <div>
+                <label className="block text-sm font-bold text-muted mb-2">
+                  Street Address
+                </label>
+                <input
+                  type="text"
+                  value={settings.street || ""}
+                  onChange={(e) => {
+                    const updated = { ...settings, street: e.target.value };
+                    setSettings(updated);
+                    storage.saveSettings(updated);
+                  }}
+                  placeholder="123 Main Street"
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="col-span-2 md:col-span-1">
                   <label className="block text-sm font-bold text-muted mb-2">
-                    Business Name
+                    City
                   </label>
                   <input
                     type="text"
-                    value={settings.businessName || ""}
+                    value={settings.city || ""}
+                    onChange={(e) => {
+                      const updated = { ...settings, city: e.target.value };
+                      setSettings(updated);
+                      storage.saveSettings(updated);
+                    }}
+                    placeholder="Spokane"
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    State/Province
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.state || ""}
+                    onChange={(e) => {
+                      const updated = { ...settings, state: e.target.value };
+                      setSettings(updated);
+                      storage.saveSettings(updated);
+                    }}
+                    placeholder="WA"
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Postal Code
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.postalCode || ""}
                     onChange={(e) => {
                       const updated = {
                         ...settings,
-                        businessName: e.target.value,
+                        postalCode: e.target.value,
                       };
                       setSettings(updated);
                       storage.saveSettings(updated);
                     }}
-                    placeholder="Stitched By Susan"
+                    placeholder="99201"
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
                 </div>
-
-                {/* Address */}
                 <div>
                   <label className="block text-sm font-bold text-muted mb-2">
-                    Address
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.address || ""}
-                    onChange={(e) => {
-                      const updated = { ...settings, address: e.target.value };
-                      setSettings(updated);
-                      storage.saveSettings(updated);
-                    }}
-                    placeholder="123 Main St, City, State 12345"
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
-                </div>
-
-                {/* Email & Phone */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-bold text-muted mb-2">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={settings.email || ""}
-                      onChange={(e) => {
-                        const updated = { ...settings, email: e.target.value };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
-                      placeholder="susan@stitchedbysusan.com"
-                      className="w-full px-4 py-2 border border-line rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-muted mb-2">
-                      Phone
-                    </label>
-                    <input
-                      type="tel"
-                      value={settings.phone || ""}
-                      onChange={(e) => {
-                        const updated = { ...settings, phone: e.target.value };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
-                      placeholder="(555) 123-4567"
-                      className="w-full px-4 py-2 border border-line rounded-xl"
-                    />
-                  </div>
-                </div>
-
-                {/* Website */}
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Website
-                  </label>
-                  <input
-                    type="url"
-                    value={settings.website || ""}
-                    onChange={(e) => {
-                      const updated = { ...settings, website: e.target.value };
-                      setSettings(updated);
-                      storage.saveSettings(updated);
-                    }}
-                    placeholder="https://stitchedbysusan.com"
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
-                </div>
-
-                {/* Logo Upload */}
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Business Logo
-                  </label>
-                  {settings.logoUrl ? (
-                    <div className="flex items-center gap-4">
-                      <img
-                        src={settings.logoUrl}
-                        alt="Business logo"
-                        className="h-20 w-20 object-contain border border-line rounded-xl p-2"
-                      />
-                      <button
-                        onClick={handleRemoveLogo}
-                        className="px-4 py-2 border border-line rounded-xl hover:bg-background transition-colors text-sm"
-                      >
-                        Remove Logo
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleLogoUpload}
-                        className="w-full px-4 py-2 border border-line rounded-xl"
-                      />
-                      <p className="text-xs text-muted mt-2">
-                        Max file size: 500KB. Recommended: Square image, PNG
-                        with transparency.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Brand Colors */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-bold text-muted mb-2">
-                      Primary Brand Color
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        value={settings.brandPrimaryColor || "#4e283a"}
-                        onChange={(e) => {
-                          const updated = {
-                            ...settings,
-                            brandPrimaryColor: e.target.value,
-                          };
-                          setSettings(updated);
-                          storage.saveSettings(updated);
-                        }}
-                        className="h-10 w-20 border border-line rounded-xl cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={settings.brandPrimaryColor || "#4e283a"}
-                        onChange={(e) => {
-                          const updated = {
-                            ...settings,
-                            brandPrimaryColor: e.target.value,
-                          };
-                          setSettings(updated);
-                          storage.saveSettings(updated);
-                        }}
-                        placeholder="#4e283a"
-                        className="flex-1 px-4 py-2 border border-line rounded-xl font-mono text-sm"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-muted mb-2">
-                      Secondary Brand Color
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        value={settings.brandSecondaryColor || "#98823a"}
-                        onChange={(e) => {
-                          const updated = {
-                            ...settings,
-                            brandSecondaryColor: e.target.value,
-                          };
-                          setSettings(updated);
-                          storage.saveSettings(updated);
-                        }}
-                        className="h-10 w-20 border border-line rounded-xl cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={settings.brandSecondaryColor || "#98823a"}
-                        onChange={(e) => {
-                          const updated = {
-                            ...settings,
-                            brandSecondaryColor: e.target.value,
-                          };
-                          setSettings(updated);
-                          storage.saveSettings(updated);
-                        }}
-                        placeholder="#98823a"
-                        className="flex-1 px-4 py-2 border border-line rounded-xl font-mono text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Measurement System */}
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Measurement System
-                  </label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        checked={settings.measurementSystem === "imperial"}
-                        onChange={() => {
-                          const updated = {
-                            ...settings,
-                            measurementSystem: "imperial" as const,
-                          };
-                          setSettings(updated);
-                          storage.saveSettings(updated);
-                        }}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm">Imperial (inches)</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        checked={settings.measurementSystem === "metric"}
-                        onChange={() => {
-                          const updated = {
-                            ...settings,
-                            measurementSystem: "metric" as const,
-                          };
-                          setSettings(updated);
-                          storage.saveSettings(updated);
-                        }}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm">Metric (centimeters)</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Currency */}
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Currency
+                    Country
                   </label>
                   <select
-                    value={settings.currencyCode || "USD"}
+                    value={settings.country || "United States"}
                     onChange={(e) => {
-                      const updated = {
-                        ...settings,
-                        currencyCode: e.target.value,
-                      };
+                      const updated = { ...settings, country: e.target.value };
                       setSettings(updated);
                       storage.saveSettings(updated);
                     }}
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   >
-                    <option value="USD">USD - US Dollar ($)</option>
-                    <option value="CAD">CAD - Canadian Dollar ($)</option>
-                    <option value="GBP">GBP - British Pound (£)</option>
-                    <option value="EUR">EUR - Euro (€)</option>
-                    <option value="AUD">AUD - Australian Dollar ($)</option>
+                    {COUNTRY_OPTIONS.map((country) => (
+                      <option key={country} value={country}>
+                        {country}
+                      </option>
+                    ))}
                   </select>
                 </div>
+              </div>
 
-                {/* Tax */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={settings.email || ""}
+                    onChange={(e) => {
+                      const updated = { ...settings, email: e.target.value };
+                      setSettings(updated);
+                      storage.saveSettings(updated);
+                    }}
+                    placeholder="susan@stitchedbysusan.com"
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={settings.phone || ""}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    placeholder="509-828-2945"
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-muted mb-2">
+                  Website
+                </label>
+                <input
+                  type="url"
+                  value={settings.website || ""}
+                  onChange={(e) => {
+                    const updated = { ...settings, website: e.target.value };
+                    setSettings(updated);
+                    storage.saveSettings(updated);
+                  }}
+                  placeholder="https://stitchedbysusan.com"
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-muted mb-2">
+                  Business Logo
+                </label>
+                {settings.logoUrl ? (
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={settings.logoUrl}
+                      alt="Business logo"
+                      className="h-20 w-20 object-contain border border-line rounded-xl p-2"
+                    />
+                    <button
+                      onClick={handleRemoveLogo}
+                      className="px-4 py-2 border border-line rounded-xl hover:bg-background transition-colors text-sm"
+                    >
+                      Remove Logo
+                    </button>
+                  </div>
+                ) : (
                   <div>
-                    <label className="block text-sm font-bold text-muted mb-2">
-                      Tax Rate (%)
-                    </label>
                     <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      value={settings.taxRate || 0}
-                      onChange={(e) => {
-                        const updated = {
-                          ...settings,
-                          taxRate: parseFloat(e.target.value) || 0,
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
-                      placeholder="8.5"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
                       className="w-full px-4 py-2 border border-line rounded-xl"
                     />
+                    <p className="text-xs text-muted mt-2">
+                      Max file size: 500KB. Recommended: Square image, PNG with
+                      transparency.
+                    </p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-muted mb-2">
-                      Tax Label
-                    </label>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Primary Brand Color
+                  </label>
+                  <div className="flex gap-2">
                     <input
-                      type="text"
-                      value={settings.taxLabel || "Sales Tax"}
+                      type="color"
+                      value={settings.brandPrimaryColor || "#4e283a"}
                       onChange={(e) => {
                         const updated = {
                           ...settings,
-                          taxLabel: e.target.value,
+                          brandPrimaryColor: e.target.value,
                         };
                         setSettings(updated);
                         storage.saveSettings(updated);
                       }}
-                      placeholder="Sales Tax"
-                      className="w-full px-4 py-2 border border-line rounded-xl"
+                      className="h-10 w-20 border border-line rounded-xl cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={settings.brandPrimaryColor || "#4e283a"}
+                      onChange={(e) => {
+                        const updated = {
+                          ...settings,
+                          brandPrimaryColor: e.target.value,
+                        };
+                        setSettings(updated);
+                        storage.saveSettings(updated);
+                      }}
+                      placeholder="#4e283a"
+                      className="flex-1 px-4 py-2 border border-line rounded-xl font-mono text-sm"
                     />
                   </div>
                 </div>
-
-                {/* ESTIMATE NUMBERING - NEW */}
-                <div className="border-t border-line pt-6 mt-6">
-                  <h3 className="text-md font-bold text-plum mb-4">
-                    Estimate Numbering
-                  </h3>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-muted">
-                      Next Estimate Number
-                    </label>
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Secondary Brand Color
+                  </label>
+                  <div className="flex gap-2">
                     <input
-                      type="number"
-                      min="1"
-                      value={settings.nextEstimateNumber || 1001}
+                      type="color"
+                      value={settings.brandSecondaryColor || "#98823a"}
                       onChange={(e) => {
                         const updated = {
                           ...settings,
-                          nextEstimateNumber: parseInt(e.target.value) || 1001,
+                          brandSecondaryColor: e.target.value,
                         };
                         setSettings(updated);
                         storage.saveSettings(updated);
                       }}
-                      className="w-full px-4 py-2 border border-line rounded-xl"
+                      className="h-10 w-20 border border-line rounded-xl cursor-pointer"
                     />
-                    <p className="text-xs text-muted">
-                      The next estimate you create will use this number. Change
-                      this to match your accounting system.
-                    </p>
+                    <input
+                      type="text"
+                      value={settings.brandSecondaryColor || "#98823a"}
+                      onChange={(e) => {
+                        const updated = {
+                          ...settings,
+                          brandSecondaryColor: e.target.value,
+                        };
+                        setSettings(updated);
+                        storage.saveSettings(updated);
+                      }}
+                      placeholder="#98823a"
+                      className="flex-1 px-4 py-2 border border-line rounded-xl font-mono text-sm"
+                    />
                   </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-muted mb-2">
+                  Measurement System
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={settings.measurementSystem === "imperial"}
+                      onChange={() => {
+                        const updated = {
+                          ...settings,
+                          measurementSystem: "imperial" as const,
+                        };
+                        setSettings(updated);
+                        storage.saveSettings(updated);
+                      }}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">Imperial (inches)</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={settings.measurementSystem === "metric"}
+                      onChange={() => {
+                        const updated = {
+                          ...settings,
+                          measurementSystem: "metric" as const,
+                        };
+                        setSettings(updated);
+                        storage.saveSettings(updated);
+                      }}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">Metric (centimeters)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-muted mb-2">
+                  Currency
+                </label>
+                <select
+                  value={settings.currencyCode || "USD"}
+                  onChange={(e) => {
+                    const updated = {
+                      ...settings,
+                      currencyCode: e.target.value,
+                    };
+                    setSettings(updated);
+                    storage.saveSettings(updated);
+                  }}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                >
+                  <option value="USD">USD - US Dollar ($)</option>
+                  <option value="CAD">CAD - Canadian Dollar ($)</option>
+                  <option value="GBP">GBP - British Pound (£)</option>
+                  <option value="EUR">EUR - Euro (€)</option>
+                  <option value="AUD">AUD - Australian Dollar ($)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Tax Rate (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={settings.taxRate || 0}
+                    onChange={(e) => {
+                      const updated = {
+                        ...settings,
+                        taxRate: parseFloat(e.target.value) || 0,
+                      };
+                      setSettings(updated);
+                      storage.saveSettings(updated);
+                    }}
+                    placeholder="8.5"
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Tax Label
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.taxLabel || "Sales Tax"}
+                    onChange={(e) => {
+                      const updated = { ...settings, taxLabel: e.target.value };
+                      setSettings(updated);
+                      storage.saveSettings(updated);
+                    }}
+                    placeholder="Sales Tax"
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-line pt-6 mt-6">
+                <h3 className="text-md font-bold text-plum mb-4">
+                  Estimate Numbering
+                </h3>
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-muted">
+                    Next Estimate Number
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={settings.nextEstimateNumber || 1001}
+                    onChange={(e) => {
+                      const updated = {
+                        ...settings,
+                        nextEstimateNumber: parseInt(e.target.value) || 1001,
+                      };
+                      setSettings(updated);
+                      storage.saveSettings(updated);
+                    }}
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                  <p className="text-xs text-muted">
+                    The next estimate you create will use this number. Change
+                    this to match your accounting system.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Pricing Rates Tab */}
         {activeTab === "pricing" && (
           <div className="bg-white border border-line rounded-card p-6">
             <div className="mb-4">
               <h2 className="text-lg font-bold text-plum">Quilting Rates</h2>
               <p className="text-sm text-muted mt-1">
                 {settings.isPaidTier
-                  ? "Set your pricing rates (per square inch)"
+                  ? "Set your pricing rates (per square inch) - values save when you click out of field"
                   : "Available in PAID tier"}
               </p>
             </div>
@@ -729,27 +851,20 @@ export default function SettingsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Quilting Rates */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-bold text-muted mb-2">
                       Light Edge-to-Edge ($/sq in)
                     </label>
                     <input
-                      type="number"
-                      step="0.0001"
-                      value={settings.pricingRates?.lightE2E || ""}
-                      onChange={(e) => {
-                        const updated = {
-                          ...settings,
-                          pricingRates: {
-                            ...settings.pricingRates,
-                            lightE2E: parseFloat(e.target.value) || 0,
-                          },
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      type="text"
+                      inputMode="decimal"
+                      value={rateStrings.lightE2E}
+                      onChange={(e) =>
+                        handleRateChange("lightE2E", e.target.value)
+                      }
+                      onBlur={() => handleRateBlur("lightE2E")}
+                      placeholder="0.015"
                       className="w-full px-4 py-2 border border-line rounded-xl"
                     />
                   </div>
@@ -758,20 +873,14 @@ export default function SettingsPage() {
                       Standard Edge-to-Edge ($/sq in)
                     </label>
                     <input
-                      type="number"
-                      step="0.0001"
-                      value={settings.pricingRates?.standardE2E || ""}
-                      onChange={(e) => {
-                        const updated = {
-                          ...settings,
-                          pricingRates: {
-                            ...settings.pricingRates,
-                            standardE2E: parseFloat(e.target.value) || 0,
-                          },
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      type="text"
+                      inputMode="decimal"
+                      value={rateStrings.standardE2E}
+                      onChange={(e) =>
+                        handleRateChange("standardE2E", e.target.value)
+                      }
+                      onBlur={() => handleRateBlur("standardE2E")}
+                      placeholder="0.02"
                       className="w-full px-4 py-2 border border-line rounded-xl"
                     />
                   </div>
@@ -780,20 +889,14 @@ export default function SettingsPage() {
                       Light Custom ($/sq in)
                     </label>
                     <input
-                      type="number"
-                      step="0.0001"
-                      value={settings.pricingRates?.lightCustom || ""}
-                      onChange={(e) => {
-                        const updated = {
-                          ...settings,
-                          pricingRates: {
-                            ...settings.pricingRates,
-                            lightCustom: parseFloat(e.target.value) || 0,
-                          },
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      type="text"
+                      inputMode="decimal"
+                      value={rateStrings.lightCustom}
+                      onChange={(e) =>
+                        handleRateChange("lightCustom", e.target.value)
+                      }
+                      onBlur={() => handleRateBlur("lightCustom")}
+                      placeholder="0.025"
                       className="w-full px-4 py-2 border border-line rounded-xl"
                     />
                   </div>
@@ -802,20 +905,14 @@ export default function SettingsPage() {
                       Custom ($/sq in)
                     </label>
                     <input
-                      type="number"
-                      step="0.0001"
-                      value={settings.pricingRates?.custom || ""}
-                      onChange={(e) => {
-                        const updated = {
-                          ...settings,
-                          pricingRates: {
-                            ...settings.pricingRates,
-                            custom: parseFloat(e.target.value) || 0,
-                          },
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      type="text"
+                      inputMode="decimal"
+                      value={rateStrings.custom}
+                      onChange={(e) =>
+                        handleRateChange("custom", e.target.value)
+                      }
+                      onBlur={() => handleRateBlur("custom")}
+                      placeholder="0.03"
                       className="w-full px-4 py-2 border border-line rounded-xl"
                     />
                   </div>
@@ -824,26 +921,19 @@ export default function SettingsPage() {
                       Dense Custom ($/sq in)
                     </label>
                     <input
-                      type="number"
-                      step="0.0001"
-                      value={settings.pricingRates?.denseCustom || ""}
-                      onChange={(e) => {
-                        const updated = {
-                          ...settings,
-                          pricingRates: {
-                            ...settings.pricingRates,
-                            denseCustom: parseFloat(e.target.value) || 0,
-                          },
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      type="text"
+                      inputMode="decimal"
+                      value={rateStrings.denseCustom}
+                      onChange={(e) =>
+                        handleRateChange("denseCustom", e.target.value)
+                      }
+                      onBlur={() => handleRateBlur("denseCustom")}
+                      placeholder="0.04"
                       className="w-full px-4 py-2 border border-line rounded-xl"
                     />
                   </div>
                 </div>
 
-                {/* Binding Rates */}
                 <div className="border-t border-line pt-6 mt-6">
                   <h3 className="text-md font-bold text-plum mb-4">
                     Binding Rates (per inch)
@@ -854,21 +944,13 @@ export default function SettingsPage() {
                         Top Attached Only ($/in)
                       </label>
                       <input
-                        type="number"
-                        step="0.01"
-                        value={settings.pricingRates?.bindingTopAttached || ""}
-                        onChange={(e) => {
-                          const updated = {
-                            ...settings,
-                            pricingRates: {
-                              ...settings.pricingRates,
-                              bindingTopAttached:
-                                parseFloat(e.target.value) || 0,
-                            },
-                          };
-                          setSettings(updated);
-                          storage.saveSettings(updated);
-                        }}
+                        type="text"
+                        inputMode="decimal"
+                        value={rateStrings.bindingTopAttached}
+                        onChange={(e) =>
+                          handleRateChange("bindingTopAttached", e.target.value)
+                        }
+                        onBlur={() => handleRateBlur("bindingTopAttached")}
                         placeholder="0.10"
                         className="w-full px-4 py-2 border border-line rounded-xl"
                       />
@@ -878,23 +960,16 @@ export default function SettingsPage() {
                         Fully Attached ($/in)
                       </label>
                       <input
-                        type="number"
-                        step="0.01"
-                        value={
-                          settings.pricingRates?.bindingFullyAttached || ""
+                        type="text"
+                        inputMode="decimal"
+                        value={rateStrings.bindingFullyAttached}
+                        onChange={(e) =>
+                          handleRateChange(
+                            "bindingFullyAttached",
+                            e.target.value
+                          )
                         }
-                        onChange={(e) => {
-                          const updated = {
-                            ...settings,
-                            pricingRates: {
-                              ...settings.pricingRates,
-                              bindingFullyAttached:
-                                parseFloat(e.target.value) || 0,
-                            },
-                          };
-                          setSettings(updated);
-                          storage.saveSettings(updated);
-                        }}
+                        onBlur={() => handleRateBlur("bindingFullyAttached")}
                         placeholder="0.20"
                         className="w-full px-4 py-2 border border-line rounded-xl"
                       />
@@ -902,7 +977,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Bobbin Price */}
                 <div className="border-t border-line pt-6 mt-6">
                   <h3 className="text-md font-bold text-plum mb-4">
                     Other Pricing
@@ -912,17 +986,13 @@ export default function SettingsPage() {
                       Bobbin Price ($)
                     </label>
                     <input
-                      type="number"
-                      step="0.01"
-                      value={settings.bobbinPrice || ""}
-                      onChange={(e) => {
-                        const updated = {
-                          ...settings,
-                          bobbinPrice: parseFloat(e.target.value) || 0,
-                        };
-                        setSettings(updated);
-                        storage.saveSettings(updated);
-                      }}
+                      type="text"
+                      inputMode="decimal"
+                      value={rateStrings.bobbinPrice}
+                      onChange={(e) =>
+                        handleRateChange("bobbinPrice", e.target.value)
+                      }
+                      onBlur={() => handleRateBlur("bobbinPrice")}
                       placeholder="2.50"
                       className="w-full px-4 py-2 border border-line rounded-xl"
                     />
@@ -933,7 +1003,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Thread Options Tab */}
         {activeTab === "thread" && (
           <div className="bg-white border border-line rounded-card p-6">
             <div className="mb-4">
@@ -963,7 +1032,6 @@ export default function SettingsPage() {
               </div>
             ) : (
               <>
-                {/* Add Thread */}
                 <div className="mb-6 p-4 bg-background rounded-xl">
                   <h3 className="text-sm font-bold text-plum mb-3">
                     Add Thread Option
@@ -977,8 +1045,8 @@ export default function SettingsPage() {
                       className="flex-1 px-4 py-2 border border-line rounded-xl"
                     />
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="Price"
                       value={newThreadPrice}
                       onChange={(e) => setNewThreadPrice(e.target.value)}
@@ -993,7 +1061,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Thread List */}
                 <div className="space-y-2">
                   {settings.threadOptions.length === 0 ? (
                     <p className="text-sm text-muted text-center py-8">
@@ -1043,7 +1110,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Batting Options Tab */}
         {activeTab === "batting" && (
           <div className="bg-white border border-line rounded-card p-6">
             <div className="mb-4">
@@ -1073,7 +1139,6 @@ export default function SettingsPage() {
               </div>
             ) : (
               <>
-                {/* Add Batting */}
                 <div className="mb-6 p-4 bg-background rounded-xl">
                   <h3 className="text-sm font-bold text-plum mb-3">
                     Add Batting Option
@@ -1087,16 +1152,16 @@ export default function SettingsPage() {
                       className="flex-1 px-4 py-2 border border-line rounded-xl"
                     />
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="Width (in)"
                       value={newBattingWidth}
                       onChange={(e) => setNewBattingWidth(e.target.value)}
                       className="w-32 px-4 py-2 border border-line rounded-xl"
                     />
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="$/inch"
                       value={newBattingPrice}
                       onChange={(e) => setNewBattingPrice(e.target.value)}
@@ -1111,7 +1176,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Batting List */}
                 <div className="space-y-2">
                   {settings.battingOptions.length === 0 ? (
                     <p className="text-sm text-muted text-center py-8">
@@ -1171,7 +1235,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Data Management Tab */}
         {activeTab === "data" && (
           <div className="bg-white border border-line rounded-card p-6">
             <h2 className="text-lg font-bold text-plum mb-4">
@@ -1179,7 +1242,6 @@ export default function SettingsPage() {
             </h2>
 
             <div className="space-y-6">
-              {/* Export CSV */}
               <div className="p-4 border border-line rounded-xl">
                 <h3 className="font-bold text-sm mb-2">Export Data</h3>
                 <p className="text-xs text-muted mb-4">
@@ -1194,7 +1256,6 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              {/* Clear All Data */}
               <div className="p-4 border border-red-300 rounded-xl bg-red-50">
                 <h3 className="font-bold text-sm text-red-600 mb-2">
                   Danger Zone

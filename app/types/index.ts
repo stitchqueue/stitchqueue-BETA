@@ -19,6 +19,18 @@ export const STAGES: Stage[] = [
   "Archived",
 ];
 
+// Country options for dropdown
+export const COUNTRY_OPTIONS = [
+  "United States",
+  "Canada",
+  "United Kingdom",
+  "Australia",
+  "Mexico",
+  "Ecuador",
+] as const;
+
+export type Country = (typeof COUNTRY_OPTIONS)[number] | string;
+
 export interface Project {
   id: string;
   stage: Stage;
@@ -31,6 +43,13 @@ export interface Project {
   clientLastName: string;
   clientEmail?: string;
   clientPhone?: string;
+  // Address fields (separate)
+  clientStreet?: string;
+  clientCity?: string;
+  clientState?: string;
+  clientPostalCode?: string;
+  clientCountry?: string;
+  // Legacy single address field (for backwards compatibility)
   clientAddress?: string;
   description?: string;
   cardLabel?: string;
@@ -45,8 +64,40 @@ export interface Project {
   battingLengthAddition?: string;
   clientSuppliesBatting?: boolean;
   bindingType?: string;
-  notes: Note[];
-  attachments: Attachment[];
+  // Deposit fields
+  depositType?: "percentage" | "flat";
+  depositPercentage?: number;
+  depositAmount?: number;
+  depositPaid?: boolean;
+  depositPaidDate?: string;
+  depositPaidMethod?: string;
+  depositPaidAmount?: number;
+  // Estimate data
+  estimateData?: {
+    quiltingType: string;
+    quiltingRate: number;
+    squareInches: number;
+    quiltingCost: number;
+    threadName: string;
+    threadCost: number;
+    battingName: string;
+    battingLength: number;
+    battingCost: number;
+    bindingType: string;
+    bindingPerimeter: number;
+    bindingRate: number;
+    bindingCost: number;
+    bobbinCount: number;
+    bobbinPrice: number;
+    bobbinCost: number;
+    subtotal: number;
+    taxRate: number;
+    taxAmount: number;
+    total: number;
+    clientSuppliesBatting?: boolean;
+  };
+  notes?: Note[];
+  attachments?: Attachment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -91,6 +142,13 @@ export interface PricingRates {
 export interface Settings {
   // Business Info
   businessName?: string;
+  // Address fields (separate)
+  street?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  // Legacy single address field (for backwards compatibility)
   address?: string;
   phone?: string;
   email?: string;
@@ -133,4 +191,5 @@ export const DEFAULT_SETTINGS: Settings = {
   isPaidTier: false,
   brandPrimaryColor: "#4e283a",
   brandSecondaryColor: "#98823a",
+  country: "United States",
 };

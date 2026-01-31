@@ -1,26 +1,54 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import { storage } from "../lib/storage";
-import type { Settings } from "../types";
+import type { Settings, Project } from "../types";
 
 function CalculatorPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get("projectId");
+
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [isPaidTier, setIsPaidTier] = useState(false);
+  const [nextEstimateNumber, setNextEstimateNumber] = useState<number>(1001);
+  const [existingProject, setExistingProject] = useState<Project | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Form state
+  const [clientFirstName, setClientFirstName] = useState("");
+  const [clientLastName, setClientLastName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [clientStreet, setClientStreet] = useState("");
+  const [clientCity, setClientCity] = useState("");
+  const [clientState, setClientState] = useState("");
+  const [clientPostalCode, setClientPostalCode] = useState("");
+  const [clientCountry, setClientCountry] = useState("United States");
   const [quiltWidth, setQuiltWidth] = useState("");
   const [quiltLength, setQuiltLength] = useState("");
+  const [description, setDescription] = useState("");
+  const [requestedDateType, setRequestedDateType] = useState<
+    "asap" | "no_date" | "specific_date"
+  >("no_date");
+  const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
   const [quiltingType, setQuiltingType] = useState("");
+  const [quiltingRateManual, setQuiltingRateManual] = useState("");
   const [threadChoice, setThreadChoice] = useState("");
+  const [threadPriceManual, setThreadPriceManual] = useState("");
   const [battingChoice, setBattingChoice] = useState("");
+  const [battingPriceManual, setBattingPriceManual] = useState("");
   const [battingLengthAddition, setBattingLengthAddition] = useState("4");
   const [clientSuppliesBatting, setClientSuppliesBatting] = useState(false);
   const [bindingType, setBindingType] = useState("");
   const [bobbinCount, setBobbinCount] = useState("1");
+
+  // Deposit state
+  const [depositType, setDepositType] = useState<"percent" | "flat">("percent");
+  const [depositValue, setDepositValue] = useState("");
+  const [depositReceivedToday, setDepositReceivedToday] = useState(false);
+  const [depositPaymentMethod, setDepositPaymentMethod] = useState("Cash");
 
   // Calculated values
   const [quiltingTotal, setQuiltingTotal] = useState(0);
@@ -31,12 +59,83 @@ function CalculatorPage() {
   const [subtotal, setSubtotal] = useState(0);
   const [taxAmount, setTaxAmount] = useState(0);
   const [total, setTotal] = useState(0);
+  const [depositAmount, setDepositAmount] = useState(0);
+  const [balanceDue, setBalanceDue] = useState(0);
+
+  const isPaidTier = settings?.isPaidTier || false;
+  const hasQuiltingRates =
+    settings?.pricingRates &&
+    (settings.pricingRates.lightE2E > 0 ||
+      settings.pricingRates.standardE2E > 0 ||
+      settings.pricingRates.lightCustom > 0 ||
+      settings.pricingRates.custom > 0 ||
+      settings.pricingRates.denseCustom > 0);
+  const hasThreadOptions =
+    settings?.threadOptions && settings.threadOptions.length > 0;
+  const hasBattingOptions =
+    settings?.battingOptions && settings.battingOptions.length > 0;
+
+  // Phone formatting helper
+  const formatPhoneNumber = (value: string): string => {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length <= 3) {
+      return digits;
+    } else if (digits.length <= 6) {
+      return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    } else {
+      return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(
+        6,
+        10
+      )}`;
+    }
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const formatted = formatPhoneNumber(value);
+    setClientPhone(formatted);
+  };
 
   useEffect(() => {
     const savedSettings = storage.getSettings();
     setSettings(savedSettings);
-    setIsPaidTier(savedSettings.isPaidTier || false);
-  }, []);
+    setNextEstimateNumber(savedSettings.nextEstimateNumber || 1001);
+
+    // Load existing project if projectId provided
+    if (projectId) {
+      const project = storage.getProjectById(decodeURIComponent(projectId));
+      if (project) {
+        setExistingProject(project);
+        setIsEditMode(true);
+
+        // Pre-fill form with project data
+        setClientFirstName(project.clientFirstName || "");
+        setClientLastName(project.clientLastName || "");
+        setClientEmail(project.clientEmail || "");
+        setClientPhone(project.clientPhone || "");
+        setClientStreet(project.clientStreet || "");
+        setClientCity(project.clientCity || "");
+        setClientState(project.clientState || "");
+        setClientPostalCode(project.clientPostalCode || "");
+        setClientCountry(project.clientCountry || "United States");
+        setQuiltWidth(project.quiltWidth?.toString() || "");
+        setQuiltLength(project.quiltLength?.toString() || "");
+        setDescription(project.description || "");
+        setRequestedDateType(project.requestedDateType || "no_date");
+        setRequestedCompletionDate(project.requestedCompletionDate || "");
+        setQuiltingType(project.quiltingType || "");
+        setThreadChoice(project.threadChoice || "");
+        setBattingChoice(project.battingChoice || "");
+        setBattingLengthAddition(project.battingLengthAddition || "4");
+        setClientSuppliesBatting(project.clientSuppliesBatting || false);
+        setBindingType(project.bindingType || "");
+
+        // If project already has estimate number, use it
+        if (project.estimateNumber) {
+          setNextEstimateNumber(project.estimateNumber);
+        }
+      }
+    }
+  }, [projectId]);
 
   useEffect(() => {
     if (settings) {
@@ -46,12 +145,17 @@ function CalculatorPage() {
     quiltWidth,
     quiltLength,
     quiltingType,
+    quiltingRateManual,
     threadChoice,
+    threadPriceManual,
     battingChoice,
+    battingPriceManual,
     battingLengthAddition,
     clientSuppliesBatting,
     bindingType,
     bobbinCount,
+    depositType,
+    depositValue,
     settings,
   ]);
 
@@ -64,41 +168,51 @@ function CalculatorPage() {
     let binding = 0;
     let bobbin = 0;
 
-    // Quilting calculation
     const w = parseFloat(quiltWidth) || 0;
     const h = parseFloat(quiltLength) || 0;
     const area = w * h;
 
-    if (quiltingType && area > 0) {
-      const rate =
-        settings.pricingRates?.[
-          quiltingType as keyof typeof settings.pricingRates
-        ] || 0;
-      quilting = area * rate;
+    // Quilting calculation
+    if (area > 0) {
+      if (isPaidTier && hasQuiltingRates && quiltingType) {
+        const rate =
+          settings.pricingRates?.[
+            quiltingType as keyof typeof settings.pricingRates
+          ] || 0;
+        quilting = area * rate;
+      } else if (quiltingRateManual) {
+        quilting = area * (parseFloat(quiltingRateManual) || 0);
+      }
     }
 
     // Thread calculation
-    if (threadChoice) {
+    if (isPaidTier && hasThreadOptions && threadChoice) {
       const threadOption = settings.threadOptions?.find(
         (t) => t.name === threadChoice
       );
       thread = threadOption?.price || 0;
+    } else if (threadPriceManual) {
+      thread = parseFloat(threadPriceManual) || 0;
     }
 
     // Batting calculation
-    if (battingChoice && !clientSuppliesBatting) {
-      const battingOption = settings.battingOptions?.find(
-        (b) => b.name === battingChoice
-      );
-      const battingWidth = battingOption?.widthInches || 0;
-      const battingPricePerInch = battingOption?.pricePerInch || 0;
+    if (!clientSuppliesBatting && h > 0) {
       const additionInches = parseFloat(battingLengthAddition) || 4;
       const battingLengthNeeded = h + additionInches;
-      batting = battingLengthNeeded * battingPricePerInch;
+
+      if (isPaidTier && hasBattingOptions && battingChoice) {
+        const battingOption = settings.battingOptions?.find(
+          (b) => b.name === battingChoice
+        );
+        const battingPricePerInch = battingOption?.pricePerInch || 0;
+        batting = battingLengthNeeded * battingPricePerInch;
+      } else if (battingPriceManual) {
+        batting = battingLengthNeeded * (parseFloat(battingPriceManual) || 0);
+      }
     }
 
     // Binding calculation (per-inch)
-    if (bindingType && w > 0 && h > 0) {
+    if (bindingType && bindingType !== "No Binding" && w > 0 && h > 0) {
       const perimeter = (w + h) * 2;
       if (bindingType === "Top Attached Only") {
         binding =
@@ -117,6 +231,18 @@ function CalculatorPage() {
     const tax = sub * ((settings.taxRate || 0) / 100);
     const tot = sub + tax;
 
+    // Deposit calculation
+    let deposit = 0;
+    const depVal = parseFloat(depositValue) || 0;
+    if (depVal > 0) {
+      if (depositType === "percent") {
+        deposit = tot * (depVal / 100);
+      } else {
+        deposit = depVal;
+      }
+    }
+    const balance = tot - deposit;
+
     setQuiltingTotal(quilting);
     setThreadTotal(thread);
     setBattingTotal(batting);
@@ -125,21 +251,25 @@ function CalculatorPage() {
     setSubtotal(sub);
     setTaxAmount(tax);
     setTotal(tot);
+    setDepositAmount(deposit);
+    setBalanceDue(balance);
   };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: settings?.currencyCode || "USD",
     }).format(amount);
   };
 
-  // NEW - Save estimate with estimate number
   const handleSaveEstimate = () => {
-    console.log("handleSaveEstimate called!");
-
     if (!quiltWidth || !quiltLength) {
       alert("Please enter quilt dimensions");
+      return;
+    }
+
+    if (!clientFirstName || !clientLastName) {
+      alert("Please enter client name");
       return;
     }
 
@@ -148,41 +278,174 @@ function CalculatorPage() {
       return;
     }
 
-    // Get current estimate number and increment it
-    const currentEstimateNumber = settings.nextEstimateNumber || 1001;
+    // Debug log - remove after testing
+    console.log(
+      "Saving with date:",
+      requestedDateType,
+      requestedCompletionDate
+    );
 
-    const newProject = {
-      id: `project-${Date.now()}`,
+    const today = new Date().toISOString().split("T")[0];
+
+    // Use existing estimate number if editing, otherwise get next number
+    const estimateNumber =
+      isEditMode && existingProject?.estimateNumber
+        ? existingProject.estimateNumber
+        : settings.nextEstimateNumber || 1001;
+
+    const estimateData = {
+      quiltArea: (parseFloat(quiltWidth) || 0) * (parseFloat(quiltLength) || 0),
+      quiltingRate:
+        isPaidTier && hasQuiltingRates && quiltingType
+          ? settings.pricingRates?.[
+              quiltingType as keyof typeof settings.pricingRates
+            ] || 0
+          : parseFloat(quiltingRateManual) || 0,
+      quiltingTotal,
+      threadCost: threadTotal,
+      battingLengthNeeded:
+        (parseFloat(quiltLength) || 0) +
+        (parseFloat(battingLengthAddition) || 4),
+      battingTotal,
+      clientSuppliesBatting,
+      bindingPerimeter:
+        ((parseFloat(quiltWidth) || 0) + (parseFloat(quiltLength) || 0)) * 2,
+      bindingRatePerInch:
+        bindingType === "Top Attached Only"
+          ? settings.pricingRates?.bindingTopAttached || 0.1
+          : bindingType === "Fully Attached"
+          ? settings.pricingRates?.bindingFullyAttached || 0.2
+          : 0,
+      bindingTotal,
+      bobbinCount: parseInt(bobbinCount) || 0,
+      bobbinPrice: settings.bobbinPrice || 0,
+      bobbinTotal,
+      subtotal,
+      taxRate: settings.taxRate || 0,
+      taxAmount,
+      total,
+      depositType,
+      depositPercent:
+        depositType === "percent" ? parseFloat(depositValue) || 0 : undefined,
+      depositFlat:
+        depositType === "flat" ? parseFloat(depositValue) || 0 : undefined,
+      depositAmount,
+      balanceDue,
+      createdAt:
+        existingProject?.estimateData?.createdAt || new Date().toISOString(),
+    };
+
+    // Build the project object with ALL current form values
+    const projectData = {
       stage: "Estimate" as const,
-      intakeDate: new Date().toISOString().split("T")[0],
-      estimateNumber: currentEstimateNumber,
-      requestedDateType: "no_date" as const,
-      clientFirstName: "Client",
-      clientLastName: "Name",
+      estimateNumber,
+      clientFirstName,
+      clientLastName,
+      clientEmail: clientEmail || undefined,
+      clientPhone: clientPhone || undefined,
+      clientStreet: clientStreet || undefined,
+      clientCity: clientCity || undefined,
+      clientState: clientState || undefined,
+      clientPostalCode: clientPostalCode || undefined,
+      clientCountry: clientCountry || undefined,
+      description: description || undefined,
+      cardLabel: description?.substring(0, 50) || undefined,
       quiltWidth: parseFloat(quiltWidth) || 0,
       quiltLength: parseFloat(quiltLength) || 0,
-      quiltingType,
-      threadChoice,
-      battingChoice,
+      requestedDateType,
+      requestedCompletionDate:
+        requestedDateType === "specific_date"
+          ? requestedCompletionDate
+          : undefined,
+      quiltingType:
+        isPaidTier && hasQuiltingRates
+          ? quiltingType
+          : quiltingType || "Manual Entry",
+      threadChoice:
+        isPaidTier && hasThreadOptions
+          ? threadChoice
+          : threadChoice || "Manual Entry",
+      battingChoice:
+        isPaidTier && hasBattingOptions
+          ? battingChoice
+          : battingChoice || "Manual Entry",
       battingLengthAddition,
       clientSuppliesBatting,
       bindingType,
-      notes: [],
-      attachments: [],
-      createdAt: new Date().toISOString(),
+      depositType,
+      depositPercentage:
+        depositType === "percent" ? parseFloat(depositValue) || 0 : undefined,
+      depositAmount,
+      depositPaid: depositReceivedToday && depositAmount > 0,
+      depositPaidDate:
+        depositReceivedToday && depositAmount > 0 ? today : undefined,
+      depositPaidMethod:
+        depositReceivedToday && depositAmount > 0
+          ? depositPaymentMethod
+          : undefined,
+      depositPaidAmount:
+        depositReceivedToday && depositAmount > 0 ? depositAmount : undefined,
+      estimateData,
       updatedAt: new Date().toISOString(),
     };
 
-    storage.addProject(newProject);
+    if (isEditMode && existingProject) {
+      // UPDATE existing project - spread existingProject first, then override with form values
+      const updatedProject: Project = {
+        ...existingProject,
+        ...projectData,
+      };
 
-    // Increment estimate number in settings
-    const updatedSettings = {
-      ...settings,
-      nextEstimateNumber: currentEstimateNumber + 1,
-    };
-    storage.saveSettings(updatedSettings);
+      // Debug log
+      console.log(
+        "Updating project:",
+        updatedProject.requestedDateType,
+        updatedProject.requestedCompletionDate
+      );
 
-    alert(`Estimate #${currentEstimateNumber} saved!`);
+      // FIX: Pass both id and updates to updateProject
+      storage.updateProject(updatedProject.id, updatedProject);
+
+      // Only increment estimate number if this project didn't already have one
+      if (!existingProject.estimateNumber) {
+        const updatedSettings = {
+          ...settings,
+          nextEstimateNumber: estimateNumber + 1,
+        };
+        storage.saveSettings(updatedSettings);
+      }
+
+      const depositMsg =
+        depositReceivedToday && depositAmount > 0
+          ? ` Deposit of ${formatCurrency(depositAmount)} recorded.`
+          : "";
+      alert(`Estimate #${estimateNumber} updated!${depositMsg}`);
+    } else {
+      // CREATE new project
+      const newProject: Project = {
+        id: `project-${Date.now()}`,
+        intakeDate: today,
+        notes: [],
+        attachments: [],
+        createdAt: new Date().toISOString(),
+        ...projectData,
+      };
+
+      storage.addProject(newProject);
+
+      const updatedSettings = {
+        ...settings,
+        nextEstimateNumber: estimateNumber + 1,
+      };
+      storage.saveSettings(updatedSettings);
+
+      const depositMsg =
+        depositReceivedToday && depositAmount > 0
+          ? ` Deposit of ${formatCurrency(depositAmount)} recorded.`
+          : "";
+      alert(`Estimate #${estimateNumber} saved!${depositMsg}`);
+    }
+
     router.push("/board");
   };
 
@@ -194,45 +457,69 @@ function CalculatorPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-plum">Pricing Calculator</h1>
+            <h1 className="text-2xl font-bold text-plum">
+              {isEditMode ? "Create Estimate" : "New Estimate"}
+            </h1>
             <p className="text-sm text-muted mt-1">
-              Create estimate for new project
+              {isEditMode ? (
+                <>
+                  Editing:{" "}
+                  <span className="font-bold">
+                    {existingProject?.clientFirstName}{" "}
+                    {existingProject?.clientLastName}
+                  </span>
+                  {" • "}
+                </>
+              ) : null}
+              Estimate{" "}
+              <span className="font-bold text-gold">#{nextEstimateNumber}</span>
             </p>
           </div>
           <button
-            onClick={() => router.push("/")}
+            onClick={() => router.back()}
             className="px-4 py-2 border border-line rounded-xl hover:bg-white transition-colors"
           >
             Back
           </button>
         </div>
 
-        {/* Tier Toggle */}
+        {/* Tier Status */}
         <div className="bg-white border border-line rounded-card p-4 mb-6">
           <div className="flex items-center justify-between">
             <div>
               <div className="font-bold text-sm">
-                Tier: {isPaidTier ? "PAID" : "FREE"}
+                Tier: {isPaidTier ? "PRO" : "FREE"}
               </div>
               <div className="text-xs text-muted mt-1">
                 {isPaidTier
-                  ? "Settings auto-populate"
-                  : "Manual entry required"}
+                  ? hasQuiltingRates
+                    ? "Using saved rates from Settings"
+                    : "Set up rates in Settings to auto-populate"
+                  : "Manual entry mode"}
               </div>
             </div>
             <button
-              onClick={() => setIsPaidTier(!isPaidTier)}
+              onClick={() => router.push("/settings")}
               className="px-4 py-2 bg-plum text-white rounded-xl text-sm font-bold"
             >
-              Toggle Tier
+              {isPaidTier ? "Edit Settings" : "Upgrade in Settings"}
             </button>
           </div>
           {!isPaidTier && (
             <div className="mt-3 p-3 bg-gold/10 rounded-xl text-xs">
-              <div className="font-bold mb-1">FREE Tier Note:</div>
+              <div className="font-bold mb-1">FREE Tier Mode:</div>
               <div>
-                You'll manually enter pricing for each estimate. Upgrade to PAID
-                to save rates and auto-populate.
+                You'll manually enter pricing for each estimate. Go to Settings
+                and enable PRO tier to save rates and auto-populate.
+              </div>
+            </div>
+          )}
+          {isPaidTier && !hasQuiltingRates && (
+            <div className="mt-3 p-3 bg-gold/10 rounded-xl text-xs">
+              <div className="font-bold mb-1">Setup Needed:</div>
+              <div>
+                Go to Settings → Pricing Rates to set up your quilting rates.
+                Until then, you can enter rates manually below.
               </div>
             </div>
           )}
@@ -240,12 +527,213 @@ function CalculatorPage() {
 
         {/* Calculator Form */}
         <div className="bg-white border border-line rounded-card p-6">
-          <h2 className="text-lg font-bold text-plum mb-4">Project Details</h2>
+          {/* Client Information Section */}
+          <h2 className="text-lg font-bold text-plum mb-4">
+            Client Information
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-bold text-muted mb-2">
+                First Name *
+              </label>
+              <input
+                type="text"
+                value={clientFirstName}
+                onChange={(e) => setClientFirstName(e.target.value)}
+                placeholder="Jane"
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-muted mb-2">
+                Last Name *
+              </label>
+              <input
+                type="text"
+                value={clientLastName}
+                onChange={(e) => setClientLastName(e.target.value)}
+                placeholder="Doe"
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-bold text-muted mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+                placeholder="jane@example.com"
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-muted mb-2">
+                Phone
+              </label>
+              <input
+                type="tel"
+                value={clientPhone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                placeholder="509-555-1234"
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
+          </div>
+
+          {/* Address Fields */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-muted mb-2">
+              Street Address
+            </label>
+            <input
+              type="text"
+              value={clientStreet}
+              onChange={(e) => setClientStreet(e.target.value)}
+              placeholder="123 Main Street"
+              className="w-full px-4 py-2 border border-line rounded-xl"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="col-span-2 md:col-span-1">
+              <label className="block text-sm font-bold text-muted mb-2">
+                City
+              </label>
+              <input
+                type="text"
+                value={clientCity}
+                onChange={(e) => setClientCity(e.target.value)}
+                placeholder="Spokane"
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-muted mb-2">
+                State/Province
+              </label>
+              <input
+                type="text"
+                value={clientState}
+                onChange={(e) => setClientState(e.target.value)}
+                placeholder="WA"
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-muted mb-2">
+                Postal Code
+              </label>
+              <input
+                type="text"
+                value={clientPostalCode}
+                onChange={(e) => setClientPostalCode(e.target.value)}
+                placeholder="99201"
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-muted mb-2">
+                Country
+              </label>
+              <select
+                value={clientCountry}
+                onChange={(e) => setClientCountry(e.target.value)}
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              >
+                <option value="United States">United States</option>
+                <option value="Canada">Canada</option>
+                <option value="United Kingdom">United Kingdom</option>
+                <option value="Australia">Australia</option>
+                <option value="Mexico">Mexico</option>
+                <option value="Ecuador">Ecuador</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Project Details Section */}
+          <h2 className="text-lg font-bold text-plum mb-4 pt-4 border-t border-line">
+            Project Details
+          </h2>
+
+          {/* Description */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-muted mb-2">
+              Quilt Description
+            </label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g., Queen wedding quilt, double ring pattern"
+              className="w-full px-4 py-2 border border-line rounded-xl"
+            />
+          </div>
+
+          {/* Requested Completion Date */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-muted mb-2">
+              Requested Completion Date
+            </label>
+            <div className="flex gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setRequestedDateType("asap")}
+                className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                  requestedDateType === "asap"
+                    ? "bg-red-500 text-white"
+                    : "bg-white border border-line text-muted hover:border-red-300"
+                }`}
+              >
+                ASAP
+              </button>
+              <button
+                type="button"
+                onClick={() => setRequestedDateType("no_date")}
+                className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                  requestedDateType === "no_date"
+                    ? "bg-gold text-white"
+                    : "bg-white border border-line text-muted hover:border-gold"
+                }`}
+              >
+                No Set Date
+              </button>
+              <button
+                type="button"
+                onClick={() => setRequestedDateType("specific_date")}
+                className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                  requestedDateType === "specific_date"
+                    ? "bg-plum text-white"
+                    : "bg-white border border-line text-muted hover:border-plum"
+                }`}
+              >
+                Select Date
+              </button>
+            </div>
+            {requestedDateType === "specific_date" && (
+              <input
+                type="date"
+                value={requestedCompletionDate}
+                onChange={(e) => setRequestedCompletionDate(e.target.value)}
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            )}
+            {requestedDateType === "asap" && (
+              <p className="text-xs text-red-600 mt-1">
+                This project will be marked as high priority
+              </p>
+            )}
+          </div>
 
           {/* Quilt Dimensions */}
           <div className="mb-6">
             <label className="block text-sm font-bold text-muted mb-2">
-              Quilt Dimensions (inches)
+              Quilt Dimensions (inches) *
             </label>
             <div className="flex gap-3">
               <input
@@ -267,7 +755,9 @@ function CalculatorPage() {
             {quiltWidth && quiltLength && (
               <div className="mt-2 text-xs text-muted">
                 Area:{" "}
-                {(parseFloat(quiltWidth) * parseFloat(quiltLength)).toFixed(0)}{" "}
+                {(
+                  parseFloat(quiltWidth) * parseFloat(quiltLength)
+                ).toLocaleString()}{" "}
                 sq in
               </div>
             )}
@@ -278,39 +768,58 @@ function CalculatorPage() {
             <label className="block text-sm font-bold text-muted mb-2">
               Quilting Type
             </label>
-            {isPaidTier && settings?.pricingRates ? (
+            {isPaidTier && hasQuiltingRates ? (
               <select
                 value={quiltingType}
                 onChange={(e) => setQuiltingType(e.target.value)}
                 className="w-full px-4 py-2 border border-line rounded-xl"
               >
                 <option value="">Select quilting type...</option>
-                <option value="lightE2E">
-                  Light Edge-to-Edge (${settings.pricingRates.lightE2E || 0}/sq
-                  in)
-                </option>
-                <option value="standardE2E">
-                  Standard Edge-to-Edge ($
-                  {settings.pricingRates.standardE2E || 0}/sq in)
-                </option>
-                <option value="lightCustom">
-                  Light Custom (${settings.pricingRates.lightCustom || 0}/sq in)
-                </option>
-                <option value="custom">
-                  Custom (${settings.pricingRates.custom || 0}/sq in)
-                </option>
-                <option value="denseCustom">
-                  Dense Custom (${settings.pricingRates.denseCustom || 0}/sq in)
-                </option>
+                {settings?.pricingRates?.lightE2E > 0 && (
+                  <option value="lightE2E">
+                    Light Edge-to-Edge (${settings.pricingRates.lightE2E}/sq in)
+                  </option>
+                )}
+                {settings?.pricingRates?.standardE2E > 0 && (
+                  <option value="standardE2E">
+                    Standard Edge-to-Edge (${settings.pricingRates.standardE2E}
+                    /sq in)
+                  </option>
+                )}
+                {settings?.pricingRates?.lightCustom > 0 && (
+                  <option value="lightCustom">
+                    Light Custom (${settings.pricingRates.lightCustom}/sq in)
+                  </option>
+                )}
+                {settings?.pricingRates?.custom > 0 && (
+                  <option value="custom">
+                    Custom (${settings.pricingRates.custom}/sq in)
+                  </option>
+                )}
+                {settings?.pricingRates?.denseCustom > 0 && (
+                  <option value="denseCustom">
+                    Dense Custom (${settings.pricingRates.denseCustom}/sq in)
+                  </option>
+                )}
               </select>
             ) : (
-              <input
-                type="text"
-                placeholder="Enter quilting type manually"
-                value={quiltingType}
-                onChange={(e) => setQuiltingType(e.target.value)}
-                className="w-full px-4 py-2 border border-line rounded-xl"
-              />
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Quilting type (e.g., Edge-to-Edge)"
+                  value={quiltingType}
+                  onChange={(e) => setQuiltingType(e.target.value)}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Rate per sq inch (e.g., 0.02)"
+                  value={quiltingRateManual}
+                  onChange={(e) => setQuiltingRateManual(e.target.value)}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+              </div>
             )}
           </div>
 
@@ -319,29 +828,37 @@ function CalculatorPage() {
             <label className="block text-sm font-bold text-muted mb-2">
               Thread
             </label>
-            {isPaidTier &&
-            settings?.threadOptions &&
-            settings.threadOptions.length > 0 ? (
+            {isPaidTier && hasThreadOptions ? (
               <select
                 value={threadChoice}
                 onChange={(e) => setThreadChoice(e.target.value)}
                 className="w-full px-4 py-2 border border-line rounded-xl"
               >
                 <option value="">Select thread...</option>
-                {settings.threadOptions.map((t) => (
+                {settings?.threadOptions?.map((t) => (
                   <option key={t.name} value={t.name}>
-                    {t.name} (${t.price})
+                    {t.name} (${t.price.toFixed(2)})
                   </option>
                 ))}
               </select>
             ) : (
-              <input
-                type="text"
-                placeholder="Enter thread choice manually"
-                value={threadChoice}
-                onChange={(e) => setThreadChoice(e.target.value)}
-                className="w-full px-4 py-2 border border-line rounded-xl"
-              />
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Thread type (e.g., So Fine #50)"
+                  value={threadChoice}
+                  onChange={(e) => setThreadChoice(e.target.value)}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Thread price (e.g., 5.00)"
+                  value={threadPriceManual}
+                  onChange={(e) => setThreadPriceManual(e.target.value)}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+              </div>
             )}
           </div>
 
@@ -372,29 +889,38 @@ function CalculatorPage() {
                 <label className="block text-sm font-bold text-muted mb-2">
                   Batting
                 </label>
-                {isPaidTier &&
-                settings?.battingOptions &&
-                settings.battingOptions.length > 0 ? (
+                {isPaidTier && hasBattingOptions ? (
                   <select
                     value={battingChoice}
                     onChange={(e) => setBattingChoice(e.target.value)}
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   >
                     <option value="">Select batting...</option>
-                    {settings.battingOptions.map((b) => (
+                    {settings?.battingOptions?.map((b) => (
                       <option key={`${b.name}-${b.widthInches}`} value={b.name}>
-                        {b.name} - {b.widthInches}" wide (${b.pricePerInch}/in)
+                        {b.name} - {b.widthInches}" wide ($
+                        {b.pricePerInch.toFixed(4)}/in)
                       </option>
                     ))}
                   </select>
                 ) : (
-                  <input
-                    type="text"
-                    placeholder="Enter batting choice manually"
-                    value={battingChoice}
-                    onChange={(e) => setBattingChoice(e.target.value)}
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Batting type (e.g., Warm & Natural)"
+                      value={battingChoice}
+                      onChange={(e) => setBattingChoice(e.target.value)}
+                      className="w-full px-4 py-2 border border-line rounded-xl"
+                    />
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Price per inch (e.g., 0.12)"
+                      value={battingPriceManual}
+                      onChange={(e) => setBattingPriceManual(e.target.value)}
+                      className="w-full px-4 py-2 border border-line rounded-xl"
+                    />
+                  </div>
                 )}
               </div>
 
@@ -442,7 +968,10 @@ function CalculatorPage() {
           {/* Bobbins */}
           <div className="mb-6">
             <label className="block text-sm font-bold text-muted mb-2">
-              Bobbins
+              Bobbins{" "}
+              {settings?.bobbinPrice
+                ? `($${settings.bobbinPrice.toFixed(2)} each)`
+                : ""}
             </label>
             <input
               type="number"
@@ -453,9 +982,140 @@ function CalculatorPage() {
             />
           </div>
 
+          {/* Deposit Section */}
+          <div className="mb-6 p-4 bg-gold/5 border border-gold/20 rounded-xl">
+            <label className="block text-sm font-bold text-plum mb-3">
+              Deposit (Optional)
+            </label>
+
+            <div className="flex gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setDepositType("percent")}
+                className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                  depositType === "percent"
+                    ? "bg-gold text-white"
+                    : "bg-white border border-line text-muted hover:border-gold"
+                }`}
+              >
+                Percentage (%)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDepositType("flat")}
+                className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                  depositType === "flat"
+                    ? "bg-gold text-white"
+                    : "bg-white border border-line text-muted hover:border-gold"
+                }`}
+              >
+                Flat Amount ($)
+              </button>
+            </div>
+
+            <div className="flex gap-3 items-center">
+              <div className="relative flex-1">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-bold">
+                  {depositType === "percent" ? "%" : "$"}
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={depositType === "percent" ? "50" : "100.00"}
+                  value={depositValue}
+                  onChange={(e) => setDepositValue(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-line rounded-xl"
+                />
+              </div>
+              {depositValue && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDepositValue("");
+                    setDepositReceivedToday(false);
+                  }}
+                  className="px-3 py-2 text-sm text-muted hover:text-red-600"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {depositAmount > 0 && (
+              <div className="mt-3 p-3 bg-white rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted">Deposit Due:</span>
+                  <span className="font-bold text-gold">
+                    {formatCurrency(depositAmount)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted">Balance on Completion:</span>
+                  <span className="font-bold">
+                    {formatCurrency(balanceDue)}
+                  </span>
+                </div>
+
+                {/* Deposit Received Today Option */}
+                <div className="border-t border-line pt-3 mt-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={depositReceivedToday}
+                      onChange={(e) =>
+                        setDepositReceivedToday(e.target.checked)
+                      }
+                      className="w-5 h-5 rounded border-line accent-green-600"
+                    />
+                    <div>
+                      <div className="text-sm font-bold text-green-700">
+                        Deposit received today
+                      </div>
+                      <div className="text-xs text-muted">
+                        Record payment now (skips deposit step later)
+                      </div>
+                    </div>
+                  </label>
+
+                  {depositReceivedToday && (
+                    <div className="mt-3">
+                      <label className="block text-xs font-bold text-muted mb-1">
+                        Payment Method
+                      </label>
+                      <select
+                        value={depositPaymentMethod}
+                        onChange={(e) =>
+                          setDepositPaymentMethod(e.target.value)
+                        }
+                        className="w-full px-3 py-2 border border-line rounded-xl text-sm"
+                      >
+                        <option value="Cash">Cash</option>
+                        <option value="Check">Check</option>
+                        <option value="Venmo">Venmo</option>
+                        <option value="PayPal">PayPal</option>
+                        <option value="Zelle">Zelle</option>
+                        <option value="Square">Square</option>
+                        <option value="Credit Card">Credit Card</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!depositAmount && (
+              <p className="text-xs text-muted mt-2">
+                Enter a deposit amount to see options.
+              </p>
+            )}
+          </div>
+
           {/* Pricing Summary */}
           <div className="border-t border-line pt-6 mt-6">
-            <h3 className="text-lg font-bold text-plum mb-4">Estimate</h3>
+            <h3 className="text-lg font-bold text-plum mb-4">
+              Estimate Summary
+            </h3>
 
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-sm">
@@ -469,7 +1129,9 @@ function CalculatorPage() {
                 <span className="font-bold">{formatCurrency(threadTotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted">Batting</span>
+                <span className="text-muted">
+                  Batting {clientSuppliesBatting && "(Client Supplied)"}
+                </span>
                 <span className="font-bold">
                   {formatCurrency(battingTotal)}
                 </span>
@@ -493,7 +1155,7 @@ function CalculatorPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted">
-                  Tax ({settings?.taxRate || 0}%)
+                  {settings?.taxLabel || "Tax"} ({settings?.taxRate || 0}%)
                 </span>
                 <span className="font-bold">{formatCurrency(taxAmount)}</span>
               </div>
@@ -504,6 +1166,32 @@ function CalculatorPage() {
                 </span>
               </div>
             </div>
+
+            {/* Deposit Summary in Total Section */}
+            {depositAmount > 0 && (
+              <div className="mt-4 p-3 bg-gold/10 rounded-xl space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="font-bold text-gold">
+                    Deposit {depositReceivedToday ? "(Paid Today)" : "Due"}
+                  </span>
+                  <span className="font-bold text-gold">
+                    {formatCurrency(depositAmount)}
+                  </span>
+                </div>
+                {depositReceivedToday && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted">Payment Method</span>
+                    <span className="font-medium">{depositPaymentMethod}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted">Balance on Completion</span>
+                  <span className="font-bold">
+                    {formatCurrency(balanceDue)}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -512,10 +1200,23 @@ function CalculatorPage() {
               onClick={handleSaveEstimate}
               className="flex-1 px-4 py-3 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors"
             >
-              Save & Go to Board
+              {isEditMode
+                ? `Update Estimate #${nextEstimateNumber}`
+                : `Save Estimate #${nextEstimateNumber}`}
             </button>
             <button
-              onClick={() => alert("Preview invoice coming soon!")}
+              onClick={() => {
+                if (
+                  !quiltWidth ||
+                  !quiltLength ||
+                  !clientFirstName ||
+                  !clientLastName
+                ) {
+                  alert("Please fill in required fields first");
+                  return;
+                }
+                alert("Preview invoice coming soon!");
+              }}
               className="flex-1 px-4 py-3 border-2 border-gold text-gold rounded-xl font-bold hover:bg-gold hover:text-white transition-colors"
             >
               Preview Invoice

@@ -6,13 +6,30 @@ import Header from "../components/Header";
 import { storage } from "../lib/storage";
 import { generateId, getTodayDate, generateProjectId } from "../lib/utils";
 import type { Project } from "../types";
+import { COUNTRY_OPTIONS } from "../types";
+
+// Phone formatting helper
+const formatPhoneNumber = (value: string): string => {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length <= 3) {
+    return digits;
+  } else if (digits.length <= 6) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  } else {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  }
+};
 
 export default function IntakePage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     clientFirstName: "",
     clientLastName: "",
-    clientAddress: "",
+    clientStreet: "",
+    clientCity: "",
+    clientState: "",
+    clientPostalCode: "",
+    clientCountry: "United States",
     clientEmail: "",
     clientPhone: "",
     requestedDateType: "no_date" as "asap" | "no_date" | "specific_date",
@@ -37,6 +54,11 @@ export default function IntakePage() {
   });
 
   const [showBackingWarning, setShowBackingWarning] = useState(false);
+
+  const handlePhoneChange = (value: string) => {
+    const formatted = formatPhoneNumber(value);
+    setFormData({ ...formData, clientPhone: formatted });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +86,11 @@ export default function IntakePage() {
       clientLastName: formData.clientLastName,
       clientEmail: formData.clientEmail || undefined,
       clientPhone: formData.clientPhone || undefined,
+      clientStreet: formData.clientStreet || undefined,
+      clientCity: formData.clientCity || undefined,
+      clientState: formData.clientState || undefined,
+      clientPostalCode: formData.clientPostalCode || undefined,
+      clientCountry: formData.clientCountry || undefined,
       intakeDate,
       requestedDateType: formData.requestedDateType,
       requestedCompletionDate: formData.requestedCompletionDate || undefined,
@@ -77,6 +104,7 @@ export default function IntakePage() {
       threadChoice: formData.threadChoice || undefined,
       battingChoice: formData.battingChoice || undefined,
       bindingType: formData.bindingType || undefined,
+      clientSuppliesBatting: formData.clientSuppliesBatting,
       notes: formData.notes
         ? [
             {
@@ -169,20 +197,94 @@ export default function IntakePage() {
                 </div>
               </div>
 
+              {/* Address Fields */}
               <div>
                 <label className="block text-sm font-bold text-muted mb-2">
-                  Address *
+                  Street Address *
                 </label>
                 <input
                   type="text"
                   required
-                  value={formData.clientAddress}
+                  value={formData.clientStreet}
                   onChange={(e) =>
-                    setFormData({ ...formData, clientAddress: e.target.value })
+                    setFormData({ ...formData, clientStreet: e.target.value })
                   }
-                  placeholder="Full mailing address"
+                  placeholder="123 Main Street"
                   className="w-full px-4 py-2 border border-line rounded-xl"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    City *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.clientCity}
+                    onChange={(e) =>
+                      setFormData({ ...formData, clientCity: e.target.value })
+                    }
+                    placeholder="Spokane"
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    State/Province *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.clientState}
+                    onChange={(e) =>
+                      setFormData({ ...formData, clientState: e.target.value })
+                    }
+                    placeholder="WA"
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Postal Code *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.clientPostalCode}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        clientPostalCode: e.target.value,
+                      })
+                    }
+                    placeholder="99201"
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Country *
+                  </label>
+                  <select
+                    required
+                    value={formData.clientCountry}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        clientCountry: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  >
+                    {COUNTRY_OPTIONS.map((country) => (
+                      <option key={country} value={country}>
+                        {country}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
@@ -194,9 +296,8 @@ export default function IntakePage() {
                     type="tel"
                     required
                     value={formData.clientPhone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, clientPhone: e.target.value })
-                    }
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    placeholder="509-828-2945"
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
                 </div>

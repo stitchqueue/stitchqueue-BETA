@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import BetaSplash from "./components/BetaSplash";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -12,15 +13,23 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
-  subsets: ["latin"],
-  weight: ["600", "700"],
-});
-
 export const metadata: Metadata = {
-  title: "StitchQueue",
-  description: "Business management for professional quilters",
+  title: "StitchQueue - Project Tracking for Professional Quilters",
+  description:
+    "Complete business management system for longarm quilters. Track projects, create estimates, generate invoices.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "StitchQueue",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#4e283a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -30,10 +39,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="apple-touch-icon" href="/icon-180.png" />
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <BetaSplash>{children}</BetaSplash>
       </body>
     </html>
   );
