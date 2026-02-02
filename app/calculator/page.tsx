@@ -451,7 +451,18 @@ function CalculatorPage() {
           ...projectData,
         };
 
-        await storage.updateProject(updatedProject.id, updatedProject);
+        const result = await storage.updateProject(
+          updatedProject.id,
+          updatedProject
+        );
+
+        if (!result.success) {
+          console.error("Error updating project:", result.error);
+          alert(
+            "Error updating estimate: " + (result.error || "Unknown error")
+          );
+          return;
+        }
 
         const depositMsg =
           depositReceivedToday && depositAmount > 0
@@ -469,7 +480,13 @@ function CalculatorPage() {
           ...projectData,
         };
 
-        await storage.addProject(newProject);
+        const result = await storage.addProject(newProject);
+
+        if (!result.success) {
+          console.error("Error adding project:", result.error);
+          alert("Error saving estimate: " + (result.error || "Unknown error"));
+          return;
+        }
 
         const depositMsg =
           depositReceivedToday && depositAmount > 0
