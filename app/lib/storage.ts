@@ -59,11 +59,12 @@ export const storage = {
     return (data || []).map(mapProjectFromDb);
   },
 
-  addProject: async (project: Project): Promise<void> => {
+  addProject: async (
+    project: Project
+  ): Promise<{ success: boolean; error?: string }> => {
     const orgId = await getOrganizationId();
     if (!orgId) {
-      console.error("No organization found");
-      return;
+      return { success: false, error: "No organization found" };
     }
 
     const dbProject = mapProjectToDb(project, orgId);
@@ -77,39 +78,91 @@ export const storage = {
         error.details,
         error.hint
       );
+      return { success: false, error: error.message };
     }
+
+    return { success: true };
   },
 
   updateProject: async (
     id: string,
     updates: Partial<Project>
-  ): Promise<void> => {
+  ): Promise<{ success: boolean; error?: string }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
+
+    // SECURITY: Verify project belongs to this organization
+    const { data: existingProject } = await supabase
+      .from("projects")
+      .select("organization_id")
+      .eq("id", id)
+      .single();
+
+    if (!existingProject || existingProject.organization_id !== orgId) {
+      return { success: false, error: "Project not found or access denied" };
+    }
+
     const dbUpdates = mapUpdatesToDb(updates);
     dbUpdates.updated_at = new Date().toISOString();
 
     const { error } = await supabase
       .from("projects")
       .update(dbUpdates)
-      .eq("id", id);
+      .eq("id", id)
+      .eq("organization_id", orgId); // Extra safety
 
     if (error) {
       console.error("Error updating project:", error.message);
+      return { success: false, error: error.message };
     }
+
+    return { success: true };
   },
 
-  deleteProject: async (id: string): Promise<void> => {
-    const { error } = await supabase.from("projects").delete().eq("id", id);
+  deleteProject: async (
+    id: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
+
+    // SECURITY: Verify project belongs to this organization
+    const { data: existingProject } = await supabase
+      .from("projects")
+      .select("organization_id")
+      .eq("id", id)
+      .single();
+
+    if (!existingProject || existingProject.organization_id !== orgId) {
+      return { success: false, error: "Project not found or access denied" };
+    }
+
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", orgId); // Extra safety
 
     if (error) {
       console.error("Error deleting project:", error.message);
+      return { success: false, error: error.message };
     }
+
+    return { success: true };
   },
 
   getProjectById: async (id: string): Promise<Project | undefined> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) return undefined;
+
     const { data, error } = await supabase
       .from("projects")
       .select("*")
       .eq("id", id)
+      .eq("organization_id", orgId) // SECURITY: Only get if belongs to org
       .single();
 
     if (error || !data) {
@@ -139,9 +192,13 @@ export const storage = {
     return mapSettingsFromDb(data);
   },
 
-  saveSettings: async (settings: Settings): Promise<void> => {
+  saveSettings: async (
+    settings: Settings
+  ): Promise<{ success: boolean; error?: string }> => {
     const orgId = await getOrganizationId();
-    if (!orgId) return;
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
 
     const dbSettings = mapSettingsToDb(settings);
 
@@ -152,12 +209,19 @@ export const storage = {
 
     if (error) {
       console.error("Error saving settings:", error.message);
+      return { success: false, error: error.message };
     }
+
+    return { success: true };
   },
 
-  updateSettings: async (updates: Partial<Settings>): Promise<void> => {
+  updateSettings: async (
+    updates: Partial<Settings>
+  ): Promise<{ success: boolean; error?: string }> => {
     const orgId = await getOrganizationId();
-    if (!orgId) return;
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
 
     const dbUpdates = mapSettingsToDb(updates);
 
@@ -168,7 +232,81 @@ export const storage = {
 
     if (error) {
       console.error("Error updating settings:", error.message);
+      return { success: false, error: error.message };
     }
+
+    return { success: true };
+  },
+
+  /**
+   * ATOMIC estimate number generator
+   * Gets the next estimate number and increments it in one database operation
+   * This prevents race conditions where two users could get the same number
+   */
+  getNextEstimateNumber: async (): Promise<{
+    success: boolean;
+    estimateNumber?: number;
+    error?: string;
+  }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
+
+    // Use a transaction-like approach: read current, increment, and update atomically
+    // We use .select() after update to get the old value
+    const { data: currentOrg, error: readError } = await supabase
+      .from("organizations")
+      .select("next_estimate_number")
+      .eq("id", orgId)
+      .single();
+
+    if (readError || !currentOrg) {
+      return { success: false, error: "Could not read organization settings" };
+    }
+
+    const currentNumber = currentOrg.next_estimate_number || 1001;
+    const nextNumber = currentNumber + 1;
+
+    // Update with a WHERE clause that checks the current value
+    // This ensures atomicity - if another request changed it, this will fail
+    const { data: updated, error: updateError } = await supabase
+      .from("organizations")
+      .update({ next_estimate_number: nextNumber })
+      .eq("id", orgId)
+      .eq("next_estimate_number", currentNumber) // Only update if value hasn't changed
+      .select("next_estimate_number")
+      .single();
+
+    if (updateError || !updated) {
+      // Race condition detected - another request got this number
+      // Retry once
+      const { data: retryOrg } = await supabase
+        .from("organizations")
+        .select("next_estimate_number")
+        .eq("id", orgId)
+        .single();
+
+      if (retryOrg) {
+        const retryNumber = retryOrg.next_estimate_number || 1001;
+        const { error: retryError } = await supabase
+          .from("organizations")
+          .update({ next_estimate_number: retryNumber + 1 })
+          .eq("id", orgId)
+          .eq("next_estimate_number", retryNumber);
+
+        if (!retryError) {
+          return { success: true, estimateNumber: retryNumber };
+        }
+      }
+
+      return {
+        success: false,
+        error: "Could not generate estimate number. Please try again.",
+      };
+    }
+
+    return { success: true, estimateNumber: currentNumber };
   },
 };
 

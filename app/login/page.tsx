@@ -1,31 +1,49 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, FormEvent, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "../lib/supabase";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleLogin(e) {
+  useEffect(() => {
+    // Check for password reset success message
+    if (searchParams.get("reset") === "success") {
+      setSuccessMessage(
+        "Password updated successfully! Please sign in with your new password."
+      );
+    }
+  }, [searchParams]);
+
+  async function handleLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+    setSuccessMessage("");
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      setError(error.message);
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+      } else {
+        router.push("/");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
       setLoading(false);
-    } else {
-      router.push("/");
     }
   }
 
@@ -62,6 +80,22 @@ export default function LoginPage() {
         <p style={{ color: "#666", marginBottom: "24px" }}>
           Sign in to StitchQueue
         </p>
+
+        {successMessage && (
+          <div
+            style={{
+              backgroundColor: "#e8f5e9",
+              border: "1px solid #c8e6c9",
+              color: "#2e7d32",
+              padding: "12px",
+              borderRadius: "8px",
+              marginBottom: "16px",
+              fontSize: "14px",
+            }}
+          >
+            {successMessage}
+          </div>
+        )}
 
         {error && (
           <div
@@ -108,7 +142,7 @@ export default function LoginPage() {
             />
           </div>
 
-          <div style={{ marginBottom: "24px" }}>
+          <div style={{ marginBottom: "8px" }}>
             <label
               style={{
                 display: "block",
@@ -134,6 +168,24 @@ export default function LoginPage() {
                 boxSizing: "border-box",
               }}
             />
+          </div>
+
+          <div
+            style={{
+              textAlign: "right",
+              marginBottom: "24px",
+            }}
+          >
+            <Link
+              href="/forgot-password"
+              style={{
+                color: "#98823a",
+                fontSize: "14px",
+                textDecoration: "none",
+              }}
+            >
+              Forgot password?
+            </Link>
           </div>
 
           <button
@@ -164,12 +216,34 @@ export default function LoginPage() {
             fontSize: "14px",
           }}
         >
-          Do not have an account?{" "}
-          <a href="/signup" style={{ color: "#98823a", fontWeight: "bold" }}>
+          Don't have an account?{" "}
+          <Link href="/signup" style={{ color: "#98823a", fontWeight: "bold" }}>
             Sign up
-          </a>
+          </Link>
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#f5f5f5",
+          }}
+        >
+          Loading...
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }

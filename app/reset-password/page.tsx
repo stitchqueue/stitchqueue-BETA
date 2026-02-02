@@ -1,19 +1,49 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../lib/supabase";
 
-export default function SignupPage() {
-  const [businessName, setBusinessName] = useState("");
-  const [email, setEmail] = useState("");
+export default function ResetPasswordPage() {
+  const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [isValidSession, setIsValidSession] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
-  async function handleSignup(e: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    // Check if user arrived via password reset link
+    const checkSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      // User should have a session from the reset link
+      if (session) {
+        setIsValidSession(true);
+      }
+      setCheckingSession(false);
+    };
+
+    checkSession();
+
+    // Listen for auth state changes (when user clicks reset link)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setIsValidSession(true);
+        setCheckingSession(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
 
@@ -32,71 +62,42 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      // Sign up with email confirmation required
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/verify-email`,
-          data: {
-            business_name: businessName,
-          },
-        },
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: password,
       });
 
-      if (authError) throw authError;
-
-      // Check if user already exists (Supabase returns user but no session)
-      if (authData.user && !authData.session) {
-        // Check if this is a "user already registered" scenario
-        // Supabase doesn't always throw an error for existing users
-        if (authData.user.identities && authData.user.identities.length === 0) {
-          setError(
-            "An account with this email already exists. Please sign in instead."
-          );
-          setLoading(false);
-          return;
-        }
-
-        // Email confirmation required - show success message
-        setEmailSent(true);
-      } else if (authData.user && authData.session) {
-        // Email confirmation disabled in Supabase - create org immediately
-        // This handles cases where email confirmation is turned off
-        const { data: org, error: orgError } = await supabase
-          .from("organizations")
-          .insert({
-            name: businessName,
-            owner_id: authData.user.id,
-          })
-          .select()
-          .single();
-
-        if (orgError) throw orgError;
-
-        const { error: profileError } = await supabase.from("profiles").insert({
-          id: authData.user.id,
-          organization_id: org.id,
-          email: email,
-          role: "owner",
-        });
-
-        if (profileError) throw profileError;
-
-        // Redirect to home
-        window.location.href = "/";
+      if (updateError) {
+        setError(updateError.message);
+        setLoading(false);
+      } else {
+        // Password updated successfully, redirect to login
+        router.push("/login?reset=success");
       }
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Something went wrong";
-      setError(errorMessage);
-    } finally {
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
       setLoading(false);
     }
   }
 
-  // Show confirmation message after signup
-  if (emailSent) {
+  if (checkingSession) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#f5f5f5",
+        }}
+      >
+        <div style={{ textAlign: "center", color: "#666" }}>
+          <p>Verifying reset link...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isValidSession) {
     return (
       <div
         style={{
@@ -122,7 +123,7 @@ export default function SignupPage() {
             style={{
               width: "60px",
               height: "60px",
-              backgroundColor: "#e8f5e9",
+              backgroundColor: "#fff3e0",
               borderRadius: "50%",
               display: "flex",
               alignItems: "center",
@@ -131,7 +132,7 @@ export default function SignupPage() {
               fontSize: "28px",
             }}
           >
-            ✉️
+            ⚠️
           </div>
           <h1
             style={{
@@ -141,31 +142,14 @@ export default function SignupPage() {
               marginBottom: "12px",
             }}
           >
-            Check Your Email
+            Invalid or Expired Link
           </h1>
-          <p style={{ color: "#666", marginBottom: "16px", lineHeight: "1.5" }}>
-            We sent a confirmation link to <strong>{email}</strong>
-          </p>
           <p style={{ color: "#666", marginBottom: "24px", lineHeight: "1.5" }}>
-            Click the link in the email to activate your account and complete
-            setup.
+            This password reset link is invalid or has expired. Please request a
+            new one.
           </p>
-          <div
-            style={{
-              backgroundColor: "#fff8e1",
-              border: "1px solid #ffecb3",
-              borderRadius: "8px",
-              padding: "12px",
-              marginBottom: "24px",
-            }}
-          >
-            <p style={{ color: "#f57c00", fontSize: "14px", margin: 0 }}>
-              <strong>Tip:</strong> Check your spam folder if you don't see the
-              email within a few minutes.
-            </p>
-          </div>
           <Link
-            href="/login"
+            href="/forgot-password"
             style={{
               display: "inline-block",
               padding: "12px 24px",
@@ -176,7 +160,7 @@ export default function SignupPage() {
               fontWeight: "bold",
             }}
           >
-            Go to Sign In
+            Request New Link
           </Link>
         </div>
       </div>
@@ -211,10 +195,10 @@ export default function SignupPage() {
             marginBottom: "8px",
           }}
         >
-          Create Account
+          Set New Password
         </h1>
         <p style={{ color: "#666", marginBottom: "24px" }}>
-          Start your StitchQueue free trial
+          Enter your new password below.
         </p>
 
         {error && (
@@ -233,7 +217,7 @@ export default function SignupPage() {
           </div>
         )}
 
-        <form onSubmit={handleSignup}>
+        <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: "16px" }}>
             <label
               style={{
@@ -244,65 +228,7 @@ export default function SignupPage() {
                 marginBottom: "6px",
               }}
             >
-              Business Name
-            </label>
-            <input
-              type="text"
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
-              required
-              placeholder="Stitched By Susan"
-              style={{
-                width: "100%",
-                padding: "12px",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                fontSize: "16px",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              style={{
-                display: "block",
-                fontSize: "14px",
-                fontWeight: "bold",
-                color: "#666",
-                marginBottom: "6px",
-              }}
-            >
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="you@example.com"
-              style={{
-                width: "100%",
-                padding: "12px",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                fontSize: "16px",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              style={{
-                display: "block",
-                fontSize: "14px",
-                fontWeight: "bold",
-                color: "#666",
-                marginBottom: "6px",
-              }}
-            >
-              Password
+              New Password
             </label>
             <input
               type="password"
@@ -332,7 +258,7 @@ export default function SignupPage() {
                 marginBottom: "6px",
               }}
             >
-              Confirm Password
+              Confirm New Password
             </label>
             <input
               type="password"
@@ -368,23 +294,9 @@ export default function SignupPage() {
               opacity: loading ? 0.7 : 1,
             }}
           >
-            {loading ? "Creating account..." : "Create Account"}
+            {loading ? "Updating..." : "Update Password"}
           </button>
         </form>
-
-        <p
-          style={{
-            textAlign: "center",
-            marginTop: "24px",
-            color: "#666",
-            fontSize: "14px",
-          }}
-        >
-          Already have an account?{" "}
-          <Link href="/login" style={{ color: "#98823a", fontWeight: "bold" }}>
-            Sign in
-          </Link>
-        </p>
       </div>
     </div>
   );

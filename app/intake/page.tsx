@@ -47,6 +47,7 @@ export default function IntakePage() {
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -151,6 +152,8 @@ export default function IntakePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (saving) return; // Prevent double-submit
+
     // Validate the form
     const validationResult = validateIntake({
       clientFirstName: formData.clientFirstName,
@@ -225,13 +228,20 @@ export default function IntakePage() {
       updatedAt: new Date().toISOString(),
     };
 
-    await storage.addProject(newProject);
+    setSaving(true);
+    try {
+      await storage.addProject(newProject);
 
-    // Show success message and navigate
-    setShowSuccessToast(true);
-    setTimeout(() => {
-      router.push("/");
-    }, 1500);
+      // Show success message and navigate
+      setShowSuccessToast(true);
+      setTimeout(() => {
+        router.push("/");
+      }, 1500);
+    } catch (error) {
+      console.error("Error saving project:", error);
+      alert("Failed to save project. Please try again.");
+      setSaving(false);
+    }
   };
 
   // Check backing size warning
@@ -915,9 +925,19 @@ export default function IntakePage() {
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-plum text-white rounded-xl hover:bg-plum/90"
+              disabled={saving}
+              className={`px-6 py-2 bg-plum text-white rounded-xl ${
+                saving ? "opacity-50 cursor-not-allowed" : "hover:bg-plum/90"
+              }`}
             >
-              Save Project
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                  Saving...
+                </span>
+              ) : (
+                "Save Project"
+              )}
             </button>
           </div>
         </form>

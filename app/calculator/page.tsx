@@ -1,1413 +1,537 @@
-"use client";
-
-import { useState, useEffect, Suspense, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Header from "../components/Header";
-import { storage } from "../lib/storage";
 import { supabase } from "../lib/supabase";
-import {
-  validateEstimate,
-  getFieldError,
-  hasFieldError,
-  scrollToFirstError,
-  type ValidationError,
-} from "../lib/validation";
-import {
-  FormField,
-  ValidatedInput,
-  ValidatedSelect,
-  FormErrorSummary,
-  ValidationToast,
-  SuccessToast,
-} from "../components/FormField";
-import type { Settings, Project } from "../types";
-
-function CalculatorContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const projectId = searchParams.get("projectId");
-
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [nextEstimateNumber, setNextEstimateNumber] = useState<number>(1001);
-  const [existingProject, setExistingProject] = useState<Project | null>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  // Validation state
-  const [errors, setErrors] = useState<ValidationError[]>([]);
-  const [showErrorToast, setShowErrorToast] = useState(false);
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-
-  // Form state
-  const [clientFirstName, setClientFirstName] = useState("");
-  const [clientLastName, setClientLastName] = useState("");
-  const [clientEmail, setClientEmail] = useState("");
-  const [clientPhone, setClientPhone] = useState("");
-  const [clientStreet, setClientStreet] = useState("");
-  const [clientCity, setClientCity] = useState("");
-  const [clientState, setClientState] = useState("");
-  const [clientPostalCode, setClientPostalCode] = useState("");
-  const [clientCountry, setClientCountry] = useState("United States");
-  const [quiltWidth, setQuiltWidth] = useState("");
-  const [quiltLength, setQuiltLength] = useState("");
-  const [description, setDescription] = useState("");
-  const [requestedDateType, setRequestedDateType] = useState<
-    "asap" | "no_date" | "specific_date"
-  >("no_date");
-  const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
-  const [quiltingType, setQuiltingType] = useState("");
-  const [quiltingRateManual, setQuiltingRateManual] = useState("");
-  const [threadChoice, setThreadChoice] = useState("");
-  const [threadPriceManual, setThreadPriceManual] = useState("");
-  const [battingChoice, setBattingChoice] = useState("");
-  const [battingPriceManual, setBattingPriceManual] = useState("");
-  const [battingLengthAddition, setBattingLengthAddition] = useState("4");
-  const [clientSuppliesBatting, setClientSuppliesBatting] = useState(false);
-  const [bindingType, setBindingType] = useState("");
-  const [bobbinCount, setBobbinCount] = useState("1");
-
-  // Deposit state
-  const [depositType, setDepositType] = useState<"percentage" | "flat">(
-    "percentage"
-  );
-  const [depositValue, setDepositValue] = useState("");
-  const [depositReceivedToday, setDepositReceivedToday] = useState(false);
-  const [depositPaymentMethod, setDepositPaymentMethod] = useState("Cash");
-
-  // Calculated values
-  const [quiltingTotal, setQuiltingTotal] = useState(0);
-  const [threadTotal, setThreadTotal] = useState(0);
-  const [battingTotal, setBattingTotal] = useState(0);
-  const [bindingTotal, setBindingTotal] = useState(0);
-  const [bobbinTotal, setBobbinTotal] = useState(0);
-  const [subtotal, setSubtotal] = useState(0);
-  const [taxAmount, setTaxAmount] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [depositAmount, setDepositAmount] = useState(0);
-  const [balanceDue, setBalanceDue] = useState(0);
-
-  const isPaidTier = settings?.isPaidTier || false;
-  const hasQuiltingRates =
-    settings?.pricingRates &&
-    (settings.pricingRates.lightE2E > 0 ||
-      settings.pricingRates.standardE2E > 0 ||
-      settings.pricingRates.lightCustom > 0 ||
-      settings.pricingRates.custom > 0 ||
-      settings.pricingRates.denseCustom > 0);
-  const hasThreadOptions =
-    settings?.threadOptions && settings.threadOptions.length > 0;
-  const hasBattingOptions =
-    settings?.battingOptions && settings.battingOptions.length > 0;
-
-  // Phone formatting helper
-  const formatPhoneNumber = (value: string): string => {
-    const digits = value.replace(/\D/g, "");
-    if (digits.length <= 3) {
-      return digits;
-    } else if (digits.length <= 6) {
-      return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-    } else {
-      return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(
-        6,
-        10
-      )}`;
-    }
-  };
-
-  const handlePhoneChange = (value: string) => {
-    const formatted = formatPhoneNumber(value);
-    setClientPhone(formatted);
-    // Clear phone error when user types
-    if (hasFieldError(errors, "Phone")) {
-      setErrors(errors.filter((e) => e.field.toLowerCase() !== "phone"));
-    }
-  };
-
-  // Clear field error when user types
-  const clearFieldError = (fieldName: string) => {
-    if (hasFieldError(errors, fieldName)) {
-      setErrors(
-        errors.filter((e) => e.field.toLowerCase() !== fieldName.toLowerCase())
-      );
-    }
-  };
-
-  useEffect(() => {
-    const loadData = async () => {
-      // Check auth
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
-      const savedSettings = await storage.getSettings();
-      setSettings(savedSettings);
-      setNextEstimateNumber(savedSettings.nextEstimateNumber || 1001);
-
-      // Load existing project if projectId provided
-      if (projectId) {
-        const project = await storage.getProjectById(
-          decodeURIComponent(projectId)
-        );
-        if (project) {
-          setExistingProject(project);
-          setIsEditMode(true);
-
-          // Pre-fill form with project data
-          setClientFirstName(project.clientFirstName || "");
-          setClientLastName(project.clientLastName || "");
-          setClientEmail(project.clientEmail || "");
-          setClientPhone(project.clientPhone || "");
-          setClientStreet(project.clientStreet || "");
-          setClientCity(project.clientCity || "");
-          setClientState(project.clientState || "");
-          setClientPostalCode(project.clientPostalCode || "");
-          setClientCountry(project.clientCountry || "United States");
-          setQuiltWidth(project.quiltWidth?.toString() || "");
-          setQuiltLength(project.quiltLength?.toString() || "");
-          setDescription(project.description || "");
-          setRequestedDateType(project.requestedDateType || "no_date");
-          setRequestedCompletionDate(project.requestedCompletionDate || "");
-          setQuiltingType(project.quiltingType || "");
-          setThreadChoice(project.threadChoice || "");
-          setBattingChoice(project.battingChoice || "");
-          setBattingLengthAddition(project.battingLengthAddition || "4");
-          setClientSuppliesBatting(project.clientSuppliesBatting || false);
-          setBindingType(project.bindingType || "");
-
-          // If project already has estimate number, use it
-          if (project.estimateNumber) {
-            setNextEstimateNumber(project.estimateNumber);
-          }
-        }
-      }
-
-      setLoading(false);
-    };
-
-    loadData();
-  }, [projectId, router]);
-
-  const calculateTotals = useCallback(() => {
-    if (!settings) return;
-
-    let quilting = 0;
-    let thread = 0;
-    let batting = 0;
-    let binding = 0;
-    let bobbin = 0;
-
-    const w = parseFloat(quiltWidth) || 0;
-    const h = parseFloat(quiltLength) || 0;
-    const area = w * h;
-
-    // Quilting calculation
-    if (area > 0) {
-      if (isPaidTier && hasQuiltingRates && quiltingType) {
-        const rate =
-          settings.pricingRates?.[
-            quiltingType as keyof typeof settings.pricingRates
-          ] || 0;
-        quilting = area * (typeof rate === "number" ? rate : 0);
-      } else if (quiltingRateManual) {
-        quilting = area * (parseFloat(quiltingRateManual) || 0);
-      }
-    }
-
-    // Thread calculation
-    if (isPaidTier && hasThreadOptions && threadChoice) {
-      const threadOption = settings.threadOptions?.find(
-        (t) => t.name === threadChoice
-      );
-      thread = threadOption?.price || 0;
-    } else if (threadPriceManual) {
-      thread = parseFloat(threadPriceManual) || 0;
-    }
-
-    // Batting calculation
-    if (!clientSuppliesBatting && h > 0) {
-      const additionInches = parseFloat(battingLengthAddition) || 4;
-      const battingLengthNeeded = h + additionInches;
-
-      if (isPaidTier && hasBattingOptions && battingChoice) {
-        const battingOption = settings.battingOptions?.find(
-          (b) => b.name === battingChoice
-        );
-        const battingPricePerInch = battingOption?.pricePerInch || 0;
-        batting = battingLengthNeeded * battingPricePerInch;
-      } else if (battingPriceManual) {
-        batting = battingLengthNeeded * (parseFloat(battingPriceManual) || 0);
-      }
-    }
-
-    // Binding calculation (per-inch)
-    if (bindingType && bindingType !== "No Binding" && w > 0 && h > 0) {
-      const perimeter = (w + h) * 2;
-      if (bindingType === "Top Attached Only") {
-        binding =
-          perimeter * (settings.pricingRates?.bindingTopAttached || 0.1);
-      } else if (bindingType === "Fully Attached") {
-        binding =
-          perimeter * (settings.pricingRates?.bindingFullyAttached || 0.2);
-      }
-    }
-
-    // Bobbin calculation
-    const bobbins = parseInt(bobbinCount) || 0;
-    bobbin = bobbins * (settings.bobbinPrice || 0);
-
-    const sub = quilting + thread + batting + binding + bobbin;
-    const tax = sub * ((settings.taxRate || 0) / 100);
-    const tot = sub + tax;
-
-    // Deposit calculation
-    let deposit = 0;
-    const depVal = parseFloat(depositValue) || 0;
-    if (depVal > 0) {
-      if (depositType === "percentage") {
-        deposit = tot * (depVal / 100);
-      } else {
-        deposit = depVal;
-      }
-    }
-    const balance = tot - deposit;
-
-    setQuiltingTotal(quilting);
-    setThreadTotal(thread);
-    setBattingTotal(batting);
-    setBindingTotal(binding);
-    setBobbinTotal(bobbin);
-    setSubtotal(sub);
-    setTaxAmount(tax);
-    setTotal(tot);
-    setDepositAmount(deposit);
-    setBalanceDue(balance);
-  }, [
-    settings,
-    quiltWidth,
-    quiltLength,
-    quiltingType,
-    quiltingRateManual,
-    threadChoice,
-    threadPriceManual,
-    battingChoice,
-    battingPriceManual,
-    battingLengthAddition,
-    clientSuppliesBatting,
-    bindingType,
-    bobbinCount,
-    depositType,
-    depositValue,
-    isPaidTier,
-    hasQuiltingRates,
-    hasThreadOptions,
-    hasBattingOptions,
-  ]);
-
-  useEffect(() => {
-    if (settings) {
-      calculateTotals();
-    }
-  }, [settings, calculateTotals]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: settings?.currencyCode || "USD",
-    }).format(amount);
-  };
-
-  const handleSaveEstimate = async () => {
-    // Validate form
-    const validationResult = validateEstimate({
-      clientFirstName,
-      clientLastName,
-      clientEmail,
-      clientPhone,
-      clientStreet,
-      clientCity,
-      clientState,
-      clientPostalCode,
-      quiltWidth,
-      quiltLength,
-      requestedDateType,
-      requestedCompletionDate,
-    });
-
-    if (!validationResult.isValid) {
-      setErrors(validationResult.errors);
-      setShowErrorToast(true);
-      scrollToFirstError(validationResult.errors);
-      return;
-    }
-
-    // Clear any previous errors
-    setErrors([]);
-
-    if (!settings) {
-      alert("Settings not loaded");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const today = new Date().toISOString().split("T")[0];
-
-      // Use existing estimate number if editing, otherwise get next number
-      const estimateNumber =
-        isEditMode && existingProject?.estimateNumber
-          ? existingProject.estimateNumber
-          : settings.nextEstimateNumber || 1001;
-
-      const estimateData = {
-        quiltArea:
-          (parseFloat(quiltWidth) || 0) * (parseFloat(quiltLength) || 0),
-        quiltingRate:
-          isPaidTier && hasQuiltingRates && quiltingType
-            ? settings.pricingRates?.[
-                quiltingType as keyof typeof settings.pricingRates
-              ] || 0
-            : parseFloat(quiltingRateManual) || 0,
-        quiltingTotal,
-        threadCost: threadTotal,
-        battingLengthNeeded:
-          (parseFloat(quiltLength) || 0) +
-          (parseFloat(battingLengthAddition) || 4),
-        battingTotal,
-        clientSuppliesBatting,
-        bindingPerimeter:
-          ((parseFloat(quiltWidth) || 0) + (parseFloat(quiltLength) || 0)) * 2,
-        bindingRatePerInch:
-          bindingType === "Top Attached Only"
-            ? settings.pricingRates?.bindingTopAttached || 0.1
-            : bindingType === "Fully Attached"
-            ? settings.pricingRates?.bindingFullyAttached || 0.2
-            : 0,
-        bindingTotal,
-        bobbinCount: parseInt(bobbinCount) || 0,
-        bobbinPrice: settings.bobbinPrice || 0,
-        bobbinTotal,
-        subtotal,
-        taxRate: settings.taxRate || 0,
-        taxAmount,
-        total,
-        depositType,
-        depositPercent:
-          depositType === "percentage"
-            ? parseFloat(depositValue) || 0
-            : undefined,
-        depositFlat:
-          depositType === "flat" ? parseFloat(depositValue) || 0 : undefined,
-        depositAmount,
-        balanceDue,
-        createdAt:
-          existingProject?.estimateData?.createdAt || new Date().toISOString(),
-      };
-
-      // Build the project object with ALL current form values
-      const projectData = {
-        stage: "Estimate" as const,
-        estimateNumber,
-        clientFirstName,
-        clientLastName,
-        clientEmail: clientEmail || undefined,
-        clientPhone: clientPhone || undefined,
-        clientStreet: clientStreet || undefined,
-        clientCity: clientCity || undefined,
-        clientState: clientState || undefined,
-        clientPostalCode: clientPostalCode || undefined,
-        clientCountry: clientCountry || undefined,
-        description: description || undefined,
-        cardLabel: description?.substring(0, 50) || undefined,
-        quiltWidth: parseFloat(quiltWidth) || 0,
-        quiltLength: parseFloat(quiltLength) || 0,
-        requestedDateType,
-        requestedCompletionDate:
-          requestedDateType === "specific_date"
-            ? requestedCompletionDate
-            : undefined,
-        quiltingType:
-          isPaidTier && hasQuiltingRates
-            ? quiltingType
-            : quiltingType || "Manual Entry",
-        threadChoice:
-          isPaidTier && hasThreadOptions
-            ? threadChoice
-            : threadChoice || "Manual Entry",
-        battingChoice:
-          isPaidTier && hasBattingOptions
-            ? battingChoice
-            : battingChoice || "Manual Entry",
-        battingLengthAddition,
-        clientSuppliesBatting,
-        bindingType: bindingType || undefined,
-        depositType: depositAmount > 0 ? depositType : undefined,
-        depositPercentage:
-          depositType === "percentage" && depositAmount > 0
-            ? parseFloat(depositValue) || 0
-            : undefined,
-        depositAmount: depositAmount > 0 ? depositAmount : undefined,
-        depositPaid: depositReceivedToday && depositAmount > 0,
-        depositPaidDate:
-          depositReceivedToday && depositAmount > 0 ? today : undefined,
-        depositPaidMethod:
-          depositReceivedToday && depositAmount > 0
-            ? depositPaymentMethod
-            : undefined,
-        depositPaidAmount:
-          depositReceivedToday && depositAmount > 0 ? depositAmount : undefined,
-        estimateData,
-        updatedAt: new Date().toISOString(),
-      };
-
-      if (isEditMode && existingProject) {
-        // UPDATE existing project
-        await storage.updateProject(existingProject.id, projectData);
-
-        // Only increment estimate number if this project didn't already have one
-        if (!existingProject.estimateNumber) {
-          await storage.updateSettings({
-            nextEstimateNumber: estimateNumber + 1,
-          });
-        }
-
-        const depositMsg =
-          depositReceivedToday && depositAmount > 0
-            ? ` Deposit of ${formatCurrency(depositAmount)} recorded.`
-            : "";
-        setSuccessMessage(`Estimate #${estimateNumber} updated!${depositMsg}`);
-      } else {
-        // CREATE new project
-        const newProject: Project = {
-          id: crypto.randomUUID(),
-          intakeDate: today,
-          notes: [],
-          createdAt: new Date().toISOString(),
-          ...projectData,
-        } as Project;
-
-        await storage.addProject(newProject);
-
-        await storage.updateSettings({
-          nextEstimateNumber: estimateNumber + 1,
-        });
-
-        const depositMsg =
-          depositReceivedToday && depositAmount > 0
-            ? ` Deposit of ${formatCurrency(depositAmount)} recorded.`
-            : "";
-        setSuccessMessage(`Estimate #${estimateNumber} saved!${depositMsg}`);
-      }
-
-      setShowSuccessToast(true);
-
-      // Navigate after brief delay to show success
-      setTimeout(() => {
-        router.push("/board");
-      }, 1500);
-    } catch (error) {
-      console.error("Error saving estimate:", error);
-      alert("Error saving estimate. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted">Loading calculator...</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-background">
-      <Header />
-
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-plum">
-              {isEditMode ? "Edit Estimate" : "New Estimate"}
-            </h1>
-            <p className="text-sm text-muted mt-1">
-              {isEditMode ? (
-                <>
-                  Editing:{" "}
-                  <span className="font-bold">
-                    {existingProject?.clientFirstName}{" "}
-                    {existingProject?.clientLastName}
-                  </span>
-                  {" • "}
-                </>
-              ) : null}
-              Estimate{" "}
-              <span className="font-bold text-gold">#{nextEstimateNumber}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => router.back()}
-            className="px-4 py-2 border border-line rounded-xl hover:bg-white transition-colors"
-          >
-            Back
-          </button>
-        </div>
-
-        {/* Tier Status */}
-        <div className="bg-white border border-line rounded-xl p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-bold text-sm">
-                Tier: {isPaidTier ? "PRO" : "FREE"}
-              </div>
-              <div className="text-xs text-muted mt-1">
-                {isPaidTier
-                  ? hasQuiltingRates
-                    ? "Using saved rates from Settings"
-                    : "Set up rates in Settings to auto-populate"
-                  : "Manual entry mode"}
-              </div>
-            </div>
-            <button
-              onClick={() => router.push("/settings")}
-              className="px-4 py-2 bg-plum text-white rounded-xl text-sm font-bold"
-            >
-              {isPaidTier ? "Edit Settings" : "Upgrade in Settings"}
-            </button>
-          </div>
-          {!isPaidTier && (
-            <div className="mt-3 p-3 bg-gold/10 rounded-xl text-xs">
-              <div className="font-bold mb-1">FREE Tier Mode:</div>
-              <div>
-                You'll manually enter pricing for each estimate. Go to Settings
-                and enable PRO tier to save rates and auto-populate.
-              </div>
-            </div>
-          )}
-          {isPaidTier && !hasQuiltingRates && (
-            <div className="mt-3 p-3 bg-gold/10 rounded-xl text-xs">
-              <div className="font-bold mb-1">Setup Needed:</div>
-              <div>
-                Go to Settings → Pricing Rates to set up your quilting rates.
-                Until then, you can enter rates manually below.
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Error Summary */}
-        <FormErrorSummary errors={errors} />
-
-        {/* Calculator Form */}
-        <div className="bg-white border border-line rounded-xl p-6">
-          {/* Client Information Section */}
-          <h2 className="text-lg font-bold text-plum mb-4">
-            Client Information
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <FormField
-              label="First Name"
-              error={getFieldError(errors, "First name")}
-              required
-            >
-              <ValidatedInput
-                type="text"
-                value={clientFirstName}
-                onChange={(e) => {
-                  setClientFirstName(e.target.value);
-                  clearFieldError("First name");
-                }}
-                placeholder="Jane"
-                hasError={hasFieldError(errors, "First name")}
-              />
-            </FormField>
-            <FormField
-              label="Last Name"
-              error={getFieldError(errors, "Last name")}
-              required
-            >
-              <ValidatedInput
-                type="text"
-                value={clientLastName}
-                onChange={(e) => {
-                  setClientLastName(e.target.value);
-                  clearFieldError("Last name");
-                }}
-                placeholder="Doe"
-                hasError={hasFieldError(errors, "Last name")}
-              />
-            </FormField>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <FormField
-              label="Email"
-              error={getFieldError(errors, "Email")}
-              required
-            >
-              <ValidatedInput
-                type="email"
-                value={clientEmail}
-                onChange={(e) => {
-                  setClientEmail(e.target.value);
-                  clearFieldError("Email");
-                }}
-                placeholder="jane@example.com"
-                hasError={hasFieldError(errors, "Email")}
-              />
-            </FormField>
-            <FormField
-              label="Phone"
-              error={getFieldError(errors, "Phone")}
-              required
-            >
-              <ValidatedInput
-                type="tel"
-                value={clientPhone}
-                onChange={(e) => handlePhoneChange(e.target.value)}
-                placeholder="509-555-1234"
-                hasError={hasFieldError(errors, "Phone")}
-              />
-            </FormField>
-          </div>
-
-          {/* Address Fields */}
-          <FormField
-            label="Street Address"
-            error={getFieldError(errors, "Street address")}
-            required
-            className="mb-6"
-          >
-            <ValidatedInput
-              type="text"
-              value={clientStreet}
-              onChange={(e) => {
-                setClientStreet(e.target.value);
-                clearFieldError("Street address");
-              }}
-              placeholder="123 Main Street"
-              hasError={hasFieldError(errors, "Street address")}
-            />
-          </FormField>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <FormField
-              label="City"
-              error={getFieldError(errors, "City")}
-              required
-              className="col-span-2 md:col-span-1"
-            >
-              <ValidatedInput
-                type="text"
-                value={clientCity}
-                onChange={(e) => {
-                  setClientCity(e.target.value);
-                  clearFieldError("City");
-                }}
-                placeholder="Spokane"
-                hasError={hasFieldError(errors, "City")}
-              />
-            </FormField>
-            <FormField
-              label="State/Province"
-              error={getFieldError(errors, "State/Province")}
-              required
-            >
-              <ValidatedInput
-                type="text"
-                value={clientState}
-                onChange={(e) => {
-                  setClientState(e.target.value);
-                  clearFieldError("State/Province");
-                }}
-                placeholder="WA"
-                hasError={hasFieldError(errors, "State/Province")}
-              />
-            </FormField>
-            <FormField
-              label="Postal Code"
-              error={getFieldError(errors, "Postal code")}
-              required
-            >
-              <ValidatedInput
-                type="text"
-                value={clientPostalCode}
-                onChange={(e) => {
-                  setClientPostalCode(e.target.value);
-                  clearFieldError("Postal code");
-                }}
-                placeholder="99201"
-                hasError={hasFieldError(errors, "Postal code")}
-              />
-            </FormField>
-            <div>
-              <label className="block text-sm font-bold text-muted mb-2">
-                Country
-              </label>
-              <select
-                value={clientCountry}
-                onChange={(e) => setClientCountry(e.target.value)}
-                className="w-full px-4 py-2 border border-line rounded-xl"
-              >
-                <option value="United States">United States</option>
-                <option value="Canada">Canada</option>
-                <option value="United Kingdom">United Kingdom</option>
-                <option value="Australia">Australia</option>
-                <option value="Mexico">Mexico</option>
-                <option value="Ecuador">Ecuador</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Project Details Section */}
-          <h2 className="text-lg font-bold text-plum mb-4 pt-4 border-t border-line">
-            Project Details
-          </h2>
-
-          {/* Description */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-muted mb-2">
-              Quilt Description
-            </label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g., Queen wedding quilt, double ring pattern"
-              className="w-full px-4 py-2 border border-line rounded-xl"
-            />
-          </div>
-
-          {/* Requested Completion Date */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-muted mb-2">
-              Requested Completion Date
-            </label>
-            <div className="flex gap-2 mb-3">
-              <button
-                type="button"
-                onClick={() => setRequestedDateType("asap")}
-                className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                  requestedDateType === "asap"
-                    ? "bg-red-500 text-white"
-                    : "bg-white border border-line text-muted hover:border-red-300"
-                }`}
-              >
-                ASAP
-              </button>
-              <button
-                type="button"
-                onClick={() => setRequestedDateType("no_date")}
-                className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                  requestedDateType === "no_date"
-                    ? "bg-gold text-white"
-                    : "bg-white border border-line text-muted hover:border-gold"
-                }`}
-              >
-                No Set Date
-              </button>
-              <button
-                type="button"
-                onClick={() => setRequestedDateType("specific_date")}
-                className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                  requestedDateType === "specific_date"
-                    ? "bg-plum text-white"
-                    : "bg-white border border-line text-muted hover:border-plum"
-                }`}
-              >
-                Select Date
-              </button>
-            </div>
-            {requestedDateType === "specific_date" && (
-              <FormField
-                label=""
-                error={getFieldError(errors, "Completion date")}
-              >
-                <ValidatedInput
-                  type="date"
-                  value={requestedCompletionDate}
-                  onChange={(e) => {
-                    setRequestedCompletionDate(e.target.value);
-                    clearFieldError("Completion date");
-                  }}
-                  hasError={hasFieldError(errors, "Completion date")}
-                />
-              </FormField>
-            )}
-            {requestedDateType === "asap" && (
-              <p className="text-xs text-red-600 mt-1">
-                This project will be marked as high priority
-              </p>
-            )}
-          </div>
-
-          {/* Quilt Dimensions */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-muted mb-2">
-              Quilt Dimensions (inches) <span className="text-red-500">*</span>
-            </label>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <ValidatedInput
-                  type="number"
-                  placeholder="Width"
-                  value={quiltWidth}
-                  onChange={(e) => {
-                    setQuiltWidth(e.target.value);
-                    clearFieldError("Quilt width");
-                  }}
-                  hasError={hasFieldError(errors, "Quilt width")}
-                />
-                {hasFieldError(errors, "Quilt width") && (
-                  <p className="text-xs text-red-600 mt-1">
-                    {getFieldError(errors, "Quilt width")}
-                  </p>
-                )}
-              </div>
-              <span className="flex items-center text-muted font-bold">×</span>
-              <div className="flex-1">
-                <ValidatedInput
-                  type="number"
-                  placeholder="Length"
-                  value={quiltLength}
-                  onChange={(e) => {
-                    setQuiltLength(e.target.value);
-                    clearFieldError("Quilt length");
-                  }}
-                  hasError={hasFieldError(errors, "Quilt length")}
-                />
-                {hasFieldError(errors, "Quilt length") && (
-                  <p className="text-xs text-red-600 mt-1">
-                    {getFieldError(errors, "Quilt length")}
-                  </p>
-                )}
-              </div>
-            </div>
-            {quiltWidth && quiltLength && (
-              <div className="mt-2 text-xs text-muted">
-                Area:{" "}
-                {(
-                  parseFloat(quiltWidth) * parseFloat(quiltLength)
-                ).toLocaleString()}{" "}
-                sq in
-              </div>
-            )}
-          </div>
-
-          {/* Quilting Type */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-muted mb-2">
-              Quilting Type
-            </label>
-            {isPaidTier && hasQuiltingRates ? (
-              <select
-                value={quiltingType}
-                onChange={(e) => setQuiltingType(e.target.value)}
-                className="w-full px-4 py-2 border border-line rounded-xl"
-              >
-                <option value="">Select quilting type...</option>
-                {settings?.pricingRates?.lightE2E !== undefined &&
-                  settings.pricingRates.lightE2E > 0 && (
-                    <option value="lightE2E">
-                      Light Edge-to-Edge (${settings.pricingRates.lightE2E}/sq
-                      in)
-                    </option>
-                  )}
-                {settings?.pricingRates?.standardE2E !== undefined &&
-                  settings.pricingRates.standardE2E > 0 && (
-                    <option value="standardE2E">
-                      Standard Edge-to-Edge ($
-                      {settings.pricingRates.standardE2E}
-                      /sq in)
-                    </option>
-                  )}
-                {settings?.pricingRates?.lightCustom !== undefined &&
-                  settings.pricingRates.lightCustom > 0 && (
-                    <option value="lightCustom">
-                      Light Custom (${settings.pricingRates.lightCustom}/sq in)
-                    </option>
-                  )}
-                {settings?.pricingRates?.custom !== undefined &&
-                  settings.pricingRates.custom > 0 && (
-                    <option value="custom">
-                      Custom (${settings.pricingRates.custom}/sq in)
-                    </option>
-                  )}
-                {settings?.pricingRates?.denseCustom !== undefined &&
-                  settings.pricingRates.denseCustom > 0 && (
-                    <option value="denseCustom">
-                      Dense Custom (${settings.pricingRates.denseCustom}/sq in)
-                    </option>
-                  )}
-              </select>
-            ) : (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="Quilting type (e.g., Edge-to-Edge)"
-                  value={quiltingType}
-                  onChange={(e) => setQuiltingType(e.target.value)}
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="Rate per sq inch (e.g., 0.02)"
-                  value={quiltingRateManual}
-                  onChange={(e) => setQuiltingRateManual(e.target.value)}
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Thread */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-muted mb-2">
-              Thread
-            </label>
-            {isPaidTier && hasThreadOptions ? (
-              <select
-                value={threadChoice}
-                onChange={(e) => setThreadChoice(e.target.value)}
-                className="w-full px-4 py-2 border border-line rounded-xl"
-              >
-                <option value="">Select thread...</option>
-                {settings?.threadOptions?.map((t) => (
-                  <option key={t.name} value={t.name}>
-                    {t.name} (${t.price.toFixed(2)})
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="Thread type (e.g., So Fine #50)"
-                  value={threadChoice}
-                  onChange={(e) => setThreadChoice(e.target.value)}
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="Thread price (e.g., 5.00)"
-                  value={threadPriceManual}
-                  onChange={(e) => setThreadPriceManual(e.target.value)}
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Client Supplies Batting Toggle */}
-          <div className="mb-6">
-            <label className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={clientSuppliesBatting}
-                onChange={(e) => setClientSuppliesBatting(e.target.checked)}
-                className="w-5 h-5 rounded border-line"
-              />
-              <div>
-                <div className="text-sm font-bold text-plum">
-                  Client Supplies Own Batting
-                </div>
-                <div className="text-xs text-muted">
-                  Batting cost will be $0
-                </div>
-              </div>
-            </label>
-          </div>
-
-          {/* Batting */}
-          {!clientSuppliesBatting && (
-            <>
-              <div className="mb-6">
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Batting
-                </label>
-                {isPaidTier && hasBattingOptions ? (
-                  <select
-                    value={battingChoice}
-                    onChange={(e) => setBattingChoice(e.target.value)}
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  >
-                    <option value="">Select batting...</option>
-                    {settings?.battingOptions?.map((b) => (
-                      <option key={`${b.name}-${b.widthInches}`} value={b.name}>
-                        {b.name} - {b.widthInches}" wide ($
-                        {b.pricePerInch.toFixed(4)}/in)
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      placeholder="Batting type (e.g., Warm & Natural)"
-                      value={battingChoice}
-                      onChange={(e) => setBattingChoice(e.target.value)}
-                      className="w-full px-4 py-2 border border-line rounded-xl"
-                    />
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="Price per inch (e.g., 0.12)"
-                      value={battingPriceManual}
-                      onChange={(e) => setBattingPriceManual(e.target.value)}
-                      className="w-full px-4 py-2 border border-line rounded-xl"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Batting Length Addition
-                </label>
-                <select
-                  value={battingLengthAddition}
-                  onChange={(e) => setBattingLengthAddition(e.target.value)}
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                >
-                  <option value="2">2 inches</option>
-                  <option value="4">4 inches (recommended)</option>
-                  <option value="6">6 inches</option>
-                  <option value="8">8 inches</option>
-                </select>
-              </div>
-            </>
-          )}
-
-          {/* Binding */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-muted mb-2">
-              Binding
-            </label>
-            <select
-              value={bindingType}
-              onChange={(e) => setBindingType(e.target.value)}
-              className="w-full px-4 py-2 border border-line rounded-xl"
-            >
-              <option value="">Select binding...</option>
-              <option value="No Binding">No Binding ($0)</option>
-              <option value="Top Attached Only">
-                Top Attached Only ($
-                {settings?.pricingRates?.bindingTopAttached || 0.1}/in)
-              </option>
-              <option value="Fully Attached">
-                Fully Attached ($
-                {settings?.pricingRates?.bindingFullyAttached || 0.2}/in)
-              </option>
-            </select>
-          </div>
-
-          {/* Bobbins */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-muted mb-2">
-              Bobbins{" "}
-              {settings?.bobbinPrice
-                ? `($${settings.bobbinPrice.toFixed(2)} each)`
-                : ""}
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={bobbinCount}
-              onChange={(e) => setBobbinCount(e.target.value)}
-              className="w-full px-4 py-2 border border-line rounded-xl"
-            />
-          </div>
-
-          {/* Deposit Section */}
-          <div className="mb-6 p-4 bg-gold/5 border border-gold/20 rounded-xl">
-            <label className="block text-sm font-bold text-plum mb-3">
-              Deposit (Optional)
-            </label>
-
-            <div className="flex gap-2 mb-3">
-              <button
-                type="button"
-                onClick={() => setDepositType("percentage")}
-                className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                  depositType === "percentage"
-                    ? "bg-gold text-white"
-                    : "bg-white border border-line text-muted hover:border-gold"
-                }`}
-              >
-                Percentage (%)
-              </button>
-              <button
-                type="button"
-                onClick={() => setDepositType("flat")}
-                className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                  depositType === "flat"
-                    ? "bg-gold text-white"
-                    : "bg-white border border-line text-muted hover:border-gold"
-                }`}
-              >
-                Flat Amount ($)
-              </button>
-            </div>
-
-            <div className="flex gap-3 items-center">
-              <div className="relative flex-1">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-bold">
-                  {depositType === "percentage" ? "%" : "$"}
-                </span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder={depositType === "percentage" ? "50" : "100.00"}
-                  value={depositValue}
-                  onChange={(e) => setDepositValue(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-line rounded-xl"
-                />
-              </div>
-              {depositValue && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDepositValue("");
-                    setDepositReceivedToday(false);
-                  }}
-                  className="px-3 py-2 text-sm text-muted hover:text-red-600"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {depositAmount > 0 && (
-              <div className="mt-3 p-3 bg-white rounded-lg space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted">Deposit Due:</span>
-                  <span className="font-bold text-gold">
-                    {formatCurrency(depositAmount)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted">Balance on Completion:</span>
-                  <span className="font-bold">
-                    {formatCurrency(balanceDue)}
-                  </span>
-                </div>
-
-                {/* Deposit Received Today Option */}
-                <div className="border-t border-line pt-3 mt-2">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={depositReceivedToday}
-                      onChange={(e) =>
-                        setDepositReceivedToday(e.target.checked)
-                      }
-                      className="w-5 h-5 rounded border-line accent-green-600"
-                    />
-                    <div>
-                      <div className="text-sm font-bold text-green-700">
-                        Deposit received today
-                      </div>
-                      <div className="text-xs text-muted">
-                        Record payment now (skips deposit step later)
-                      </div>
-                    </div>
-                  </label>
-
-                  {depositReceivedToday && (
-                    <div className="mt-3">
-                      <label className="block text-xs font-bold text-muted mb-1">
-                        Payment Method
-                      </label>
-                      <select
-                        value={depositPaymentMethod}
-                        onChange={(e) =>
-                          setDepositPaymentMethod(e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-line rounded-xl text-sm"
-                      >
-                        <option value="Cash">Cash</option>
-                        <option value="Check">Check</option>
-                        <option value="Venmo">Venmo</option>
-                        <option value="PayPal">PayPal</option>
-                        <option value="Zelle">Zelle</option>
-                        <option value="Square">Square</option>
-                        <option value="Credit Card">Credit Card</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {!depositAmount && (
-              <p className="text-xs text-muted mt-2">
-                Enter a deposit amount to see options.
-              </p>
-            )}
-          </div>
-
-          {/* Pricing Summary */}
-          <div className="border-t border-line pt-6 mt-6">
-            <h3 className="text-lg font-bold text-plum mb-4">
-              Estimate Summary
-            </h3>
-
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted">Quilting</span>
-                <span className="font-bold">
-                  {formatCurrency(quiltingTotal)}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted">Thread</span>
-                <span className="font-bold">{formatCurrency(threadTotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted">
-                  Batting {clientSuppliesBatting && "(Client Supplied)"}
-                </span>
-                <span className="font-bold">
-                  {formatCurrency(battingTotal)}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted">Binding</span>
-                <span className="font-bold">
-                  {formatCurrency(bindingTotal)}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted">Bobbins</span>
-                <span className="font-bold">{formatCurrency(bobbinTotal)}</span>
-              </div>
-            </div>
-
-            <div className="border-t border-line pt-3 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted">Subtotal</span>
-                <span className="font-bold">{formatCurrency(subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted">
-                  {settings?.taxLabel || "Tax"} ({settings?.taxRate || 0}%)
-                </span>
-                <span className="font-bold">{formatCurrency(taxAmount)}</span>
-              </div>
-              <div className="flex justify-between text-lg border-t border-line pt-3">
-                <span className="font-bold text-plum">Total</span>
-                <span className="font-bold text-plum">
-                  {formatCurrency(total)}
-                </span>
-              </div>
-            </div>
-
-            {/* Deposit Summary in Total Section */}
-            {depositAmount > 0 && (
-              <div className="mt-4 p-3 bg-gold/10 rounded-xl space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-bold text-gold">
-                    Deposit {depositReceivedToday ? "(Paid Today)" : "Due"}
-                  </span>
-                  <span className="font-bold text-gold">
-                    {formatCurrency(depositAmount)}
-                  </span>
-                </div>
-                {depositReceivedToday && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted">Payment Method</span>
-                    <span className="font-medium">{depositPaymentMethod}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted">Balance on Completion</span>
-                  <span className="font-bold">
-                    {formatCurrency(balanceDue)}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 mt-6">
-            <button
-              onClick={handleSaveEstimate}
-              disabled={saving}
-              className={`flex-1 px-4 py-3 bg-plum text-white rounded-xl font-bold transition-colors ${
-                saving ? "opacity-50 cursor-not-allowed" : "hover:bg-plum/90"
-              }`}
-            >
-              {saving ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg
-                    className="animate-spin h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Saving...
-                </span>
-              ) : isEditMode ? (
-                `Update Estimate #${nextEstimateNumber}`
-              ) : (
-                `Save Estimate #${nextEstimateNumber}`
-              )}
-            </button>
-          </div>
-        </div>
-      </main>
-
-      {/* Toast Notifications */}
-      <ValidationToast
-        show={showErrorToast}
-        message="Please fix the errors above"
-        onClose={() => setShowErrorToast(false)}
-      />
-      <SuccessToast
-        show={showSuccessToast}
-        message={successMessage}
-        onClose={() => setShowSuccessToast(false)}
-      />
-    </div>
-  );
+import type { Project, Settings } from "../types";
+import { DEFAULT_SETTINGS } from "../types";
+
+// Re-export DEFAULT_SETTINGS so pages can import from storage
+export { DEFAULT_SETTINGS };
+
+// Auth helper: get current user
+export async function getCurrentUser() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user;
 }
 
-export default function CalculatorPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          Loading...
-        </div>
+// Standalone export for backwards compatibility
+export async function hasOrganization(): Promise<boolean> {
+  const orgId = await getOrganizationId();
+  return orgId !== null;
+}
+
+async function getOrganizationId(): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+
+  return profile?.organization_id || null;
+}
+
+export const storage = {
+  // Auth helper: check if user has an organization (also available on storage object)
+  hasOrganization: async (): Promise<boolean> => {
+    const orgId = await getOrganizationId();
+    return orgId !== null;
+  },
+
+  getProjects: async (): Promise<Project[]> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) return [];
+
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("organization_id", orgId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching projects:", error.message);
+      return [];
+    }
+
+    return (data || []).map(mapProjectFromDb);
+  },
+
+  addProject: async (
+    project: Project
+  ): Promise<{ success: boolean; error?: string }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
+
+    const dbProject = mapProjectToDb(project, orgId);
+
+    const { error } = await supabase.from("projects").insert(dbProject);
+
+    if (error) {
+      console.error(
+        "Error adding project:",
+        error.message,
+        error.details,
+        error.hint
+      );
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  },
+
+  updateProject: async (
+    id: string,
+    updates: Partial<Project>
+  ): Promise<{ success: boolean; error?: string }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
+
+    // SECURITY: Verify project belongs to this organization
+    const { data: existingProject } = await supabase
+      .from("projects")
+      .select("organization_id")
+      .eq("id", id)
+      .single();
+
+    if (!existingProject || existingProject.organization_id !== orgId) {
+      return { success: false, error: "Project not found or access denied" };
+    }
+
+    const dbUpdates = mapUpdatesToDb(updates);
+    dbUpdates.updated_at = new Date().toISOString();
+
+    const { error } = await supabase
+      .from("projects")
+      .update(dbUpdates)
+      .eq("id", id)
+      .eq("organization_id", orgId); // Extra safety
+
+    if (error) {
+      console.error("Error updating project:", error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  },
+
+  deleteProject: async (
+    id: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
+
+    // SECURITY: Verify project belongs to this organization
+    const { data: existingProject } = await supabase
+      .from("projects")
+      .select("organization_id")
+      .eq("id", id)
+      .single();
+
+    if (!existingProject || existingProject.organization_id !== orgId) {
+      return { success: false, error: "Project not found or access denied" };
+    }
+
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", orgId); // Extra safety
+
+    if (error) {
+      console.error("Error deleting project:", error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  },
+
+  getProjectById: async (id: string): Promise<Project | undefined> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) return undefined;
+
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", id)
+      .eq("organization_id", orgId) // SECURITY: Only get if belongs to org
+      .single();
+
+    if (error || !data) {
+      if (error?.code !== "PGRST116") {
+        console.error("Error fetching project:", error?.message);
       }
-    >
-      <CalculatorContent />
-    </Suspense>
-  );
+      return undefined;
+    }
+
+    return mapProjectFromDb(data);
+  },
+
+  getSettings: async (): Promise<Settings> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) return DEFAULT_SETTINGS;
+
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("*")
+      .eq("id", orgId)
+      .single();
+
+    if (error || !data) {
+      return DEFAULT_SETTINGS;
+    }
+
+    return mapSettingsFromDb(data);
+  },
+
+  saveSettings: async (
+    settings: Settings
+  ): Promise<{ success: boolean; error?: string }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
+
+    const dbSettings = mapSettingsToDb(settings);
+
+    const { error } = await supabase
+      .from("organizations")
+      .update(dbSettings)
+      .eq("id", orgId);
+
+    if (error) {
+      console.error("Error saving settings:", error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  },
+
+  updateSettings: async (
+    updates: Partial<Settings>
+  ): Promise<{ success: boolean; error?: string }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
+
+    const dbUpdates = mapSettingsToDb(updates);
+
+    const { error } = await supabase
+      .from("organizations")
+      .update(dbUpdates)
+      .eq("id", orgId);
+
+    if (error) {
+      console.error("Error updating settings:", error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  },
+
+  /**
+   * ATOMIC estimate number generator
+   * Gets the next estimate number and increments it in one database operation
+   * This prevents race conditions where two users could get the same number
+   */
+  getNextEstimateNumber: async (): Promise<{
+    success: boolean;
+    estimateNumber?: number;
+    error?: string;
+  }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
+
+    // Use a transaction-like approach: read current, increment, and update atomically
+    // We use .select() after update to get the old value
+    const { data: currentOrg, error: readError } = await supabase
+      .from("organizations")
+      .select("next_estimate_number")
+      .eq("id", orgId)
+      .single();
+
+    if (readError || !currentOrg) {
+      return { success: false, error: "Could not read organization settings" };
+    }
+
+    const currentNumber = currentOrg.next_estimate_number || 1001;
+    const nextNumber = currentNumber + 1;
+
+    // Update with a WHERE clause that checks the current value
+    // This ensures atomicity - if another request changed it, this will fail
+    const { data: updated, error: updateError } = await supabase
+      .from("organizations")
+      .update({ next_estimate_number: nextNumber })
+      .eq("id", orgId)
+      .eq("next_estimate_number", currentNumber) // Only update if value hasn't changed
+      .select("next_estimate_number")
+      .single();
+
+    if (updateError || !updated) {
+      // Race condition detected - another request got this number
+      // Retry once
+      const { data: retryOrg } = await supabase
+        .from("organizations")
+        .select("next_estimate_number")
+        .eq("id", orgId)
+        .single();
+
+      if (retryOrg) {
+        const retryNumber = retryOrg.next_estimate_number || 1001;
+        const { error: retryError } = await supabase
+          .from("organizations")
+          .update({ next_estimate_number: retryNumber + 1 })
+          .eq("id", orgId)
+          .eq("next_estimate_number", retryNumber);
+
+        if (!retryError) {
+          return { success: true, estimateNumber: retryNumber };
+        }
+      }
+
+      return {
+        success: false,
+        error: "Could not generate estimate number. Please try again.",
+      };
+    }
+
+    return { success: true, estimateNumber: currentNumber };
+  },
+};
+
+function mapProjectFromDb(row: any): Project {
+  return {
+    id: row.id,
+    stage: row.stage,
+    intakeDate: row.intake_date,
+    estimateNumber: row.estimate_number,
+    requestedDateType: row.requested_date_type || "no_date",
+    requestedCompletionDate: row.requested_completion_date,
+    dueDate: row.due_date,
+    orderIndex: row.order_index,
+    clientFirstName: row.client_first_name || "",
+    clientLastName: row.client_last_name || "",
+    clientEmail: row.client_email,
+    clientPhone: row.client_phone,
+    clientStreet: row.client_street,
+    clientCity: row.client_city,
+    clientState: row.client_state,
+    clientPostalCode: row.client_postal_code,
+    clientCountry: row.client_country,
+    description: row.description,
+    cardLabel: row.card_label,
+    quiltWidth: row.quilt_width,
+    quiltLength: row.quilt_length,
+    quiltingType: row.quilting_type,
+    threadChoice: row.thread_choice,
+    battingChoice: row.batting_choice,
+    battingLengthAddition: row.batting_length_addition,
+    clientSuppliesBatting: row.client_supplies_batting,
+    bindingType: row.binding_type,
+    depositType: row.deposit_type,
+    depositPercentage: row.deposit_percentage,
+    depositAmount: row.deposit_amount,
+    depositPaid: row.deposit_paid,
+    depositPaidDate: row.deposit_paid_date,
+    depositPaidMethod: row.deposit_paid_method,
+    depositPaidAmount: row.deposit_paid_amount,
+    estimateData: row.estimate_data,
+    notes: row.notes || [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapProjectToDb(project: Project, orgId: string): any {
+  return {
+    id: project.id,
+    organization_id: orgId,
+    stage: project.stage,
+    intake_date: project.intakeDate,
+    estimate_number: project.estimateNumber,
+    requested_date_type: project.requestedDateType,
+    requested_completion_date: project.requestedCompletionDate,
+    due_date: project.dueDate,
+    order_index: project.orderIndex,
+    client_first_name: project.clientFirstName,
+    client_last_name: project.clientLastName,
+    client_email: project.clientEmail,
+    client_phone: project.clientPhone,
+    client_street: project.clientStreet,
+    client_city: project.clientCity,
+    client_state: project.clientState,
+    client_postal_code: project.clientPostalCode,
+    client_country: project.clientCountry,
+    description: project.description,
+    card_label: project.cardLabel,
+    quilt_width: project.quiltWidth,
+    quilt_length: project.quiltLength,
+    quilting_type: project.quiltingType,
+    thread_choice: project.threadChoice,
+    batting_choice: project.battingChoice,
+    batting_length_addition: project.battingLengthAddition,
+    client_supplies_batting: project.clientSuppliesBatting,
+    binding_type: project.bindingType,
+    deposit_type: project.depositType,
+    deposit_percentage: project.depositPercentage,
+    deposit_amount: project.depositAmount,
+    deposit_paid: project.depositPaid,
+    deposit_paid_date: project.depositPaidDate,
+    deposit_paid_method: project.depositPaidMethod,
+    deposit_paid_amount: project.depositPaidAmount,
+    estimate_data: project.estimateData,
+    notes: project.notes,
+    created_at: project.createdAt,
+    updated_at: project.updatedAt,
+  };
+}
+
+function mapUpdatesToDb(updates: Partial<Project>): any {
+  const dbUpdates: any = {};
+
+  if (updates.stage !== undefined) dbUpdates.stage = updates.stage;
+  if (updates.intakeDate !== undefined)
+    dbUpdates.intake_date = updates.intakeDate;
+  if (updates.estimateNumber !== undefined)
+    dbUpdates.estimate_number = updates.estimateNumber;
+  if (updates.requestedDateType !== undefined)
+    dbUpdates.requested_date_type = updates.requestedDateType;
+  if (updates.requestedCompletionDate !== undefined)
+    dbUpdates.requested_completion_date = updates.requestedCompletionDate;
+  if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate;
+  if (updates.orderIndex !== undefined)
+    dbUpdates.order_index = updates.orderIndex;
+  if (updates.clientFirstName !== undefined)
+    dbUpdates.client_first_name = updates.clientFirstName;
+  if (updates.clientLastName !== undefined)
+    dbUpdates.client_last_name = updates.clientLastName;
+  if (updates.clientEmail !== undefined)
+    dbUpdates.client_email = updates.clientEmail;
+  if (updates.clientPhone !== undefined)
+    dbUpdates.client_phone = updates.clientPhone;
+  if (updates.clientStreet !== undefined)
+    dbUpdates.client_street = updates.clientStreet;
+  if (updates.clientCity !== undefined)
+    dbUpdates.client_city = updates.clientCity;
+  if (updates.clientState !== undefined)
+    dbUpdates.client_state = updates.clientState;
+  if (updates.clientPostalCode !== undefined)
+    dbUpdates.client_postal_code = updates.clientPostalCode;
+  if (updates.clientCountry !== undefined)
+    dbUpdates.client_country = updates.clientCountry;
+  if (updates.description !== undefined)
+    dbUpdates.description = updates.description;
+  if (updates.cardLabel !== undefined) dbUpdates.card_label = updates.cardLabel;
+  if (updates.quiltWidth !== undefined)
+    dbUpdates.quilt_width = updates.quiltWidth;
+  if (updates.quiltLength !== undefined)
+    dbUpdates.quilt_length = updates.quiltLength;
+  if (updates.quiltingType !== undefined)
+    dbUpdates.quilting_type = updates.quiltingType;
+  if (updates.threadChoice !== undefined)
+    dbUpdates.thread_choice = updates.threadChoice;
+  if (updates.battingChoice !== undefined)
+    dbUpdates.batting_choice = updates.battingChoice;
+  if (updates.battingLengthAddition !== undefined)
+    dbUpdates.batting_length_addition = updates.battingLengthAddition;
+  if (updates.clientSuppliesBatting !== undefined)
+    dbUpdates.client_supplies_batting = updates.clientSuppliesBatting;
+  if (updates.bindingType !== undefined)
+    dbUpdates.binding_type = updates.bindingType;
+  if (updates.depositType !== undefined)
+    dbUpdates.deposit_type = updates.depositType;
+  if (updates.depositPercentage !== undefined)
+    dbUpdates.deposit_percentage = updates.depositPercentage;
+  if (updates.depositAmount !== undefined)
+    dbUpdates.deposit_amount = updates.depositAmount;
+  if (updates.depositPaid !== undefined)
+    dbUpdates.deposit_paid = updates.depositPaid;
+  if (updates.depositPaidDate !== undefined)
+    dbUpdates.deposit_paid_date = updates.depositPaidDate;
+  if (updates.depositPaidMethod !== undefined)
+    dbUpdates.deposit_paid_method = updates.depositPaidMethod;
+  if (updates.depositPaidAmount !== undefined)
+    dbUpdates.deposit_paid_amount = updates.depositPaidAmount;
+  if (updates.estimateData !== undefined)
+    dbUpdates.estimate_data = updates.estimateData;
+  if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+
+  return dbUpdates;
+}
+
+function mapSettingsFromDb(row: any): Settings {
+  return {
+    businessName: row.name || row.business_name,
+    street: row.street,
+    city: row.city,
+    state: row.state,
+    postalCode: row.postal_code,
+    country: row.country,
+    phone: row.phone,
+    email: row.email,
+    website: row.website,
+    logoUrl: row.logo_url,
+    brandPrimaryColor: row.brand_primary_color || "#4e283a",
+    brandSecondaryColor: row.brand_secondary_color || "#98823a",
+    measurementSystem: row.measurement_system || "imperial",
+    currencyCode: row.currency_code || "USD",
+    taxRate: row.tax_rate || 0,
+    taxLabel: row.tax_label || "Sales Tax",
+    nextEstimateNumber: row.next_estimate_number || 1001,
+    pricingRates: row.pricing_rates || {},
+    bobbinPrice: row.pricing_rates?.bobbinPrice,
+    threadOptions: row.thread_options || [],
+    battingOptions: row.batting_options || [],
+    isPaidTier: row.subscription_tier === "pro",
+  };
+}
+
+function mapSettingsToDb(settings: Partial<Settings>): any {
+  const dbSettings: any = {};
+
+  if (settings.businessName !== undefined)
+    dbSettings.name = settings.businessName;
+  if (settings.street !== undefined) dbSettings.street = settings.street;
+  if (settings.city !== undefined) dbSettings.city = settings.city;
+  if (settings.state !== undefined) dbSettings.state = settings.state;
+  if (settings.postalCode !== undefined)
+    dbSettings.postal_code = settings.postalCode;
+  if (settings.country !== undefined) dbSettings.country = settings.country;
+  if (settings.phone !== undefined) dbSettings.phone = settings.phone;
+  if (settings.email !== undefined) dbSettings.email = settings.email;
+  if (settings.website !== undefined) dbSettings.website = settings.website;
+  if (settings.logoUrl !== undefined) dbSettings.logo_url = settings.logoUrl;
+  if (settings.brandPrimaryColor !== undefined)
+    dbSettings.brand_primary_color = settings.brandPrimaryColor;
+  if (settings.brandSecondaryColor !== undefined)
+    dbSettings.brand_secondary_color = settings.brandSecondaryColor;
+  if (settings.measurementSystem !== undefined)
+    dbSettings.measurement_system = settings.measurementSystem;
+  if (settings.currencyCode !== undefined)
+    dbSettings.currency_code = settings.currencyCode;
+  if (settings.taxRate !== undefined) dbSettings.tax_rate = settings.taxRate;
+  if (settings.taxLabel !== undefined) dbSettings.tax_label = settings.taxLabel;
+  if (settings.nextEstimateNumber !== undefined)
+    dbSettings.next_estimate_number = settings.nextEstimateNumber;
+  if (settings.pricingRates !== undefined)
+    dbSettings.pricing_rates = settings.pricingRates;
+  if (settings.threadOptions !== undefined)
+    dbSettings.thread_options = settings.threadOptions;
+  if (settings.battingOptions !== undefined)
+    dbSettings.batting_options = settings.battingOptions;
+  if (settings.isPaidTier !== undefined)
+    dbSettings.subscription_tier = settings.isPaidTier ? "pro" : "free";
+
+  return dbSettings;
 }
