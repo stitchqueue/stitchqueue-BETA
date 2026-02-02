@@ -91,6 +91,7 @@ function CalculatorPage() {
   const [battingLengthAddition, setBattingLengthAddition] = useState("4");
   const [clientSuppliesBatting, setClientSuppliesBatting] = useState(false);
   const [bindingType, setBindingType] = useState("");
+  const [bindingRateManual, setBindingRateManual] = useState("");
   const [bobbinCount, setBobbinCount] = useState("1");
 
   // Deposit state
@@ -208,6 +209,7 @@ function CalculatorPage() {
     battingLengthAddition,
     clientSuppliesBatting,
     bindingType,
+    bindingRateManual,
     bobbinCount,
     depositType,
     depositValue,
@@ -269,12 +271,20 @@ function CalculatorPage() {
     // Binding calculation (per-inch)
     if (bindingType && bindingType !== "No Binding" && w > 0 && h > 0) {
       const perimeter = (w + h) * 2;
-      if (bindingType === "Top Attached Only") {
-        binding =
-          perimeter * (settings.pricingRates?.bindingTopAttached || 0.1);
-      } else if (bindingType === "Fully Attached") {
-        binding =
-          perimeter * (settings.pricingRates?.bindingFullyAttached || 0.2);
+      if (
+        isPaidTier &&
+        (settings.pricingRates?.bindingTopAttached ||
+          settings.pricingRates?.bindingFullyAttached)
+      ) {
+        if (bindingType === "Top Attached Only") {
+          binding =
+            perimeter * (settings.pricingRates?.bindingTopAttached || 0);
+        } else if (bindingType === "Fully Attached") {
+          binding =
+            perimeter * (settings.pricingRates?.bindingFullyAttached || 0);
+        }
+      } else if (bindingRateManual) {
+        binding = perimeter * (parseFloat(bindingRateManual) || 0);
       }
     }
 
@@ -1004,22 +1014,53 @@ function CalculatorPage() {
             <label className="block text-sm font-bold text-muted mb-2">
               Binding
             </label>
-            <select
-              value={bindingType}
-              onChange={(e) => setBindingType(e.target.value)}
-              className="w-full px-4 py-2 border border-line rounded-xl"
-            >
-              <option value="">Select binding...</option>
-              <option value="No Binding">No Binding ($0)</option>
-              <option value="Top Attached Only">
-                Top Attached Only ($
-                {settings?.pricingRates?.bindingTopAttached || 0.1}/in)
-              </option>
-              <option value="Fully Attached">
-                Fully Attached ($
-                {settings?.pricingRates?.bindingFullyAttached || 0.2}/in)
-              </option>
-            </select>
+            {isPaidTier &&
+            (settings?.pricingRates?.bindingTopAttached ||
+              settings?.pricingRates?.bindingFullyAttached) ? (
+              <select
+                value={bindingType}
+                onChange={(e) => setBindingType(e.target.value)}
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              >
+                <option value="">Select binding...</option>
+                <option value="No Binding">No Binding ($0)</option>
+                {(settings?.pricingRates?.bindingTopAttached ?? 0) > 0 && (
+                  <option value="Top Attached Only">
+                    Top Attached Only ($
+                    {settings?.pricingRates?.bindingTopAttached}/in)
+                  </option>
+                )}
+                {(settings?.pricingRates?.bindingFullyAttached ?? 0) > 0 && (
+                  <option value="Fully Attached">
+                    Fully Attached ($
+                    {settings?.pricingRates?.bindingFullyAttached}/in)
+                  </option>
+                )}
+              </select>
+            ) : (
+              <div className="space-y-2">
+                <select
+                  value={bindingType}
+                  onChange={(e) => setBindingType(e.target.value)}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                >
+                  <option value="">Select binding type...</option>
+                  <option value="No Binding">No Binding</option>
+                  <option value="Top Attached Only">Top Attached Only</option>
+                  <option value="Fully Attached">Fully Attached</option>
+                </select>
+                {bindingType && bindingType !== "No Binding" && (
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Rate per inch (e.g., 0.15)"
+                    value={bindingRateManual}
+                    onChange={(e) => setBindingRateManual(e.target.value)}
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           {/* Bobbins */}
