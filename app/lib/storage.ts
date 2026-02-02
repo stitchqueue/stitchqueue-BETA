@@ -154,6 +154,32 @@ export const storage = {
     return { success: true };
   },
 
+  /**
+   * Delete ALL projects for the current organization
+   * Used by "Clear All Data" in settings
+   */
+  deleteAllProjects: async (): Promise<{
+    success: boolean;
+    error?: string;
+  }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return { success: false, error: "No organization found" };
+    }
+
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("organization_id", orgId);
+
+    if (error) {
+      console.error("Error deleting all projects:", error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  },
+
   getProjectById: async (id: string): Promise<Project | undefined> => {
     const orgId = await getOrganizationId();
     if (!orgId) return undefined;

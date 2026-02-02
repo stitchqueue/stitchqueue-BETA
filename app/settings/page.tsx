@@ -281,7 +281,7 @@ export default function SettingsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleClearAllData = () => {
+  const handleClearAllData = async () => {
     if (
       !confirm(
         "Are you sure you want to clear ALL data? This cannot be undone!"
@@ -293,9 +293,26 @@ export default function SettingsPage() {
     )
       return;
 
-    localStorage.clear();
-    alert("All data cleared! Reloading...");
-    window.location.reload();
+    try {
+      // Delete all projects from Supabase
+      const deleteResult = await storage.deleteAllProjects();
+      if (!deleteResult.success) {
+        alert("Error deleting projects: " + deleteResult.error);
+        return;
+      }
+
+      // Reset settings to defaults
+      await storage.saveSettings(DEFAULT_SETTINGS);
+
+      // Also clear localStorage just in case
+      localStorage.clear();
+
+      alert("All data cleared! Reloading...");
+      window.location.reload();
+    } catch (error) {
+      console.error("Error clearing data:", error);
+      alert("Error clearing data. Check console for details.");
+    }
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
