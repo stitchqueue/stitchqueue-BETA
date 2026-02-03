@@ -89,6 +89,7 @@ function CalculatorPage() {
   const [bindingType, setBindingType] = useState("");
   const [bindingRateManual, setBindingRateManual] = useState("");
   const [bobbinCount, setBobbinCount] = useState("1");
+  const [bobbinPriceManual, setBobbinPriceManual] = useState("");
 
   // Deposit state
   const [depositType, setDepositType] = useState<"percentage" | "flat">("percentage");
@@ -207,6 +208,7 @@ function CalculatorPage() {
     bindingType,
     bindingRateManual,
     bobbinCount,
+    bobbinPriceManual,
     depositType,
     depositValue,
     settings,
@@ -284,9 +286,13 @@ function CalculatorPage() {
       }
     }
 
-    // Bobbin calculation
-    const bobbins = parseInt(bobbinCount) || 0;
-    bobbin = bobbins * (settings.bobbinPrice || 0);
+   // Bobbin calculation
+const bobbins = parseInt(bobbinCount) || 0;
+if (isPaidTier && settings.bobbinPrice) {
+  bobbin = bobbins * settings.bobbinPrice;
+} else if (bobbinPriceManual) {
+  bobbin = bobbins * (parseFloat(bobbinPriceManual) || 0);
+}
 
     const sub = quilting + thread + batting + binding + bobbin;
     const tax = sub * ((settings.taxRate || 0) / 100);
@@ -1060,21 +1066,45 @@ function CalculatorPage() {
           </div>
 
           {/* Bobbins */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-muted mb-2">
-              Bobbins{" "}
-              {settings?.bobbinPrice
-                ? `($${settings.bobbinPrice.toFixed(2)} each)`
-                : ""}
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={bobbinCount}
-              onChange={(e) => setBobbinCount(e.target.value)}
-              className="w-full px-4 py-2 border border-line rounded-xl"
-            />
-          </div>
+<div className="mb-6">
+  <label className="block text-sm font-bold text-muted mb-2">
+    Bobbins
+  </label>
+  {isPaidTier && settings?.bobbinPrice ? (
+    <div className="space-y-2">
+      <input
+        type="number"
+        min="0"
+        value={bobbinCount}
+        onChange={(e) => setBobbinCount(e.target.value)}
+        placeholder="Number of bobbins"
+        className="w-full px-4 py-2 border border-line rounded-xl"
+      />
+      <p className="text-xs text-muted">
+        ${settings.bobbinPrice.toFixed(2)} each (from Settings)
+      </p>
+    </div>
+  ) : (
+    <div className="space-y-2">
+      <input
+        type="number"
+        min="0"
+        value={bobbinCount}
+        onChange={(e) => setBobbinCount(e.target.value)}
+        placeholder="Number of bobbins"
+        className="w-full px-4 py-2 border border-line rounded-xl"
+      />
+      <input
+        type="text"
+        inputMode="decimal"
+        placeholder="Price per bobbin (e.g., 2.50)"
+        value={bobbinPriceManual}
+        onChange={(e) => setBobbinPriceManual(e.target.value)}
+        className="w-full px-4 py-2 border border-line rounded-xl"
+      />
+    </div>
+  )}
+</div>
 
           {/* Deposit Section */}
           <div className="mb-6 p-4 bg-gold/5 border border-gold/20 rounded-xl">
