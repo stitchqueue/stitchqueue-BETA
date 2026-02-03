@@ -6,6 +6,14 @@ import Header from "../components/Header";
 import { storage } from "../lib/storage";
 import { supabase } from "../lib/supabase";
 import type { Settings, Project } from "../types";
+import { COUNTRY_OPTIONS } from "../types";
+import {
+  getRegionsForCountry,
+  countryHasRegionDropdown,
+  getRegionLabel,
+  getPostalCodeLabel,
+  getPostalCodePlaceholder,
+} from "../lib/locations";
 
 // Atomic estimate number generator to prevent race conditions
 async function getNextEstimateNumberAtomic(): Promise<number> {
@@ -74,7 +82,7 @@ function CalculatorPage() {
   const [quiltWidth, setQuiltWidth] = useState("");
   const [quiltLength, setQuiltLength] = useState("");
   const [description, setDescription] = useState("");
-  const [requestedDateType, setRequestedDateType] = useState<
+  const [requestedDateType, setRequestedDateType] = useState
     "asap" | "no_date" | "specific_date"
   >("no_date");
   const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
@@ -121,6 +129,19 @@ function CalculatorPage() {
     settings?.threadOptions && settings.threadOptions.length > 0;
   const hasBattingOptions =
     settings?.battingOptions && settings.battingOptions.length > 0;
+
+  // Location helpers
+  const regions = getRegionsForCountry(clientCountry);
+  const showRegionDropdown = countryHasRegionDropdown(clientCountry);
+  const regionLabel = getRegionLabel(clientCountry);
+  const postalCodeLabel = getPostalCodeLabel(clientCountry);
+  const postalCodePlaceholder = getPostalCodePlaceholder(clientCountry);
+
+  // Handle country change - reset state when country changes
+  const handleCountryChange = (newCountry: string) => {
+    setClientCountry(newCountry);
+    setClientState(""); // Reset state when country changes
+  };
 
   // Phone formatting helper
   const formatPhoneNumber = (value: string): string => {
@@ -683,25 +704,40 @@ if (isPaidTier && settings.bobbinPrice) {
             </div>
             <div>
               <label className="block text-sm font-bold text-muted mb-2">
-                State
+                {regionLabel}
               </label>
-              <input
-                type="text"
-                value={clientState}
-                onChange={(e) => setClientState(e.target.value)}
-                placeholder="WA"
-                className="w-full px-4 py-2 border border-line rounded-xl"
-              />
+              {showRegionDropdown ? (
+                <select
+                  value={clientState}
+                  onChange={(e) => setClientState(e.target.value)}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                >
+                  <option value="">Select...</option>
+                  {regions.map((region) => (
+                    <option key={region.code} value={region.code}>
+                      {region.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={clientState}
+                  onChange={(e) => setClientState(e.target.value)}
+                  placeholder="State/Province"
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-bold text-muted mb-2">
-                Postal Code
+                {postalCodeLabel}
               </label>
               <input
                 type="text"
                 value={clientPostalCode}
                 onChange={(e) => setClientPostalCode(e.target.value)}
-                placeholder="99201"
+                placeholder={postalCodePlaceholder}
                 className="w-full px-4 py-2 border border-line rounded-xl"
               />
             </div>
@@ -711,15 +747,14 @@ if (isPaidTier && settings.bobbinPrice) {
               </label>
               <select
                 value={clientCountry}
-                onChange={(e) => setClientCountry(e.target.value)}
+                onChange={(e) => handleCountryChange(e.target.value)}
                 className="w-full px-4 py-2 border border-line rounded-xl"
               >
-                <option value="United States">United States</option>
-                <option value="Canada">Canada</option>
-                <option value="United Kingdom">United Kingdom</option>
-                <option value="Australia">Australia</option>
-                <option value="Mexico">Mexico</option>
-                <option value="Ecuador">Ecuador</option>
+                {COUNTRY_OPTIONS.map((country) => (
+                  <option key={country} value={country}>
+                    {country}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
