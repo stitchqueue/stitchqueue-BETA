@@ -82,9 +82,7 @@ function CalculatorPage() {
   const [quiltWidth, setQuiltWidth] = useState("");
   const [quiltLength, setQuiltLength] = useState("");
   const [description, setDescription] = useState("");
-  const [requestedDateType, setRequestedDateType] = useState
-    "asap" | "no_date" | "specific_date"
-  >("no_date");
+  const [requestedDateType, setRequestedDateType] = useState<"asap" | "no_date" | "specific_date">("no_date");
   const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
   const [quiltingType, setQuiltingType] = useState("");
   const [quiltingRateManual, setQuiltingRateManual] = useState("");
@@ -307,13 +305,13 @@ function CalculatorPage() {
       }
     }
 
-   // Bobbin calculation
-const bobbins = parseInt(bobbinCount) || 0;
-if (isPaidTier && settings.bobbinPrice) {
-  bobbin = bobbins * settings.bobbinPrice;
-} else if (bobbinPriceManual) {
-  bobbin = bobbins * (parseFloat(bobbinPriceManual) || 0);
-}
+    // Bobbin calculation
+    const bobbins = parseInt(bobbinCount) || 0;
+    if (isPaidTier && settings.bobbinPrice) {
+      bobbin = bobbins * settings.bobbinPrice;
+    } else if (bobbinPriceManual) {
+      bobbin = bobbins * (parseFloat(bobbinPriceManual) || 0);
+    }
 
     const sub = quilting + thread + batting + binding + bobbin;
     const tax = sub * ((settings.taxRate || 0) / 100);
@@ -688,7 +686,7 @@ if (isPaidTier && settings.bobbinPrice) {
             />
           </div>
 
-          {/* FIXED: Address grid - responsive layout */}
+          {/* Address grid - responsive layout */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-bold text-muted mb-2">
@@ -783,7 +781,7 @@ if (isPaidTier && settings.bobbinPrice) {
             <label className="block text-sm font-bold text-muted mb-2">
               Requested Completion Date
             </label>
-            {/* FIXED: Date type buttons - stack on mobile */}
+            {/* Date type buttons - stack on mobile */}
             <div className="flex flex-col sm:flex-row gap-2 mb-3">
               <button
                 type="button"
@@ -834,7 +832,7 @@ if (isPaidTier && settings.bobbinPrice) {
             )}
           </div>
 
-          {/* FIXED: Quilt Dimensions - stack on mobile, side-by-side on tablet+ */}
+          {/* Quilt Dimensions - stack on mobile, side-by-side on tablet+ */}
           <div className="mb-6">
             <label className="block text-sm font-bold text-muted mb-2">
               Quilt Dimensions (inches) *
@@ -1106,45 +1104,45 @@ if (isPaidTier && settings.bobbinPrice) {
           </div>
 
           {/* Bobbins */}
-<div className="mb-6">
-  <label className="block text-sm font-bold text-muted mb-2">
-    Bobbins
-  </label>
-  {isPaidTier && settings?.bobbinPrice ? (
-    <div className="space-y-2">
-      <input
-        type="number"
-        min="0"
-        value={bobbinCount}
-        onChange={(e) => setBobbinCount(e.target.value)}
-        placeholder="Number of bobbins"
-        className="w-full px-4 py-2 border border-line rounded-xl"
-      />
-      <p className="text-xs text-muted">
-        ${settings.bobbinPrice.toFixed(2)} each (from Settings)
-      </p>
-    </div>
-  ) : (
-    <div className="space-y-2">
-      <input
-        type="number"
-        min="0"
-        value={bobbinCount}
-        onChange={(e) => setBobbinCount(e.target.value)}
-        placeholder="Number of bobbins"
-        className="w-full px-4 py-2 border border-line rounded-xl"
-      />
-      <input
-        type="text"
-        inputMode="decimal"
-        placeholder="Price per bobbin (e.g., 2.50)"
-        value={bobbinPriceManual}
-        onChange={(e) => setBobbinPriceManual(e.target.value)}
-        className="w-full px-4 py-2 border border-line rounded-xl"
-      />
-    </div>
-  )}
-</div>
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-muted mb-2">
+              Bobbins
+            </label>
+            {isPaidTier && settings?.bobbinPrice ? (
+              <div className="space-y-2">
+                <input
+                  type="number"
+                  min="0"
+                  value={bobbinCount}
+                  onChange={(e) => setBobbinCount(e.target.value)}
+                  placeholder="Number of bobbins"
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+                <p className="text-xs text-muted">
+                  ${settings.bobbinPrice.toFixed(2)} each (from Settings)
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="number"
+                  min="0"
+                  value={bobbinCount}
+                  onChange={(e) => setBobbinCount(e.target.value)}
+                  placeholder="Number of bobbins"
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Price per bobbin (e.g., 2.50)"
+                  value={bobbinPriceManual}
+                  onChange={(e) => setBobbinPriceManual(e.target.value)}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+              </div>
+            )}
+          </div>
 
           {/* Deposit Section */}
           <div className="mb-6 p-4 bg-gold/5 border border-gold/20 rounded-xl">
@@ -1152,7 +1150,7 @@ if (isPaidTier && settings.bobbinPrice) {
               Deposit (Optional)
             </label>
 
-            {/* FIXED: Deposit type buttons - stack on mobile */}
+            {/* Deposit type buttons - stack on mobile */}
             <div className="flex flex-col sm:flex-row gap-2 mb-3">
               <button
                 type="button"
@@ -1359,7 +1357,7 @@ if (isPaidTier && settings.bobbinPrice) {
             )}
           </div>
 
-          {/* FIXED: Action buttons - stack on mobile */}
+          {/* Action buttons - stack on mobile */}
           <div className="flex flex-col sm:flex-row gap-3 mt-6">
             <button
               onClick={handleSaveEstimate}
