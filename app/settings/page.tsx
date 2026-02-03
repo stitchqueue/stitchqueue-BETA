@@ -385,7 +385,7 @@ export default function SettingsPage() {
       <Header />
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-plum">Settings</h1>
             <p className="text-sm text-muted mt-1">
@@ -394,14 +394,14 @@ export default function SettingsPage() {
           </div>
           <button
             onClick={() => router.push("/")}
-            className="px-4 py-2 border border-line rounded-xl hover:bg-white transition-colors"
+            className="px-4 py-2 border border-line rounded-xl hover:bg-white transition-colors self-start sm:self-auto"
           >
             Back to Home
           </button>
         </div>
 
         <div className="bg-white border border-line rounded-card p-4 mb-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="font-bold text-sm">
                 Current Tier: {settings.isPaidTier ? "PAID" : "FREE"}
@@ -421,7 +421,7 @@ export default function SettingsPage() {
                 setSettings(updated);
                 await storage.saveSettings(updated);
               }}
-              className="px-4 py-2 bg-plum text-white rounded-xl text-sm font-bold"
+              className="px-4 py-2 bg-plum text-white rounded-xl text-sm font-bold self-start sm:self-auto"
             >
               Toggle Tier (Demo)
             </button>
@@ -442,10 +442,11 @@ export default function SettingsPage() {
           )}
         </div>
 
-        <div className="flex gap-2 mb-6 border-b border-line overflow-x-auto">
+        {/* FIXED: Tab navigation - horizontal scroll on mobile */}
+        <div className="flex gap-2 mb-6 border-b border-line overflow-x-auto pb-px -mx-4 px-4 sm:mx-0 sm:px-0">
           <button
             onClick={() => setActiveTab("business")}
-            className={`px-4 py-3 font-bold text-sm whitespace-nowrap ${
+            className={`px-4 py-3 font-bold text-sm whitespace-nowrap flex-shrink-0 ${
               activeTab === "business"
                 ? "text-plum border-b-2 border-plum"
                 : "text-muted hover:text-plum"
@@ -455,7 +456,7 @@ export default function SettingsPage() {
           </button>
           <button
             onClick={() => setActiveTab("pricing")}
-            className={`px-4 py-3 font-bold text-sm whitespace-nowrap ${
+            className={`px-4 py-3 font-bold text-sm whitespace-nowrap flex-shrink-0 ${
               activeTab === "pricing"
                 ? "text-plum border-b-2 border-plum"
                 : "text-muted hover:text-plum"
@@ -465,7 +466,7 @@ export default function SettingsPage() {
           </button>
           <button
             onClick={() => setActiveTab("thread")}
-            className={`px-4 py-3 font-bold text-sm whitespace-nowrap ${
+            className={`px-4 py-3 font-bold text-sm whitespace-nowrap flex-shrink-0 ${
               activeTab === "thread"
                 ? "text-plum border-b-2 border-plum"
                 : "text-muted hover:text-plum"
@@ -475,7 +476,7 @@ export default function SettingsPage() {
           </button>
           <button
             onClick={() => setActiveTab("batting")}
-            className={`px-4 py-3 font-bold text-sm whitespace-nowrap ${
+            className={`px-4 py-3 font-bold text-sm whitespace-nowrap flex-shrink-0 ${
               activeTab === "batting"
                 ? "text-plum border-b-2 border-plum"
                 : "text-muted hover:text-plum"
@@ -485,7 +486,7 @@ export default function SettingsPage() {
           </button>
           <button
             onClick={() => setActiveTab("data")}
-            className={`px-4 py-3 font-bold text-sm whitespace-nowrap ${
+            className={`px-4 py-3 font-bold text-sm whitespace-nowrap flex-shrink-0 ${
               activeTab === "data"
                 ? "text-plum border-b-2 border-plum"
                 : "text-muted hover:text-plum"
@@ -496,7 +497,7 @@ export default function SettingsPage() {
         </div>
 
         {activeTab === "business" && (
-          <div className="bg-white border border-line rounded-card p-6 space-y-6">
+          <div className="bg-white border border-line rounded-card p-4 sm:p-6 space-y-6">
             <h2 className="text-lg font-bold text-plum mb-4">
               Business Information
             </h2>
@@ -530,8 +531,9 @@ export default function SettingsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="col-span-2 md:col-span-1">
+              {/* FIXED: Address grid - responsive layout */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="col-span-2 sm:col-span-1">
                   <label className="block text-sm font-bold text-muted mb-2">
                     City
                   </label>
@@ -545,7 +547,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-muted mb-2">
-                    State/Province
+                    State
                   </label>
                   <input
                     type="text"
@@ -569,7 +571,7 @@ export default function SettingsPage() {
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
                 </div>
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                   <label className="block text-sm font-bold text-muted mb-2">
                     Country
                   </label>
@@ -831,7 +833,7 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "pricing" && (
-          <div className="bg-white border border-line rounded-card p-6">
+          <div className="bg-white border border-line rounded-card p-4 sm:p-6">
             <div className="mb-4">
               <h2 className="text-lg font-bold text-plum">Quilting Rates</h2>
               <p className="text-sm text-muted mt-1">
@@ -1013,7 +1015,7 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "thread" && (
-          <div className="bg-white border border-line rounded-card p-6">
+          <div className="bg-white border border-line rounded-card p-4 sm:p-6">
             <div className="mb-4">
               <h2 className="text-lg font-bold text-plum">Thread Options</h2>
               <p className="text-sm text-muted mt-1">
@@ -1045,7 +1047,8 @@ export default function SettingsPage() {
                   <h3 className="text-sm font-bold text-plum mb-3">
                     Add Thread Option
                   </h3>
-                  <div className="flex gap-3">
+                  {/* FIXED: Thread input - stack on mobile */}
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <input
                       type="text"
                       placeholder="Thread name (e.g., So Fine #50)"
@@ -1053,20 +1056,22 @@ export default function SettingsPage() {
                       onChange={(e) => setNewThreadName(e.target.value)}
                       className="flex-1 px-4 py-2 border border-line rounded-xl"
                     />
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="Price"
-                      value={newThreadPrice}
-                      onChange={(e) => setNewThreadPrice(e.target.value)}
-                      className="w-32 px-4 py-2 border border-line rounded-xl"
-                    />
-                    <button
-                      onClick={handleAddThread}
-                      className="px-6 py-2 bg-plum text-white rounded-xl font-bold"
-                    >
-                      Add
-                    </button>
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Price"
+                        value={newThreadPrice}
+                        onChange={(e) => setNewThreadPrice(e.target.value)}
+                        className="w-24 sm:w-32 px-4 py-2 border border-line rounded-xl"
+                      />
+                      <button
+                        onClick={handleAddThread}
+                        className="px-6 py-2 bg-plum text-white rounded-xl font-bold whitespace-nowrap"
+                      >
+                        Add
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1079,7 +1084,7 @@ export default function SettingsPage() {
                     settings.threadOptions.map((thread) => (
                       <div
                         key={thread.name}
-                        className="flex items-center justify-between p-4 border border-line rounded-xl"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-line rounded-xl"
                       >
                         <div className="flex-1">
                           <div className="font-bold text-sm">{thread.name}</div>
@@ -1120,7 +1125,7 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "batting" && (
-          <div className="bg-white border border-line rounded-card p-6">
+          <div className="bg-white border border-line rounded-card p-4 sm:p-6">
             <div className="mb-4">
               <h2 className="text-lg font-bold text-plum">Batting Options</h2>
               <p className="text-sm text-muted mt-1">
@@ -1152,13 +1157,14 @@ export default function SettingsPage() {
                   <h3 className="text-sm font-bold text-plum mb-3">
                     Add Batting Option
                   </h3>
-                  <div className="flex gap-3">
+                  {/* FIXED: Batting inputs - responsive grid that stacks on mobile */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
                       placeholder="Batting name (e.g., Warm & Natural)"
                       value={newBattingName}
                       onChange={(e) => setNewBattingName(e.target.value)}
-                      className="flex-1 px-4 py-2 border border-line rounded-xl"
+                      className="sm:col-span-2 px-4 py-2 border border-line rounded-xl"
                     />
                     <input
                       type="text"
@@ -1166,7 +1172,7 @@ export default function SettingsPage() {
                       placeholder="Width (in)"
                       value={newBattingWidth}
                       onChange={(e) => setNewBattingWidth(e.target.value)}
-                      className="w-32 px-4 py-2 border border-line rounded-xl"
+                      className="px-4 py-2 border border-line rounded-xl"
                     />
                     <input
                       type="text"
@@ -1174,13 +1180,13 @@ export default function SettingsPage() {
                       placeholder="$/inch"
                       value={newBattingPrice}
                       onChange={(e) => setNewBattingPrice(e.target.value)}
-                      className="w-32 px-4 py-2 border border-line rounded-xl"
+                      className="px-4 py-2 border border-line rounded-xl"
                     />
                     <button
                       onClick={handleAddBatting}
-                      className="px-6 py-2 bg-plum text-white rounded-xl font-bold"
+                      className="sm:col-span-2 px-6 py-2 bg-plum text-white rounded-xl font-bold"
                     >
-                      Add
+                      Add Batting Option
                     </button>
                   </div>
                 </div>
@@ -1194,7 +1200,7 @@ export default function SettingsPage() {
                     settings.battingOptions.map((batting) => (
                       <div
                         key={`${batting.name}-${batting.widthInches}`}
-                        className="flex items-center justify-between p-4 border border-line rounded-xl"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-line rounded-xl"
                       >
                         <div className="flex-1">
                           <div className="font-bold text-sm">
@@ -1245,7 +1251,7 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "data" && (
-          <div className="bg-white border border-line rounded-card p-6">
+          <div className="bg-white border border-line rounded-card p-4 sm:p-6">
             <h2 className="text-lg font-bold text-plum mb-4">
               Data Management
             </h2>

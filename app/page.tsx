@@ -190,45 +190,53 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-5 gap-3 mb-6">
-          {STAGE_CONFIG.map(({ stage, icon, color }) => (
-            <button
-              key={stage}
-              onClick={() =>
-                router.push(`/board?stage=${encodeURIComponent(stage)}`)
-              }
-              className={`${color} rounded-xl p-4 text-center hover:opacity-90 transition-opacity`}
-            >
-              <div className="text-2xl mb-1">{icon}</div>
-              <div className="text-2xl font-bold">{getStageCount(stage)}</div>
-              <div className="text-xs font-medium">{stage}</div>
-            </button>
-          ))}
+        {/* FIXED: Stage stat boxes - responsive grid that works on mobile */}
+        {/* Mobile: horizontal scroll with fixed-width cards */}
+        {/* Tablet+: 5-column grid */}
+        <div className="mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-3 overflow-x-auto pb-2 sm:pb-0 sm:overflow-visible sm:grid sm:grid-cols-5">
+            {STAGE_CONFIG.map(({ stage, icon, color }) => (
+              <button
+                key={stage}
+                onClick={() =>
+                  router.push(`/board?stage=${encodeURIComponent(stage)}`)
+                }
+                className={`${color} rounded-xl p-3 sm:p-4 text-center hover:opacity-90 transition-opacity flex-shrink-0 w-[72px] sm:w-auto`}
+              >
+                <div className="text-xl sm:text-2xl mb-1">{icon}</div>
+                <div className="text-xl sm:text-2xl font-bold">{getStageCount(stage)}</div>
+                <div className="text-[10px] sm:text-xs font-medium leading-tight">{stage}</div>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        {/* FIXED: Action buttons - stack on mobile, 3-col on tablet+ */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
           <button
             onClick={() => router.push("/calculator")}
-            className="bg-plum text-white rounded-xl p-6 text-center hover:bg-plum/90 transition-colors"
+            className="bg-plum text-white rounded-xl p-4 sm:p-6 text-center hover:bg-plum/90 transition-colors flex sm:block items-center justify-center gap-3"
           >
-            <div className="text-2xl mb-2">➕</div>
+            <div className="text-2xl sm:mb-2">➕</div>
             <div className="font-bold">New Estimate</div>
           </button>
 
           <button
             onClick={() => router.push("/board?filter=due-this-week")}
-            className="bg-orange-100 text-orange-700 border-2 border-orange-200 rounded-xl p-6 text-center hover:bg-orange-200 transition-colors"
+            className="bg-orange-100 text-orange-700 border-2 border-orange-200 rounded-xl p-4 sm:p-6 text-center hover:bg-orange-200 transition-colors flex sm:block items-center justify-center gap-3"
           >
-            <div className="text-2xl mb-2">⏰</div>
-            <div className="text-2xl font-bold">{dueThisWeekCount}</div>
-            <div className="font-medium text-sm">Due This Week</div>
+            <div className="text-2xl sm:mb-2">⏰</div>
+            <div className="flex sm:flex-col items-center gap-2 sm:gap-0">
+              <span className="text-2xl font-bold">{dueThisWeekCount}</span>
+              <span className="font-medium text-sm">Due This Week</span>
+            </div>
           </button>
 
           <button
             onClick={() => router.push("/board")}
-            className="bg-gold text-white rounded-xl p-6 text-center hover:bg-gold/90 transition-colors"
+            className="bg-gold text-white rounded-xl p-4 sm:p-6 text-center hover:bg-gold/90 transition-colors flex sm:block items-center justify-center gap-3"
           >
-            <div className="text-2xl mb-2">📋</div>
+            <div className="text-2xl sm:mb-2">📋</div>
             <div className="font-bold">View Board</div>
           </button>
         </div>

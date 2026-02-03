@@ -13,26 +13,22 @@ async function getNextEstimateNumberAtomic(): Promise<number> {
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Get current settings
+      // Get current estimate number from organizations table
       const { data: orgData, error: fetchError } = await supabase
         .from("organizations")
-        .select("settings")
+        .select("id, next_estimate_number")
         .single();
 
       if (fetchError) throw fetchError;
 
-      const currentSettings = orgData?.settings || {};
-      const currentNumber = currentSettings.nextEstimateNumber || 1001;
+      const currentNumber = orgData?.next_estimate_number || 1001;
       const newNumber = currentNumber + 1;
 
       // Update with the new number
       const { error: updateError } = await supabase
         .from("organizations")
         .update({
-          settings: {
-            ...currentSettings,
-            nextEstimateNumber: newNumber,
-          },
+          next_estimate_number: newNumber,
           updated_at: new Date().toISOString(),
         })
         .eq("id", orgData?.id);
@@ -93,9 +89,10 @@ function CalculatorPage() {
   const [bindingType, setBindingType] = useState("");
   const [bindingRateManual, setBindingRateManual] = useState("");
   const [bobbinCount, setBobbinCount] = useState("1");
+  const [bobbinPriceManual, setBobbinPriceManual] = useState("");
 
   // Deposit state
-  const [depositType, setDepositType] = useState<"percent" | "flat">("percent");
+  const [depositType, setDepositType] = useState<"percentage" | "flat">("percentage");
   const [depositValue, setDepositValue] = useState("");
   const [depositReceivedToday, setDepositReceivedToday] = useState(false);
   const [depositPaymentMethod, setDepositPaymentMethod] = useState("Cash");
@@ -211,6 +208,7 @@ function CalculatorPage() {
     bindingType,
     bindingRateManual,
     bobbinCount,
+    bobbinPriceManual,
     depositType,
     depositValue,
     settings,
@@ -288,9 +286,13 @@ function CalculatorPage() {
       }
     }
 
-    // Bobbin calculation
-    const bobbins = parseInt(bobbinCount) || 0;
-    bobbin = bobbins * (settings.bobbinPrice || 0);
+   // Bobbin calculation
+const bobbins = parseInt(bobbinCount) || 0;
+if (isPaidTier && settings.bobbinPrice) {
+  bobbin = bobbins * settings.bobbinPrice;
+} else if (bobbinPriceManual) {
+  bobbin = bobbins * (parseFloat(bobbinPriceManual) || 0);
+}
 
     const sub = quilting + thread + batting + binding + bobbin;
     const tax = sub * ((settings.taxRate || 0) / 100);
@@ -300,7 +302,7 @@ function CalculatorPage() {
     let deposit = 0;
     const depVal = parseFloat(depositValue) || 0;
     if (depVal > 0) {
-      if (depositType === "percent") {
+      if (depositType === "percentage") {
         deposit = tot * (depVal / 100);
       } else {
         deposit = depVal;
@@ -389,9 +391,9 @@ function CalculatorPage() {
         taxRate: settings.taxRate || 0,
         taxAmount,
         total,
-        depositType,
-        depositPercent:
-          depositType === "percent" ? parseFloat(depositValue) || 0 : undefined,
+        depositType: depositAmount > 0 ? depositType : null,
+        depositPercentage:
+          depositType === "percentage" ? parseFloat(depositValue) || 0 : undefined,
         depositFlat:
           depositType === "flat" ? parseFloat(depositValue) || 0 : undefined,
         depositAmount,
@@ -437,9 +439,9 @@ function CalculatorPage() {
         battingLengthAddition,
         clientSuppliesBatting,
         bindingType,
-        depositType,
+        depositType: depositAmount > 0 ? depositType : null,
         depositPercentage:
-          depositType === "percent" ? parseFloat(depositValue) || 0 : undefined,
+          depositType === "percentage" ? parseFloat(depositValue) || 0 : undefined,
         depositAmount,
         depositPaid: depositReceivedToday && depositAmount > 0,
         depositPaidDate:
@@ -591,7 +593,7 @@ function CalculatorPage() {
         </div>
 
         {/* Calculator Form */}
-        <div className="bg-white border border-line rounded-card p-6">
+        <div className="bg-white border border-line rounded-card p-4 sm:p-6">
           {/* Client Information Section */}
           <h2 className="text-lg font-bold text-plum mb-4">
             Client Information
@@ -665,8 +667,9 @@ function CalculatorPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="col-span-2 md:col-span-1">
+          {/* FIXED: Address grid - responsive layout */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+            <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-bold text-muted mb-2">
                 City
               </label>
@@ -680,7 +683,7 @@ function CalculatorPage() {
             </div>
             <div>
               <label className="block text-sm font-bold text-muted mb-2">
-                State/Province
+                State
               </label>
               <input
                 type="text"
@@ -702,7 +705,7 @@ function CalculatorPage() {
                 className="w-full px-4 py-2 border border-line rounded-xl"
               />
             </div>
-            <div>
+            <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-bold text-muted mb-2">
                 Country
               </label>
@@ -745,7 +748,8 @@ function CalculatorPage() {
             <label className="block text-sm font-bold text-muted mb-2">
               Requested Completion Date
             </label>
-            <div className="flex gap-2 mb-3">
+            {/* FIXED: Date type buttons - stack on mobile */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-3">
               <button
                 type="button"
                 onClick={() => setRequestedDateType("asap")}
@@ -795,12 +799,12 @@ function CalculatorPage() {
             )}
           </div>
 
-          {/* Quilt Dimensions */}
+          {/* FIXED: Quilt Dimensions - stack on mobile, side-by-side on tablet+ */}
           <div className="mb-6">
             <label className="block text-sm font-bold text-muted mb-2">
               Quilt Dimensions (inches) *
             </label>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="number"
                 placeholder="Width"
@@ -808,7 +812,10 @@ function CalculatorPage() {
                 onChange={(e) => setQuiltWidth(e.target.value)}
                 className="flex-1 px-4 py-2 border border-line rounded-xl"
               />
-              <span className="flex items-center text-muted font-bold">×</span>
+              <span className="hidden sm:flex items-center text-muted font-bold">×</span>
+              <div className="flex sm:hidden items-center justify-center text-muted font-bold text-xs">
+                × (multiplied by)
+              </div>
               <input
                 type="number"
                 placeholder="Length"
@@ -1064,21 +1071,45 @@ function CalculatorPage() {
           </div>
 
           {/* Bobbins */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-muted mb-2">
-              Bobbins{" "}
-              {settings?.bobbinPrice
-                ? `($${settings.bobbinPrice.toFixed(2)} each)`
-                : ""}
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={bobbinCount}
-              onChange={(e) => setBobbinCount(e.target.value)}
-              className="w-full px-4 py-2 border border-line rounded-xl"
-            />
-          </div>
+<div className="mb-6">
+  <label className="block text-sm font-bold text-muted mb-2">
+    Bobbins
+  </label>
+  {isPaidTier && settings?.bobbinPrice ? (
+    <div className="space-y-2">
+      <input
+        type="number"
+        min="0"
+        value={bobbinCount}
+        onChange={(e) => setBobbinCount(e.target.value)}
+        placeholder="Number of bobbins"
+        className="w-full px-4 py-2 border border-line rounded-xl"
+      />
+      <p className="text-xs text-muted">
+        ${settings.bobbinPrice.toFixed(2)} each (from Settings)
+      </p>
+    </div>
+  ) : (
+    <div className="space-y-2">
+      <input
+        type="number"
+        min="0"
+        value={bobbinCount}
+        onChange={(e) => setBobbinCount(e.target.value)}
+        placeholder="Number of bobbins"
+        className="w-full px-4 py-2 border border-line rounded-xl"
+      />
+      <input
+        type="text"
+        inputMode="decimal"
+        placeholder="Price per bobbin (e.g., 2.50)"
+        value={bobbinPriceManual}
+        onChange={(e) => setBobbinPriceManual(e.target.value)}
+        className="w-full px-4 py-2 border border-line rounded-xl"
+      />
+    </div>
+  )}
+</div>
 
           {/* Deposit Section */}
           <div className="mb-6 p-4 bg-gold/5 border border-gold/20 rounded-xl">
@@ -1086,12 +1117,13 @@ function CalculatorPage() {
               Deposit (Optional)
             </label>
 
-            <div className="flex gap-2 mb-3">
+            {/* FIXED: Deposit type buttons - stack on mobile */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-3">
               <button
                 type="button"
-                onClick={() => setDepositType("percent")}
+                onClick={() => setDepositType("percentage")}
                 className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                  depositType === "percent"
+                  depositType === "percentage"
                     ? "bg-gold text-white"
                     : "bg-white border border-line text-muted hover:border-gold"
                 }`}
@@ -1114,12 +1146,12 @@ function CalculatorPage() {
             <div className="flex gap-3 items-center">
               <div className="relative flex-1">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-bold">
-                  {depositType === "percent" ? "%" : "$"}
+                  {depositType === "percentage" ? "%" : "$"}
                 </span>
                 <input
                   type="text"
                   inputMode="decimal"
-                  placeholder={depositType === "percent" ? "50" : "100.00"}
+                  placeholder={depositType === "percentage" ? "50" : "100.00"}
                   value={depositValue}
                   onChange={(e) => setDepositValue(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-line rounded-xl"
@@ -1292,8 +1324,8 @@ function CalculatorPage() {
             )}
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 mt-6">
+          {/* FIXED: Action buttons - stack on mobile */}
+          <div className="flex flex-col sm:flex-row gap-3 mt-6">
             <button
               onClick={handleSaveEstimate}
               disabled={saving}
