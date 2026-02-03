@@ -95,7 +95,7 @@ function CalculatorPage() {
   const [bobbinCount, setBobbinCount] = useState("1");
 
   // Deposit state
-  const [depositType, setDepositType] = useState<"percent" | "flat">("percent");
+  const [depositType, setDepositType] = useState<"percentage" | "flat">("percentage");
   const [depositValue, setDepositValue] = useState("");
   const [depositReceivedToday, setDepositReceivedToday] = useState(false);
   const [depositPaymentMethod, setDepositPaymentMethod] = useState("Cash");
@@ -389,9 +389,9 @@ function CalculatorPage() {
         taxRate: settings.taxRate || 0,
         taxAmount,
         total,
-        depositType,
+        depositType: depositAmount > 0 ? depositType : null,
         depositPercent:
-          depositType === "percent" ? parseFloat(depositValue) || 0 : undefined,
+          depositType === "percentage" ? parseFloat(depositValue) || 0 : undefined,
         depositFlat:
           depositType === "flat" ? parseFloat(depositValue) || 0 : undefined,
         depositAmount,
@@ -437,9 +437,9 @@ function CalculatorPage() {
         battingLengthAddition,
         clientSuppliesBatting,
         bindingType,
-        depositType,
+        depositType: depositAmount > 0 ? depositType : null,
         depositPercentage:
-          depositType === "percent" ? parseFloat(depositValue) || 0 : undefined,
+          depositType === "percentage" ? parseFloat(depositValue) || 0 : undefined,
         depositAmount,
         depositPaid: depositReceivedToday && depositAmount > 0,
         depositPaidDate:
@@ -1089,9 +1089,9 @@ function CalculatorPage() {
             <div className="flex gap-2 mb-3">
               <button
                 type="button"
-                onClick={() => setDepositType("percent")}
+                onClick={() => setDepositType("percentage")}
                 className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                  depositType === "percent"
+                  depositType === "percentage"
                     ? "bg-gold text-white"
                     : "bg-white border border-line text-muted hover:border-gold"
                 }`}
