@@ -23,6 +23,13 @@ import {
 } from "../components/FormField";
 import type { Project, Settings } from "../types";
 import { COUNTRY_OPTIONS, DEFAULT_SETTINGS } from "../types";
+import {
+  getRegionsForCountry,
+  countryHasRegionDropdown,
+  getRegionLabel,
+  getPostalCodeLabel,
+  getPostalCodePlaceholder,
+} from "../lib/locations";
 
 // Phone formatting helper
 const formatPhoneNumber = (value: string): string => {
@@ -104,11 +111,29 @@ export default function IntakePage() {
   const hasBattingOptions =
     settings.battingOptions && settings.battingOptions.length > 0;
 
+  // Get regions for selected country
+  const regions = getRegionsForCountry(formData.clientCountry);
+  const showRegionDropdown = countryHasRegionDropdown(formData.clientCountry);
+  const regionLabel = getRegionLabel(formData.clientCountry);
+  const postalCodeLabel = getPostalCodeLabel(formData.clientCountry);
+  const postalCodePlaceholder = getPostalCodePlaceholder(formData.clientCountry);
+
   // Update form data helper
   const updateFormData = (field: string, value: string | boolean) => {
     setFormData({ ...formData, [field]: value });
     // Clear field error when user types
     clearFieldError(field);
+  };
+
+  // Handle country change - reset state when country changes
+  const handleCountryChange = (newCountry: string) => {
+    setFormData({
+      ...formData,
+      clientCountry: newCountry,
+      clientState: "", // Reset state when country changes
+    });
+    clearFieldError("clientCountry");
+    clearFieldError("clientState");
   };
 
   // Clear field error helper
@@ -354,23 +379,40 @@ export default function IntakePage() {
                 </div>
 
                 <FormField
-                  label="State/Province"
+                  label={regionLabel}
                   required
                   error={getFieldError(errors, "State/Province")}
                 >
-                  <ValidatedInput
-                    type="text"
-                    value={formData.clientState}
-                    onChange={(e) =>
-                      updateFormData("clientState", e.target.value)
-                    }
-                    placeholder="WA"
-                    hasError={hasFieldError(errors, "State/Province")}
-                  />
+                  {showRegionDropdown ? (
+                    <ValidatedSelect
+                      value={formData.clientState}
+                      onChange={(e) =>
+                        updateFormData("clientState", e.target.value)
+                      }
+                      hasError={hasFieldError(errors, "State/Province")}
+                    >
+                      <option value="">Select...</option>
+                      {regions.map((region) => (
+                        <option key={region.code} value={region.code}>
+                          {region.name}
+                        </option>
+                      ))}
+                    </ValidatedSelect>
+                  ) : (
+                    <ValidatedInput
+                      type="text"
+                      value={formData.clientState}
+                      onChange={(e) =>
+                        updateFormData("clientState", e.target.value)
+                      }
+                      placeholder="State/Province"
+                      hasError={hasFieldError(errors, "State/Province")}
+                    />
+                  )}
                 </FormField>
 
                 <FormField
-                  label="Postal Code"
+                  label={postalCodeLabel}
                   required
                   error={getFieldError(errors, "Postal code")}
                 >
@@ -380,7 +422,7 @@ export default function IntakePage() {
                     onChange={(e) =>
                       updateFormData("clientPostalCode", e.target.value)
                     }
-                    placeholder="99201"
+                    placeholder={postalCodePlaceholder}
                     hasError={hasFieldError(errors, "Postal code")}
                   />
                 </FormField>
@@ -392,9 +434,7 @@ export default function IntakePage() {
                 >
                   <ValidatedSelect
                     value={formData.clientCountry}
-                    onChange={(e) =>
-                      updateFormData("clientCountry", e.target.value)
-                    }
+                    onChange={(e) => handleCountryChange(e.target.value)}
                     hasError={hasFieldError(errors, "Country")}
                   >
                     {COUNTRY_OPTIONS.map((country) => (

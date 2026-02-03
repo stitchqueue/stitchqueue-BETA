@@ -6,6 +6,14 @@ import Header from "../components/Header";
 import { storage } from "../lib/storage";
 import { supabase } from "../lib/supabase";
 import type { Settings, Project } from "../types";
+import { COUNTRY_OPTIONS } from "../types";
+import {
+  getRegionsForCountry,
+  countryHasRegionDropdown,
+  getRegionLabel,
+  getPostalCodeLabel,
+  getPostalCodePlaceholder,
+} from "../lib/locations";
 
 // Atomic estimate number generator to prevent race conditions
 async function getNextEstimateNumberAtomic(): Promise<number> {
@@ -74,9 +82,7 @@ function CalculatorPage() {
   const [quiltWidth, setQuiltWidth] = useState("");
   const [quiltLength, setQuiltLength] = useState("");
   const [description, setDescription] = useState("");
-  const [requestedDateType, setRequestedDateType] = useState<
-    "asap" | "no_date" | "specific_date"
-  >("no_date");
+  const [requestedDateType, setRequestedDateType] = useState<"asap" | "no_date" | "specific_date">("no_date");
   const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
   const [quiltingType, setQuiltingType] = useState("");
   const [quiltingRateManual, setQuiltingRateManual] = useState("");
@@ -121,6 +127,19 @@ function CalculatorPage() {
     settings?.threadOptions && settings.threadOptions.length > 0;
   const hasBattingOptions =
     settings?.battingOptions && settings.battingOptions.length > 0;
+
+  // Location helpers
+  const regions = getRegionsForCountry(clientCountry);
+  const showRegionDropdown = countryHasRegionDropdown(clientCountry);
+  const regionLabel = getRegionLabel(clientCountry);
+  const postalCodeLabel = getPostalCodeLabel(clientCountry);
+  const postalCodePlaceholder = getPostalCodePlaceholder(clientCountry);
+
+  // Handle country change - reset state when country changes
+  const handleCountryChange = (newCountry: string) => {
+    setClientCountry(newCountry);
+    setClientState(""); // Reset state when country changes
+  };
 
   // Phone formatting helper
   const formatPhoneNumber = (value: string): string => {
@@ -286,13 +305,13 @@ function CalculatorPage() {
       }
     }
 
-   // Bobbin calculation
-const bobbins = parseInt(bobbinCount) || 0;
-if (isPaidTier && settings.bobbinPrice) {
-  bobbin = bobbins * settings.bobbinPrice;
-} else if (bobbinPriceManual) {
-  bobbin = bobbins * (parseFloat(bobbinPriceManual) || 0);
-}
+    // Bobbin calculation
+    const bobbins = parseInt(bobbinCount) || 0;
+    if (isPaidTier && settings.bobbinPrice) {
+      bobbin = bobbins * settings.bobbinPrice;
+    } else if (bobbinPriceManual) {
+      bobbin = bobbins * (parseFloat(bobbinPriceManual) || 0);
+    }
 
     const sub = quilting + thread + batting + binding + bobbin;
     const tax = sub * ((settings.taxRate || 0) / 100);
@@ -593,7 +612,7 @@ if (isPaidTier && settings.bobbinPrice) {
         </div>
 
         {/* Calculator Form */}
-        <div className="bg-white border border-line rounded-card p-6">
+        <div className="bg-white border border-line rounded-card p-4 sm:p-6">
           {/* Client Information Section */}
           <h2 className="text-lg font-bold text-plum mb-4">
             Client Information
@@ -667,8 +686,9 @@ if (isPaidTier && settings.bobbinPrice) {
             />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="col-span-2 md:col-span-1">
+          {/* Address grid - responsive layout */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+            <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-bold text-muted mb-2">
                 City
               </label>
@@ -682,43 +702,57 @@ if (isPaidTier && settings.bobbinPrice) {
             </div>
             <div>
               <label className="block text-sm font-bold text-muted mb-2">
-                State/Province
+                {regionLabel}
               </label>
-              <input
-                type="text"
-                value={clientState}
-                onChange={(e) => setClientState(e.target.value)}
-                placeholder="WA"
-                className="w-full px-4 py-2 border border-line rounded-xl"
-              />
+              {showRegionDropdown ? (
+                <select
+                  value={clientState}
+                  onChange={(e) => setClientState(e.target.value)}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                >
+                  <option value="">Select...</option>
+                  {regions.map((region) => (
+                    <option key={region.code} value={region.code}>
+                      {region.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={clientState}
+                  onChange={(e) => setClientState(e.target.value)}
+                  placeholder="State/Province"
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-bold text-muted mb-2">
-                Postal Code
+                {postalCodeLabel}
               </label>
               <input
                 type="text"
                 value={clientPostalCode}
                 onChange={(e) => setClientPostalCode(e.target.value)}
-                placeholder="99201"
+                placeholder={postalCodePlaceholder}
                 className="w-full px-4 py-2 border border-line rounded-xl"
               />
             </div>
-            <div>
+            <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-bold text-muted mb-2">
                 Country
               </label>
               <select
                 value={clientCountry}
-                onChange={(e) => setClientCountry(e.target.value)}
+                onChange={(e) => handleCountryChange(e.target.value)}
                 className="w-full px-4 py-2 border border-line rounded-xl"
               >
-                <option value="United States">United States</option>
-                <option value="Canada">Canada</option>
-                <option value="United Kingdom">United Kingdom</option>
-                <option value="Australia">Australia</option>
-                <option value="Mexico">Mexico</option>
-                <option value="Ecuador">Ecuador</option>
+                {COUNTRY_OPTIONS.map((country) => (
+                  <option key={country} value={country}>
+                    {country}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -747,7 +781,8 @@ if (isPaidTier && settings.bobbinPrice) {
             <label className="block text-sm font-bold text-muted mb-2">
               Requested Completion Date
             </label>
-            <div className="flex gap-2 mb-3">
+            {/* Date type buttons - stack on mobile */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-3">
               <button
                 type="button"
                 onClick={() => setRequestedDateType("asap")}
@@ -797,12 +832,12 @@ if (isPaidTier && settings.bobbinPrice) {
             )}
           </div>
 
-          {/* Quilt Dimensions */}
+          {/* Quilt Dimensions - stack on mobile, side-by-side on tablet+ */}
           <div className="mb-6">
             <label className="block text-sm font-bold text-muted mb-2">
               Quilt Dimensions (inches) *
             </label>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="number"
                 placeholder="Width"
@@ -810,7 +845,10 @@ if (isPaidTier && settings.bobbinPrice) {
                 onChange={(e) => setQuiltWidth(e.target.value)}
                 className="flex-1 px-4 py-2 border border-line rounded-xl"
               />
-              <span className="flex items-center text-muted font-bold">×</span>
+              <span className="hidden sm:flex items-center text-muted font-bold">×</span>
+              <div className="flex sm:hidden items-center justify-center text-muted font-bold text-xs">
+                × (multiplied by)
+              </div>
               <input
                 type="number"
                 placeholder="Length"
@@ -1066,45 +1104,45 @@ if (isPaidTier && settings.bobbinPrice) {
           </div>
 
           {/* Bobbins */}
-<div className="mb-6">
-  <label className="block text-sm font-bold text-muted mb-2">
-    Bobbins
-  </label>
-  {isPaidTier && settings?.bobbinPrice ? (
-    <div className="space-y-2">
-      <input
-        type="number"
-        min="0"
-        value={bobbinCount}
-        onChange={(e) => setBobbinCount(e.target.value)}
-        placeholder="Number of bobbins"
-        className="w-full px-4 py-2 border border-line rounded-xl"
-      />
-      <p className="text-xs text-muted">
-        ${settings.bobbinPrice.toFixed(2)} each (from Settings)
-      </p>
-    </div>
-  ) : (
-    <div className="space-y-2">
-      <input
-        type="number"
-        min="0"
-        value={bobbinCount}
-        onChange={(e) => setBobbinCount(e.target.value)}
-        placeholder="Number of bobbins"
-        className="w-full px-4 py-2 border border-line rounded-xl"
-      />
-      <input
-        type="text"
-        inputMode="decimal"
-        placeholder="Price per bobbin (e.g., 2.50)"
-        value={bobbinPriceManual}
-        onChange={(e) => setBobbinPriceManual(e.target.value)}
-        className="w-full px-4 py-2 border border-line rounded-xl"
-      />
-    </div>
-  )}
-</div>
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-muted mb-2">
+              Bobbins
+            </label>
+            {isPaidTier && settings?.bobbinPrice ? (
+              <div className="space-y-2">
+                <input
+                  type="number"
+                  min="0"
+                  value={bobbinCount}
+                  onChange={(e) => setBobbinCount(e.target.value)}
+                  placeholder="Number of bobbins"
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+                <p className="text-xs text-muted">
+                  ${settings.bobbinPrice.toFixed(2)} each (from Settings)
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="number"
+                  min="0"
+                  value={bobbinCount}
+                  onChange={(e) => setBobbinCount(e.target.value)}
+                  placeholder="Number of bobbins"
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Price per bobbin (e.g., 2.50)"
+                  value={bobbinPriceManual}
+                  onChange={(e) => setBobbinPriceManual(e.target.value)}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                />
+              </div>
+            )}
+          </div>
 
           {/* Deposit Section */}
           <div className="mb-6 p-4 bg-gold/5 border border-gold/20 rounded-xl">
@@ -1112,7 +1150,8 @@ if (isPaidTier && settings.bobbinPrice) {
               Deposit (Optional)
             </label>
 
-            <div className="flex gap-2 mb-3">
+            {/* Deposit type buttons - stack on mobile */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-3">
               <button
                 type="button"
                 onClick={() => setDepositType("percentage")}
@@ -1318,8 +1357,8 @@ if (isPaidTier && settings.bobbinPrice) {
             )}
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 mt-6">
+          {/* Action buttons - stack on mobile */}
+          <div className="flex flex-col sm:flex-row gap-3 mt-6">
             <button
               onClick={handleSaveEstimate}
               disabled={saving}

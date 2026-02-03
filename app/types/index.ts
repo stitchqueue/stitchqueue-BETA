@@ -19,14 +19,11 @@ export const STAGES: Stage[] = [
   "Archived",
 ];
 
-// Country options for dropdown
+// Country options for dropdown (simplified - detailed data in locations.ts)
 export const COUNTRY_OPTIONS = [
   "United States",
   "Canada",
-  "United Kingdom",
-  "Australia",
-  "Mexico",
-  "Ecuador",
+  "Other",
 ] as const;
 
 export type Country = (typeof COUNTRY_OPTIONS)[number] | string;
