@@ -13,26 +13,22 @@ async function getNextEstimateNumberAtomic(): Promise<number> {
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Get current settings
+      // Get current estimate number from organizations table
       const { data: orgData, error: fetchError } = await supabase
         .from("organizations")
-        .select("settings")
+        .select("id, next_estimate_number")
         .single();
 
       if (fetchError) throw fetchError;
 
-      const currentSettings = orgData?.settings || {};
-      const currentNumber = currentSettings.nextEstimateNumber || 1001;
+      const currentNumber = orgData?.next_estimate_number || 1001;
       const newNumber = currentNumber + 1;
 
       // Update with the new number
       const { error: updateError } = await supabase
         .from("organizations")
         .update({
-          settings: {
-            ...currentSettings,
-            nextEstimateNumber: newNumber,
-          },
+          next_estimate_number: newNumber,
           updated_at: new Date().toISOString(),
         })
         .eq("id", orgData?.id);
@@ -300,7 +296,7 @@ function CalculatorPage() {
     let deposit = 0;
     const depVal = parseFloat(depositValue) || 0;
     if (depVal > 0) {
-      if (depositType === "percent") {
+      if (depositType === "percentage") {
         deposit = tot * (depVal / 100);
       } else {
         deposit = depVal;
@@ -390,7 +386,7 @@ function CalculatorPage() {
         taxAmount,
         total,
         depositType: depositAmount > 0 ? depositType : null,
-        depositPercent:
+        depositPercentage:
           depositType === "percentage" ? parseFloat(depositValue) || 0 : undefined,
         depositFlat:
           depositType === "flat" ? parseFloat(depositValue) || 0 : undefined,
@@ -1114,12 +1110,12 @@ function CalculatorPage() {
             <div className="flex gap-3 items-center">
               <div className="relative flex-1">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-bold">
-                  {depositType === "percent" ? "%" : "$"}
+                  {depositType === "percentage" ? "%" : "$"}
                 </span>
                 <input
                   type="text"
                   inputMode="decimal"
-                  placeholder={depositType === "percent" ? "50" : "100.00"}
+                  placeholder={depositType === "percentage" ? "50" : "100.00"}
                   value={depositValue}
                   onChange={(e) => setDepositValue(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-line rounded-xl"
