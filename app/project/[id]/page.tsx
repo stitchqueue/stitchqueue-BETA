@@ -39,6 +39,14 @@ export default function ProjectDetailPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [updating, setUpdating] = useState(false);
 
+  // Payment recording state
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [paymentDate, setPaymentDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+
   useEffect(() => {
     const loadProject = async () => {
       try {
@@ -53,6 +61,15 @@ export default function ProjectDetailPage() {
         // Load project
         const savedProject = await storage.getProjectById(projectId);
         setProject(savedProject || null);
+
+        // Pre-fill payment amount with balance due
+        if (savedProject?.estimateData?.total) {
+          const depositPaid = savedProject.depositPaid
+            ? savedProject.depositPaidAmount || savedProject.depositAmount || 0
+            : 0;
+          const balanceDue = savedProject.estimateData.total - depositPaid;
+          setPaymentAmount(balanceDue.toFixed(2));
+        }
       } catch (error) {
         console.error("Error loading project:", error);
         setProject(null);
@@ -120,6 +137,18 @@ export default function ProjectDetailPage() {
   const hasEstimate = project.estimateData && project.estimateData.total > 0;
   const estimate = project.estimateData;
 
+  // Calculate balance due
+  const getBalanceDue = (): number => {
+    if (!estimate?.total) return 0;
+    const depositPaid = project.depositPaid
+      ? project.depositPaidAmount || project.depositAmount || 0
+      : 0;
+    const finalPaid = project.paidInFull ? project.finalPaymentAmount || 0 : 0;
+    return estimate.total - depositPaid - finalPaid;
+  };
+
+  const balanceDue = getBalanceDue();
+
   const handleStageChange = async (newStage: Stage) => {
     if (updating) return;
     setUpdating(true);
@@ -155,6 +184,114 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleRecordDeposit = async () => {
+    if (!project.depositAmount || project.depositAmount <= 0) {
+      alert("No deposit amount set for this project.");
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      await storage.updateProject(project.id, {
+        depositPaid: true,
+        depositPaidDate: today,
+        depositPaidMethod: paymentMethod,
+        depositPaidAmount: project.depositAmount,
+      });
+      setProject({
+        ...project,
+        depositPaid: true,
+        depositPaidDate: today,
+        depositPaidMethod: paymentMethod,
+        depositPaidAmount: project.depositAmount,
+      });
+      alert("Deposit recorded successfully!");
+    } catch (error) {
+      console.error("Error recording deposit:", error);
+      alert("Failed to record deposit. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleRecordFinalPayment = async () => {
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid payment amount.");
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const isPaidInFull = amount >= balanceDue - 0.01; // Allow for rounding
+      await storage.updateProject(project.id, {
+        finalPaymentAmount: amount,
+        finalPaymentDate: paymentDate,
+        finalPaymentMethod: paymentMethod,
+        paidInFull: isPaidInFull,
+        // Automatically advance to Paid/Shipped if paid in full
+        ...(isPaidInFull && project.stage === "Invoiced"
+          ? { stage: "Paid/Shipped" as Stage }
+          : {}),
+      });
+      setProject({
+        ...project,
+        finalPaymentAmount: amount,
+        finalPaymentDate: paymentDate,
+        finalPaymentMethod: paymentMethod,
+        paidInFull: isPaidInFull,
+        ...(isPaidInFull && project.stage === "Invoiced"
+          ? { stage: "Paid/Shipped" as Stage }
+          : {}),
+      });
+      setShowPaymentForm(false);
+      alert(
+        isPaidInFull
+          ? "Payment recorded! Project marked as Paid/Shipped."
+          : "Partial payment recorded."
+      );
+    } catch (error) {
+      console.error("Error recording payment:", error);
+      alert("Failed to record payment. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleClearFinalPayment = async () => {
+    if (!confirm("Clear the final payment record?")) return;
+
+    setUpdating(true);
+    try {
+      await storage.updateProject(project.id, {
+        finalPaymentAmount: undefined,
+        finalPaymentDate: undefined,
+        finalPaymentMethod: undefined,
+        paidInFull: false,
+      });
+      setProject({
+        ...project,
+        finalPaymentAmount: undefined,
+        finalPaymentDate: undefined,
+        finalPaymentMethod: undefined,
+        paidInFull: false,
+      });
+      // Reset the payment amount field
+      if (estimate?.total) {
+        const depositPaid = project.depositPaid
+          ? project.depositPaidAmount || project.depositAmount || 0
+          : 0;
+        setPaymentAmount((estimate.total - depositPaid).toFixed(2));
+      }
+    } catch (error) {
+      console.error("Error clearing payment:", error);
+      alert("Failed to clear payment. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const getCompletionDateDisplay = () => {
     if (project.requestedDateType === "asap") {
       return "ASAP";
@@ -182,6 +319,11 @@ export default function ProjectDetailPage() {
               {project.estimateNumber && (
                 <span className="px-3 py-1 bg-gray-100 border border-line rounded-full text-sm font-bold text-gold">
                   #{project.estimateNumber}
+                </span>
+              )}
+              {project.paidInFull && (
+                <span className="px-3 py-1 bg-green-100 border border-green-300 rounded-full text-sm font-bold text-green-700">
+                  ✓ PAID
                 </span>
               )}
             </div>
@@ -354,24 +496,26 @@ export default function ProjectDetailPage() {
             </div>
 
             <div className="space-y-2 text-sm">
-              {estimate.quiltingTotal > 0 && (
+              {estimate.quiltingTotal && estimate.quiltingTotal > 0 && (
                 <div className="flex justify-between py-2 border-b border-line">
                   <span>
-                    Quilting ({estimate.quiltArea?.toLocaleString() || 0} sq in × ${estimate.quiltingRate || 0})
+                    Quilting ({estimate.quiltArea?.toLocaleString() || 0} sq in
+                    × ${estimate.quiltingRate || 0})
                   </span>
                   <span>{formatCurrency(estimate.quiltingTotal)}</span>
                 </div>
               )}
-              {estimate.threadCost > 0 && (
+              {estimate.threadCost && estimate.threadCost > 0 && (
                 <div className="flex justify-between py-2 border-b border-line">
                   <span>Thread</span>
                   <span>{formatCurrency(estimate.threadCost)}</span>
                 </div>
               )}
-              {estimate.battingTotal > 0 && (
+              {estimate.battingTotal && estimate.battingTotal > 0 && (
                 <div className="flex justify-between py-2 border-b border-line">
                   <span>
-                    Batting ({estimate.battingLengthNeeded?.toFixed(0) || 0}" length)
+                    Batting ({estimate.battingLengthNeeded?.toFixed(0) || 0}"
+                    length)
                   </span>
                   <span>{formatCurrency(estimate.battingTotal)}</span>
                 </div>
@@ -382,18 +526,20 @@ export default function ProjectDetailPage() {
                   <span>$0.00</span>
                 </div>
               )}
-              {estimate.bindingTotal > 0 && (
+              {estimate.bindingTotal && estimate.bindingTotal > 0 && (
                 <div className="flex justify-between py-2 border-b border-line">
                   <span>
-                    Binding ({estimate.bindingPerimeter?.toFixed(0) || 0}" × ${estimate.bindingRatePerInch || 0}/in)
+                    Binding ({estimate.bindingPerimeter?.toFixed(0) || 0}" × $
+                    {estimate.bindingRatePerInch || 0}/in)
                   </span>
                   <span>{formatCurrency(estimate.bindingTotal)}</span>
                 </div>
               )}
-              {estimate.bobbinTotal > 0 && (
+              {estimate.bobbinTotal && estimate.bobbinTotal > 0 && (
                 <div className="flex justify-between py-2 border-b border-line">
                   <span>
-                    Bobbins ({estimate.bobbinCount || 0} × ${estimate.bobbinPrice || 0})
+                    Bobbins ({estimate.bobbinCount || 0} × $
+                    {estimate.bobbinPrice || 0})
                   </span>
                   <span>{formatCurrency(estimate.bobbinTotal)}</span>
                 </div>
@@ -403,60 +549,200 @@ export default function ProjectDetailPage() {
             <div className="border-t border-line pt-3 mt-3 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted">Subtotal</span>
-                <span className="font-medium">{formatCurrency(estimate.subtotal)}</span>
+                <span className="font-medium">
+                  {formatCurrency(estimate.subtotal)}
+                </span>
               </div>
-              {estimate.taxAmount > 0 && (
+              {estimate.taxAmount && estimate.taxAmount > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted">Tax ({estimate.taxRate || 0}%)</span>
-                  <span className="font-medium">{formatCurrency(estimate.taxAmount)}</span>
+                  <span className="text-muted">
+                    Tax ({estimate.taxRate || 0}%)
+                  </span>
+                  <span className="font-medium">
+                    {formatCurrency(estimate.taxAmount)}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between py-2 font-bold text-lg border-t border-line">
                 <span>Total</span>
-                <span className="text-plum">{formatCurrency(estimate.total)}</span>
+                <span className="text-plum">
+                  {formatCurrency(estimate.total)}
+                </span>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Deposit Info */}
-            {project.depositAmount && project.depositAmount > 0 && (
-              <div className="mt-4 p-3 bg-gold/10 rounded-xl space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-bold text-gold">
-                    Deposit {project.depositPaid ? "(Paid)" : "Due"}
-                  </span>
-                  <span className="font-bold text-gold">
-                    {formatCurrency(project.depositAmount)}
-                  </span>
-                </div>
-                {project.depositPaid && project.depositPaidDate && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted">
-                      Paid on {formatDate(project.depositPaidDate)}
-                      {project.depositPaidMethod && ` via ${project.depositPaidMethod}`}
+        {/* Payment Summary Card */}
+        {hasEstimate && estimate && (
+          <div className="bg-white border border-line rounded-xl p-6 mb-6">
+            <h2 className="font-bold text-plum mb-4">Payment Summary</h2>
+
+            <div className="space-y-3">
+              {/* Invoice Total */}
+              <div className="flex justify-between text-sm py-2 border-b border-line">
+                <span className="text-muted">Invoice Total</span>
+                <span className="font-bold">
+                  {formatCurrency(estimate.total)}
+                </span>
+              </div>
+
+              {/* Deposit Section */}
+              {project.depositAmount && project.depositAmount > 0 && (
+                <div className="p-3 bg-gold/10 rounded-xl space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-bold text-gold">Deposit</span>
+                    <span className="font-bold text-gold">
+                      {formatCurrency(project.depositAmount)}
                     </span>
                   </div>
-                )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted">Balance Due</span>
-                  <span className="font-bold">
-                    {formatCurrency(estimate.total - (project.depositPaid ? (project.depositPaidAmount || project.depositAmount || 0) : 0))}
-                  </span>
+                  {project.depositPaid ? (
+                    <div className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded">
+                      ✓ Paid on {formatDate(project.depositPaidDate)}
+                      {project.depositPaidMethod &&
+                        ` via ${project.depositPaidMethod}`}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-orange-600">
+                        Not yet received
+                      </span>
+                      <button
+                        onClick={handleRecordDeposit}
+                        disabled={updating}
+                        className="px-3 py-1 bg-gold text-white rounded-lg text-xs font-bold hover:bg-gold/90 transition-colors disabled:opacity-50"
+                      >
+                        Record Deposit
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {estimate.createdAt && (
-              <div className="text-xs text-muted mt-4">
-                Estimate created:{" "}
-                {new Date(estimate.createdAt).toLocaleString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
+              {/* Final Payment Section */}
+              {project.finalPaymentAmount && project.finalPaymentAmount > 0 ? (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-xl space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-bold text-green-700">
+                      Final Payment
+                    </span>
+                    <span className="font-bold text-green-700">
+                      {formatCurrency(project.finalPaymentAmount)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-green-700">
+                    ✓ Paid on {formatDate(project.finalPaymentDate)}
+                    {project.finalPaymentMethod &&
+                      ` via ${project.finalPaymentMethod}`}
+                  </div>
+                  <button
+                    onClick={handleClearFinalPayment}
+                    disabled={updating}
+                    className="text-xs text-red-600 hover:text-red-800 underline"
+                  >
+                    Clear payment
+                  </button>
+                </div>
+              ) : (
+                /* Record Payment Form/Button */
+                !project.paidInFull &&
+                balanceDue > 0 && (
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    {showPaymentForm ? (
+                      <div className="space-y-3">
+                        <div className="font-bold text-sm text-plum">
+                          Record Final Payment
+                        </div>
+                        <div>
+                          <label className="block text-xs text-muted mb-1">
+                            Amount
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+                              $
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={paymentAmount}
+                              onChange={(e) => setPaymentAmount(e.target.value)}
+                              className="w-full pl-7 pr-3 py-2 border border-line rounded-lg text-sm"
+                              placeholder="0.00"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-muted mb-1">
+                            Payment Method
+                          </label>
+                          <select
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            className="w-full px-3 py-2 border border-line rounded-lg text-sm"
+                          >
+                            <option value="Cash">Cash</option>
+                            <option value="Check">Check</option>
+                            <option value="Venmo">Venmo</option>
+                            <option value="PayPal">PayPal</option>
+                            <option value="Zelle">Zelle</option>
+                            <option value="Square">Square</option>
+                            <option value="Credit Card">Credit Card</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-muted mb-1">
+                            Payment Date
+                          </label>
+                          <input
+                            type="date"
+                            value={paymentDate}
+                            onChange={(e) => setPaymentDate(e.target.value)}
+                            className="w-full px-3 py-2 border border-line rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleRecordFinalPayment}
+                            disabled={updating}
+                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors disabled:opacity-50"
+                          >
+                            {updating ? "Saving..." : "Save Payment"}
+                          </button>
+                          <button
+                            onClick={() => setShowPaymentForm(false)}
+                            className="px-4 py-2 border border-line rounded-lg text-sm hover:bg-white transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowPaymentForm(true)}
+                        className="w-full px-4 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors"
+                      >
+                        💵 Record Final Payment
+                      </button>
+                    )}
+                  </div>
+                )
+              )}
+
+              {/* Balance Due */}
+              <div
+                className={`flex justify-between py-3 font-bold text-lg border-t border-line ${
+                  balanceDue <= 0 ? "text-green-700" : "text-plum"
+                }`}
+              >
+                <span>Balance Due</span>
+                <span>
+                  {balanceDue <= 0
+                    ? "✓ PAID IN FULL"
+                    : formatCurrency(balanceDue)}
+                </span>
               </div>
-            )}
+            </div>
           </div>
         )}
 
