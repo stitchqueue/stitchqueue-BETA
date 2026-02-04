@@ -16,6 +16,15 @@ export default function InvoicePage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
+  // Payment recording state
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [paymentDate, setPaymentDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
 
   useEffect(() => {
     const loadData = async () => {
@@ -35,6 +44,16 @@ export default function InvoicePage() {
         ]);
         setProject(proj || null);
         setSettings(savedSettings);
+
+        // Pre-fill payment amount with balance due
+        if (proj?.estimateData?.total) {
+          const depositPaid = proj.depositPaid
+            ? proj.depositPaidAmount || proj.depositAmount || 0
+            : 0;
+          const finalPaid = proj.paidInFull ? proj.finalPaymentAmount || 0 : 0;
+          const balanceDue = proj.estimateData.total - depositPaid - finalPaid;
+          setPaymentAmount(balanceDue.toFixed(2));
+        }
       } catch (error) {
         console.error("Error loading invoice data:", error);
       } finally {
@@ -114,6 +133,98 @@ export default function InvoicePage() {
     window.print();
   };
 
+  const handleRecordFinalPayment = async () => {
+    if (!project) return;
+
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid payment amount.");
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const estimate = project.estimateData;
+      const depositPaid = project.depositPaid
+        ? project.depositPaidAmount || project.depositAmount || 0
+        : 0;
+      const balanceDue = (estimate?.total || 0) - depositPaid;
+      const isPaidInFull = amount >= balanceDue - 0.01; // Allow for rounding
+
+      await storage.updateProject(project.id, {
+        finalPaymentAmount: amount,
+        finalPaymentDate: paymentDate,
+        finalPaymentMethod: paymentMethod,
+        paidInFull: isPaidInFull,
+        // Automatically advance to Paid/Shipped if paid in full and currently Invoiced
+        ...(isPaidInFull && project.stage === "Invoiced"
+          ? { stage: "Paid/Shipped" }
+          : {}),
+      });
+
+      setProject({
+        ...project,
+        finalPaymentAmount: amount,
+        finalPaymentDate: paymentDate,
+        finalPaymentMethod: paymentMethod,
+        paidInFull: isPaidInFull,
+        ...(isPaidInFull && project.stage === "Invoiced"
+          ? { stage: "Paid/Shipped" }
+          : {}),
+      });
+
+      setShowPaymentForm(false);
+      alert(
+        isPaidInFull
+          ? "Payment recorded! Project marked as Paid/Shipped."
+          : "Partial payment recorded."
+      );
+    } catch (error) {
+      console.error("Error recording payment:", error);
+      alert("Failed to record payment. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleClearFinalPayment = async () => {
+    if (!project) return;
+    if (!confirm("Clear the final payment record?")) return;
+
+    setUpdating(true);
+    try {
+      await storage.updateProject(project.id, {
+        finalPaymentAmount: undefined,
+        finalPaymentDate: undefined,
+        finalPaymentMethod: undefined,
+        paidInFull: false,
+      });
+
+      const estimate = project.estimateData;
+      const depositPaid = project.depositPaid
+        ? project.depositPaidAmount || project.depositAmount || 0
+        : 0;
+
+      setProject({
+        ...project,
+        finalPaymentAmount: undefined,
+        finalPaymentDate: undefined,
+        finalPaymentMethod: undefined,
+        paidInFull: false,
+      });
+
+      // Reset the payment amount field
+      if (estimate?.total) {
+        setPaymentAmount((estimate.total - depositPaid).toFixed(2));
+      }
+    } catch (error) {
+      console.error("Error clearing payment:", error);
+      alert("Failed to clear payment. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -177,27 +288,28 @@ export default function InvoicePage() {
   const depositPaid = project.depositPaid
     ? project.depositPaidAmount || project.depositAmount || 0
     : 0;
-  const amountDue = total - depositPaid;
+  const finalPaid = project.paidInFull ? project.finalPaymentAmount || 0 : 0;
+  const amountDue = total - depositPaid - finalPaid;
 
   const lineItems: { description: string; amount: number }[] = [];
 
-  if (estimate.quiltingTotal > 0) {
+  if (estimate.quiltingTotal && estimate.quiltingTotal > 0) {
     lineItems.push({
-      description: `Quilting - ${estimate.quiltArea.toLocaleString()} sq in × $${
-        estimate.quiltingRate
+      description: `Quilting - ${(estimate.quiltArea || 0).toLocaleString()} sq in × $${
+        estimate.quiltingRate || 0
       }/sq in`,
       amount: estimate.quiltingTotal,
     });
   }
 
-  if (estimate.threadCost > 0) {
+  if (estimate.threadCost && estimate.threadCost > 0) {
     lineItems.push({
       description: `Thread - ${project.threadChoice || "Standard"}`,
       amount: estimate.threadCost,
     });
   }
 
-  if (estimate.battingTotal > 0) {
+  if (estimate.battingTotal && estimate.battingTotal > 0) {
     lineItems.push({
       description: `Batting - ${
         estimate.battingLengthNeeded?.toFixed(0) || "0"
@@ -213,11 +325,11 @@ export default function InvoicePage() {
     });
   }
 
-  if (estimate.bindingTotal > 0) {
+  if (estimate.bindingTotal && estimate.bindingTotal > 0) {
     lineItems.push({
       description: `Binding - ${
         estimate.bindingPerimeter?.toFixed(0) || "0"
-      }" × $${estimate.bindingRatePerInch}/in`,
+      }" × $${estimate.bindingRatePerInch || 0}/in`,
       amount: estimate.bindingTotal,
     });
   }
@@ -234,6 +346,7 @@ export default function InvoicePage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Header - hidden when printing */}
       <div className="print:hidden bg-white border-b border-line sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
@@ -242,16 +355,140 @@ export default function InvoicePage() {
           >
             ← Back to Project
           </button>
-          <button
-            onClick={handlePrint}
-            className="px-6 py-2 bg-plum text-white rounded-xl font-bold hover:bg-plum/90"
-          >
-            Print / Save PDF
-          </button>
+          <div className="flex gap-2">
+            {project.paidInFull && (
+              <span className="px-4 py-2 bg-green-100 text-green-700 rounded-xl font-bold">
+                ✓ PAID IN FULL
+              </span>
+            )}
+            <button
+              onClick={handlePrint}
+              className="px-6 py-2 bg-plum text-white rounded-xl font-bold hover:bg-plum/90"
+            >
+              Print / Save PDF
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto p-4 print:p-0 print:max-w-none">
+        {/* Payment Recording Section - hidden when printing */}
+        {!project.paidInFull && amountDue > 0 && (
+          <div className="print:hidden bg-white border border-line rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-plum">Payment Due</h3>
+                <p className="text-2xl font-bold text-plum">
+                  {formatCurrency(amountDue)}
+                </p>
+              </div>
+              {!showPaymentForm && (
+                <button
+                  onClick={() => setShowPaymentForm(true)}
+                  className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors"
+                >
+                  💵 Record Payment
+                </button>
+              )}
+            </div>
+
+            {showPaymentForm && (
+              <div className="mt-4 pt-4 border-t border-line">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-muted mb-1">
+                      Amount
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+                        $
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                        className="w-full pl-7 pr-3 py-2 border border-line rounded-xl"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-muted mb-1">
+                      Payment Method
+                    </label>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="w-full px-3 py-2 border border-line rounded-xl"
+                    >
+                      <option value="Cash">Cash</option>
+                      <option value="Check">Check</option>
+                      <option value="Venmo">Venmo</option>
+                      <option value="PayPal">PayPal</option>
+                      <option value="Zelle">Zelle</option>
+                      <option value="Square">Square</option>
+                      <option value="Credit Card">Credit Card</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-muted mb-1">
+                      Payment Date
+                    </label>
+                    <input
+                      type="date"
+                      value={paymentDate}
+                      onChange={(e) => setPaymentDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-line rounded-xl"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={handleRecordFinalPayment}
+                    disabled={updating}
+                    className="px-6 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {updating ? "Saving..." : "Save Payment"}
+                  </button>
+                  <button
+                    onClick={() => setShowPaymentForm(false)}
+                    className="px-4 py-2 border border-line rounded-xl hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Paid confirmation - hidden when printing */}
+        {project.paidInFull && project.finalPaymentAmount && (
+          <div className="print:hidden bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-green-700">✓ Payment Received</h3>
+                <p className="text-sm text-green-600">
+                  {formatCurrency(project.finalPaymentAmount)} paid on{" "}
+                  {formatDate(project.finalPaymentDate || "")}
+                  {project.finalPaymentMethod &&
+                    ` via ${project.finalPaymentMethod}`}
+                </p>
+              </div>
+              <button
+                onClick={handleClearFinalPayment}
+                disabled={updating}
+                className="text-sm text-red-600 hover:text-red-800 underline"
+              >
+                Clear payment
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Invoice Document */}
         <div
           ref={invoiceRef}
           className="bg-white shadow-lg print:shadow-none rounded-lg print:rounded-none p-6 print:p-8"
@@ -434,15 +671,39 @@ export default function InvoicePage() {
                 </div>
               )}
 
+              {finalPaid > 0 && (
+                <div className="flex justify-between py-1.5 text-sm bg-green-50 px-2 rounded mt-1">
+                  <span className="text-green-700">
+                    Payment Received
+                    {project.finalPaymentDate &&
+                      ` (${formatDate(project.finalPaymentDate)})`}
+                    {project.finalPaymentMethod &&
+                      ` - ${project.finalPaymentMethod}`}
+                  </span>
+                  <span className="font-medium text-green-700">
+                    -{formatCurrency(finalPaid)}
+                  </span>
+                </div>
+              )}
+
               <div
-                className="flex justify-between py-2 text-lg font-bold mt-1 px-2 rounded"
-                style={{
-                  backgroundColor: settings.brandPrimaryColor || "#4e283a",
-                  color: "white",
-                }}
+                className={`flex justify-between py-2 text-lg font-bold mt-1 px-2 rounded ${
+                  amountDue <= 0 ? "bg-green-600" : ""
+                }`}
+                style={
+                  amountDue > 0
+                    ? {
+                        backgroundColor:
+                          settings.brandPrimaryColor || "#4e283a",
+                        color: "white",
+                      }
+                    : { color: "white" }
+                }
               >
-                <span>Amount Due</span>
-                <span>{formatCurrency(amountDue)}</span>
+                <span>{amountDue <= 0 ? "Paid in Full" : "Amount Due"}</span>
+                <span>
+                  {amountDue <= 0 ? "✓" : formatCurrency(amountDue)}
+                </span>
               </div>
             </div>
           </div>
