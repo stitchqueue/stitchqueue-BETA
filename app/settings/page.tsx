@@ -9,7 +9,7 @@ import {
   hasOrganization,
   DEFAULT_SETTINGS,
 } from "../lib/storage";
-import type { Settings, ThreadOption, BattingOption } from "../types";
+import type { Settings, BobbinOption, BattingOption } from "../types";
 import { COUNTRY_OPTIONS } from "../types";
 
 // Phone formatting helper
@@ -31,17 +31,24 @@ export default function SettingsPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "business" | "pricing" | "thread" | "batting" | "data"
+    "business" | "pricing" | "bobbin" | "batting" | "data"
   >("business");
 
-  // Thread state
-  const [newThreadName, setNewThreadName] = useState("");
-  const [newThreadPrice, setNewThreadPrice] = useState("");
+  // Bobbin state
+  const [newBobbinName, setNewBobbinName] = useState("");
+  const [newBobbinPrice, setNewBobbinPrice] = useState("");
+  const [editingBobbin, setEditingBobbin] = useState<string | null>(null);
+  const [editBobbinName, setEditBobbinName] = useState("");
+  const [editBobbinPrice, setEditBobbinPrice] = useState("");
 
   // Batting state
   const [newBattingName, setNewBattingName] = useState("");
   const [newBattingWidth, setNewBattingWidth] = useState("");
   const [newBattingPrice, setNewBattingPrice] = useState("");
+  const [editingBatting, setEditingBatting] = useState<string | null>(null);
+  const [editBattingName, setEditBattingName] = useState("");
+  const [editBattingWidth, setEditBattingWidth] = useState("");
+  const [editBattingPrice, setEditBattingPrice] = useState("");
 
   // Pricing rate string states (to allow typing decimals)
   const [rateStrings, setRateStrings] = useState({
@@ -52,7 +59,6 @@ export default function SettingsPage() {
     denseCustom: "",
     bindingTopAttached: "",
     bindingFullyAttached: "",
-    bobbinPrice: "",
   });
 
   useEffect(() => {
@@ -68,6 +74,10 @@ export default function SettingsPage() {
 
         // Load settings
         const s = await storage.getSettings();
+        // Ensure bobbinOptions exists (migration from old settings)
+        if (!s.bobbinOptions) {
+          s.bobbinOptions = [];
+        }
         setSettings(s);
         setRateStrings({
           lightE2E: s.pricingRates?.lightE2E?.toString() || "",
@@ -79,7 +89,6 @@ export default function SettingsPage() {
             s.pricingRates?.bindingTopAttached?.toString() || "",
           bindingFullyAttached:
             s.pricingRates?.bindingFullyAttached?.toString() || "",
-          bobbinPrice: s.bobbinPrice?.toString() || "",
         });
       } catch (error) {
         console.error("Error loading settings:", error);
@@ -97,21 +106,15 @@ export default function SettingsPage() {
   const handleRateBlur = async (field: keyof typeof rateStrings) => {
     const value = parseFloat(rateStrings[field]) || 0;
 
-    if (field === "bobbinPrice") {
-      const updated = { ...settings, bobbinPrice: value };
-      setSettings(updated);
-      await storage.saveSettings(updated);
-    } else {
-      const updated = {
-        ...settings,
-        pricingRates: {
-          ...settings.pricingRates,
-          [field]: value,
-        },
-      };
-      setSettings(updated);
-      await storage.saveSettings(updated);
-    }
+    const updated = {
+      ...settings,
+      pricingRates: {
+        ...settings.pricingRates,
+        [field]: value,
+      },
+    };
+    setSettings(updated);
+    await storage.saveSettings(updated);
   };
 
   const handlePhoneChange = async (value: string) => {
@@ -121,47 +124,50 @@ export default function SettingsPage() {
     await storage.saveSettings(updated);
   };
 
-  const handleAddThread = async () => {
-    if (!newThreadName || !newThreadPrice) {
-      alert("Please enter thread name and price");
+  // Bobbin handlers
+  const handleAddBobbin = async () => {
+    if (!newBobbinName || !newBobbinPrice) {
+      alert("Please enter bobbin name and price");
       return;
     }
 
-    const newThread: ThreadOption = {
-      name: newThreadName,
-      price: parseFloat(newThreadPrice),
-      isDefault: settings.threadOptions.length === 0,
+    const newBobbin: BobbinOption = {
+      name: newBobbinName,
+      price: parseFloat(newBobbinPrice),
+      isDefault: (settings.bobbinOptions || []).length === 0,
     };
 
     const updated = {
       ...settings,
-      threadOptions: [...settings.threadOptions, newThread],
-    };
-
-    setSettings(updated);
-    await storage.saveSettings(updated);
-    setNewThreadName("");
-    setNewThreadPrice("");
-  };
-
-  const handleDeleteThread = async (name: string) => {
-    if (!confirm(`Delete thread option "${name}"?`)) return;
-
-    const updated = {
-      ...settings,
-      threadOptions: settings.threadOptions.filter((t) => t.name !== name),
+      bobbinOptions: [...(settings.bobbinOptions || []), newBobbin],
     };
 
     setSettings(updated);
     await storage.saveSettings(updated);
+    setNewBobbinName("");
+    setNewBobbinPrice("");
   };
 
-  const handleSetDefaultThread = async (name: string) => {
+  const handleDeleteBobbin = async (name: string) => {
+    if (!confirm(`Delete bobbin option "${name}"?`)) return;
+
     const updated = {
       ...settings,
-      threadOptions: settings.threadOptions.map((t) => ({
-        ...t,
-        isDefault: t.name === name,
+      bobbinOptions: (settings.bobbinOptions || []).filter(
+        (b) => b.name !== name
+      ),
+    };
+
+    setSettings(updated);
+    await storage.saveSettings(updated);
+  };
+
+  const handleSetDefaultBobbin = async (name: string) => {
+    const updated = {
+      ...settings,
+      bobbinOptions: (settings.bobbinOptions || []).map((b) => ({
+        ...b,
+        isDefault: b.name === name,
       })),
     };
 
@@ -169,6 +175,39 @@ export default function SettingsPage() {
     await storage.saveSettings(updated);
   };
 
+  const handleStartEditBobbin = (bobbin: BobbinOption) => {
+    setEditingBobbin(bobbin.name);
+    setEditBobbinName(bobbin.name);
+    setEditBobbinPrice(bobbin.price.toString());
+  };
+
+  const handleSaveEditBobbin = async (originalName: string) => {
+    if (!editBobbinName || !editBobbinPrice) {
+      alert("Please enter bobbin name and price");
+      return;
+    }
+
+    const updated = {
+      ...settings,
+      bobbinOptions: (settings.bobbinOptions || []).map((b) =>
+        b.name === originalName
+          ? { ...b, name: editBobbinName, price: parseFloat(editBobbinPrice) }
+          : b
+      ),
+    };
+
+    setSettings(updated);
+    await storage.saveSettings(updated);
+    setEditingBobbin(null);
+  };
+
+  const handleCancelEditBobbin = () => {
+    setEditingBobbin(null);
+    setEditBobbinName("");
+    setEditBobbinPrice("");
+  };
+
+  // Batting handlers
   const handleAddBatting = async () => {
     if (!newBattingName || !newBattingWidth || !newBattingPrice) {
       alert("Please enter batting name, width, and price per inch");
@@ -219,6 +258,49 @@ export default function SettingsPage() {
 
     setSettings(updated);
     await storage.saveSettings(updated);
+  };
+
+  const handleStartEditBatting = (batting: BattingOption) => {
+    const key = `${batting.name}-${batting.widthInches}`;
+    setEditingBatting(key);
+    setEditBattingName(batting.name);
+    setEditBattingWidth(batting.widthInches.toString());
+    setEditBattingPrice(batting.pricePerInch.toString());
+  };
+
+  const handleSaveEditBatting = async (
+    originalName: string,
+    originalWidth: number
+  ) => {
+    if (!editBattingName || !editBattingWidth || !editBattingPrice) {
+      alert("Please enter batting name, width, and price");
+      return;
+    }
+
+    const updated = {
+      ...settings,
+      battingOptions: settings.battingOptions.map((b) =>
+        b.name === originalName && b.widthInches === originalWidth
+          ? {
+              ...b,
+              name: editBattingName,
+              widthInches: parseFloat(editBattingWidth),
+              pricePerInch: parseFloat(editBattingPrice),
+            }
+          : b
+      ),
+    };
+
+    setSettings(updated);
+    await storage.saveSettings(updated);
+    setEditingBatting(null);
+  };
+
+  const handleCancelEditBatting = () => {
+    setEditingBatting(null);
+    setEditBattingName("");
+    setEditBattingWidth("");
+    setEditBattingPrice("");
   };
 
   const handleExportCSV = async () => {
@@ -348,18 +430,6 @@ export default function SettingsPage() {
     await storage.saveSettings(updated);
   };
 
-  const handlePricingRatesChange = async (field: string, value: any) => {
-    const updated = {
-      ...settings,
-      pricingRates: {
-        ...settings.pricingRates,
-        [field]: value,
-      },
-    };
-    setSettings(updated);
-    await storage.saveSettings(updated);
-  };
-
   // Loading state
   if (loading) {
     return (
@@ -432,7 +502,7 @@ export default function SettingsPage() {
               <div className="font-bold mb-2">PAID Tier Features ($19/mo):</div>
               <ul className="space-y-1 ml-4 list-disc">
                 <li>Save pricing rates (auto-populate calculator)</li>
-                <li>Save thread and batting options</li>
+                <li>Save bobbin and batting options</li>
                 <li>Email estimates/invoices</li>
                 <li>Branded client intake form</li>
                 <li>Multi-user access (up to 5 users)</li>
@@ -442,7 +512,7 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* FIXED: Tab navigation - horizontal scroll on mobile */}
+        {/* Tab navigation - horizontal scroll on mobile */}
         <div className="flex gap-2 mb-6 border-b border-line overflow-x-auto pb-px -mx-4 px-4 sm:mx-0 sm:px-0">
           <button
             onClick={() => setActiveTab("business")}
@@ -465,14 +535,14 @@ export default function SettingsPage() {
             Pricing Rates
           </button>
           <button
-            onClick={() => setActiveTab("thread")}
+            onClick={() => setActiveTab("bobbin")}
             className={`px-4 py-3 font-bold text-sm whitespace-nowrap flex-shrink-0 ${
-              activeTab === "thread"
+              activeTab === "bobbin"
                 ? "text-plum border-b-2 border-plum"
                 : "text-muted hover:text-plum"
             }`}
           >
-            Thread Options
+            Bobbin Options
           </button>
           <button
             onClick={() => setActiveTab("batting")}
@@ -531,7 +601,7 @@ export default function SettingsPage() {
                 />
               </div>
 
-              {/* FIXED: Address grid - responsive layout */}
+              {/* Address grid - responsive layout */}
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-sm font-bold text-muted mb-2">
@@ -987,40 +1057,18 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
-
-                <div className="border-t border-line pt-6 mt-6">
-                  <h3 className="text-md font-bold text-plum mb-4">
-                    Other Pricing
-                  </h3>
-                  <div>
-                    <label className="block text-sm font-bold text-muted mb-2">
-                      Bobbin Price ($)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={rateStrings.bobbinPrice}
-                      onChange={(e) =>
-                        handleRateChange("bobbinPrice", e.target.value)
-                      }
-                      onBlur={() => handleRateBlur("bobbinPrice")}
-                      placeholder="2.50"
-                      className="w-full px-4 py-2 border border-line rounded-xl"
-                    />
-                  </div>
-                </div>
               </div>
             )}
           </div>
         )}
 
-        {activeTab === "thread" && (
+        {activeTab === "bobbin" && (
           <div className="bg-white border border-line rounded-card p-4 sm:p-6">
             <div className="mb-4">
-              <h2 className="text-lg font-bold text-plum">Thread Options</h2>
+              <h2 className="text-lg font-bold text-plum">Bobbin Options</h2>
               <p className="text-sm text-muted mt-1">
                 {settings.isPaidTier
-                  ? "Manage your thread options and pricing"
+                  ? "Manage your bobbin types and pricing"
                   : "Available in PAID tier"}
               </p>
             </div>
@@ -1028,7 +1076,7 @@ export default function SettingsPage() {
             {!settings.isPaidTier ? (
               <div className="p-6 bg-gold/10 rounded-xl text-center">
                 <p className="text-sm text-muted mb-4">
-                  Upgrade to PAID tier to save thread options
+                  Upgrade to PAID tier to save bobbin options
                 </p>
                 <button
                   onClick={async () => {
@@ -1045,28 +1093,33 @@ export default function SettingsPage() {
               <>
                 <div className="mb-6 p-4 bg-background rounded-xl">
                   <h3 className="text-sm font-bold text-plum mb-3">
-                    Add Thread Option
+                    Add Bobbin Option
                   </h3>
-                  {/* FIXED: Thread input - stack on mobile */}
+                  {/* Bobbin input - stack on mobile */}
                   <div className="flex flex-col sm:flex-row gap-3">
                     <input
                       type="text"
-                      placeholder="Thread name (e.g., So Fine #50)"
-                      value={newThreadName}
-                      onChange={(e) => setNewThreadName(e.target.value)}
+                      placeholder="Bobbin name (e.g., Prewound White)"
+                      value={newBobbinName}
+                      onChange={(e) => setNewBobbinName(e.target.value)}
                       className="flex-1 px-4 py-2 border border-line rounded-xl"
                     />
                     <div className="flex gap-3">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="Price"
-                        value={newThreadPrice}
-                        onChange={(e) => setNewThreadPrice(e.target.value)}
-                        className="w-24 sm:w-32 px-4 py-2 border border-line rounded-xl"
-                      />
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+                          $
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="Price"
+                          value={newBobbinPrice}
+                          onChange={(e) => setNewBobbinPrice(e.target.value)}
+                          className="w-24 sm:w-32 pl-7 pr-3 py-2 border border-line rounded-xl"
+                        />
+                      </div>
                       <button
-                        onClick={handleAddThread}
+                        onClick={handleAddBobbin}
                         className="px-6 py-2 bg-plum text-white rounded-xl font-bold whitespace-nowrap"
                       >
                         Add
@@ -1076,45 +1129,100 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  {settings.threadOptions.length === 0 ? (
+                  {(settings.bobbinOptions || []).length === 0 ? (
                     <p className="text-sm text-muted text-center py-8">
-                      No thread options yet. Add one above!
+                      No bobbin options yet. Add one above!
                     </p>
                   ) : (
-                    settings.threadOptions.map((thread) => (
+                    (settings.bobbinOptions || []).map((bobbin) => (
                       <div
-                        key={thread.name}
+                        key={bobbin.name}
                         className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-line rounded-xl"
                       >
-                        <div className="flex-1">
-                          <div className="font-bold text-sm">{thread.name}</div>
-                          <div className="text-xs text-muted mt-1">
-                            ${thread.price.toFixed(2)}
-                            {thread.isDefault && (
-                              <span className="ml-2 px-2 py-0.5 bg-gold/20 text-gold rounded text-xs font-bold">
-                                DEFAULT
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          {!thread.isDefault && (
-                            <button
-                              onClick={() =>
-                                handleSetDefaultThread(thread.name)
+                        {editingBobbin === bobbin.name ? (
+                          // Edit mode
+                          <div className="flex-1 flex flex-col sm:flex-row gap-3">
+                            <input
+                              type="text"
+                              value={editBobbinName}
+                              onChange={(e) =>
+                                setEditBobbinName(e.target.value)
                               }
-                              className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
-                            >
-                              Set Default
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteThread(thread.name)}
-                            className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                              className="flex-1 px-3 py-2 border border-line rounded-lg"
+                            />
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+                                $
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={editBobbinPrice}
+                                onChange={(e) =>
+                                  setEditBobbinPrice(e.target.value)
+                                }
+                                className="w-24 pl-7 pr-3 py-2 border border-line rounded-lg"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() =>
+                                  handleSaveEditBobbin(bobbin.name)
+                                }
+                                className="px-3 py-1 text-xs bg-plum text-white rounded-lg"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={handleCancelEditBobbin}
+                                className="px-3 py-1 text-xs border border-line rounded-lg"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          // View mode
+                          <>
+                            <div className="flex-1">
+                              <div className="font-bold text-sm">
+                                {bobbin.name}
+                              </div>
+                              <div className="text-xs text-muted mt-1">
+                                ${bobbin.price.toFixed(2)} each
+                                {bobbin.isDefault && (
+                                  <span className="ml-2 px-2 py-0.5 bg-gold/20 text-gold rounded text-xs font-bold">
+                                    DEFAULT
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleStartEditBobbin(bobbin)}
+                                className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
+                              >
+                                Edit
+                              </button>
+                              {!bobbin.isDefault && (
+                                <button
+                                  onClick={() =>
+                                    handleSetDefaultBobbin(bobbin.name)
+                                  }
+                                  className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
+                                >
+                                  Set Default
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDeleteBobbin(bobbin.name)}
+                                className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     ))
                   )}
@@ -1157,7 +1265,7 @@ export default function SettingsPage() {
                   <h3 className="text-sm font-bold text-plum mb-3">
                     Add Batting Option
                   </h3>
-                  {/* FIXED: Batting inputs - responsive grid that stacks on mobile */}
+                  {/* Batting inputs - responsive grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
@@ -1197,52 +1305,118 @@ export default function SettingsPage() {
                       No batting options yet. Add one above!
                     </p>
                   ) : (
-                    settings.battingOptions.map((batting) => (
-                      <div
-                        key={`${batting.name}-${batting.widthInches}`}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-line rounded-xl"
-                      >
-                        <div className="flex-1">
-                          <div className="font-bold text-sm">
-                            {batting.name} - {batting.widthInches}" wide
-                          </div>
-                          <div className="text-xs text-muted mt-1">
-                            ${batting.pricePerInch.toFixed(4)}/inch
-                            {batting.isDefault && (
-                              <span className="ml-2 px-2 py-0.5 bg-gold/20 text-gold rounded text-xs font-bold">
-                                DEFAULT
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          {!batting.isDefault && (
-                            <button
-                              onClick={() =>
-                                handleSetDefaultBatting(
-                                  batting.name,
-                                  batting.widthInches
-                                )
-                              }
-                              className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
-                            >
-                              Set Default
-                            </button>
+                    settings.battingOptions.map((batting) => {
+                      const key = `${batting.name}-${batting.widthInches}`;
+                      return (
+                        <div
+                          key={key}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-line rounded-xl"
+                        >
+                          {editingBatting === key ? (
+                            // Edit mode
+                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
+                              <input
+                                type="text"
+                                value={editBattingName}
+                                onChange={(e) =>
+                                  setEditBattingName(e.target.value)
+                                }
+                                className="sm:col-span-2 px-3 py-2 border border-line rounded-lg"
+                                placeholder="Name"
+                              />
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={editBattingWidth}
+                                onChange={(e) =>
+                                  setEditBattingWidth(e.target.value)
+                                }
+                                className="px-3 py-2 border border-line rounded-lg"
+                                placeholder="Width"
+                              />
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={editBattingPrice}
+                                onChange={(e) =>
+                                  setEditBattingPrice(e.target.value)
+                                }
+                                className="px-3 py-2 border border-line rounded-lg"
+                                placeholder="$/in"
+                              />
+                              <div className="sm:col-span-4 flex gap-2">
+                                <button
+                                  onClick={() =>
+                                    handleSaveEditBatting(
+                                      batting.name,
+                                      batting.widthInches
+                                    )
+                                  }
+                                  className="px-3 py-1 text-xs bg-plum text-white rounded-lg"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={handleCancelEditBatting}
+                                  className="px-3 py-1 text-xs border border-line rounded-lg"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            // View mode
+                            <>
+                              <div className="flex-1">
+                                <div className="font-bold text-sm">
+                                  {batting.name} - {batting.widthInches}" wide
+                                </div>
+                                <div className="text-xs text-muted mt-1">
+                                  ${batting.pricePerInch.toFixed(4)}/inch
+                                  {batting.isDefault && (
+                                    <span className="ml-2 px-2 py-0.5 bg-gold/20 text-gold rounded text-xs font-bold">
+                                      DEFAULT
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleStartEditBatting(batting)}
+                                  className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
+                                >
+                                  Edit
+                                </button>
+                                {!batting.isDefault && (
+                                  <button
+                                    onClick={() =>
+                                      handleSetDefaultBatting(
+                                        batting.name,
+                                        batting.widthInches
+                                      )
+                                    }
+                                    className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
+                                  >
+                                    Set Default
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() =>
+                                    handleDeleteBatting(
+                                      batting.name,
+                                      batting.widthInches
+                                    )
+                                  }
+                                  className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </>
                           )}
-                          <button
-                            onClick={() =>
-                              handleDeleteBatting(
-                                batting.name,
-                                batting.widthInches
-                              )
-                            }
-                            className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
-                          >
-                            Delete
-                          </button>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </>
