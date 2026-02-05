@@ -592,19 +592,19 @@ function ReportsSection({ settings }: { settings: Settings }) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-center">
                     <div className="text-2xl font-bold text-blue-700">
-                      {reportData.totalUniqueClients}
+                      {reportData.totalUniqueClients || 0}
                     </div>
                     <div className="text-blue-600 text-sm font-bold">Total Clients</div>
                   </div>
                   <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
                     <div className="text-2xl font-bold text-green-700">
-                      {reportData.repeatClientPercentage.toFixed(0)}%
+                      {(reportData.repeatClientPercentage || 0).toFixed(0)}%
                     </div>
                     <div className="text-green-600 text-sm font-bold">Repeat Clients</div>
                   </div>
                   <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl text-center">
                     <div className="text-2xl font-bold text-purple-700">
-                      {reportData.topClientsByRevenue.length}
+                      {(reportData.topClientsByRevenue || []).length}
                     </div>
                     <div className="text-purple-600 text-sm font-bold">Top Clients</div>
                   </div>
@@ -613,7 +613,7 @@ function ReportsSection({ settings }: { settings: Settings }) {
                 <div>
                   <h4 className="font-bold text-plum mb-4">Top Clients by Revenue</h4>
                   <div className="space-y-2">
-                    {reportData.topClientsByRevenue.map((client: any, index: number) => (
+                    {(reportData.topClientsByRevenue || []).map((client: any, index: number) => (
                       <div key={index} className="flex items-center justify-between p-3 border border-line rounded-lg">
                         <div className="flex-1">
                           <div className="font-bold text-sm">{client.name}</div>
@@ -625,14 +625,14 @@ function ReportsSection({ settings }: { settings: Settings }) {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-bold">{formatCurrency(client.totalRevenue)}</div>
+                          <div className="font-bold">{formatCurrency(client.totalRevenue || 0)}</div>
                           <div className="text-xs text-muted">
-                            {client.projectCount} project{client.projectCount !== 1 ? "s" : ""}
+                            {client.projectCount || 0} project{(client.projectCount || 0) !== 1 ? "s" : ""}
                           </div>
                         </div>
                       </div>
                     ))}
-                    {reportData.topClientsByRevenue.length === 0 && (
+                    {(reportData.topClientsByRevenue || []).length === 0 && (
                       <div className="text-center text-muted py-8">
                         No client data available yet.
                       </div>
