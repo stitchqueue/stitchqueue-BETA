@@ -26,6 +26,14 @@ export default function InvoicePage() {
     new Date().toISOString().split("T")[0]
   );
 
+  // Donation state (can be toggled on invoice)
+  const [isDonation, setIsDonation] = useState(false);
+  const [mileage, setMileage] = useState("");
+  const [showMileageInput, setShowMileageInput] = useState(false);
+
+  // Constants
+  const CHARITABLE_MILEAGE_RATE = 0.14; // IRS charitable mileage rate
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -44,6 +52,17 @@ export default function InvoicePage() {
         ]);
         setProject(proj || null);
         setSettings(savedSettings);
+
+        // Initialize donation state from project data
+        if (proj?.isDonation) {
+          setIsDonation(true);
+        }
+        
+        // Initialize mileage from estimate data if present
+        if (proj?.estimateData?.mileage) {
+          setMileage(proj.estimateData.mileage.toString());
+          setShowMileageInput(true);
+        }
 
         // Pre-fill payment amount with balance due
         if (proj?.estimateData?.total) {
@@ -131,6 +150,42 @@ export default function InvoicePage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleUpdateDonation = async () => {
+    if (!project) return;
+
+    setUpdating(true);
+    try {
+      const mileageNumber = parseFloat(mileage) || 0;
+      const mileageTotal = mileageNumber * CHARITABLE_MILEAGE_RATE;
+
+      // Update project with donation settings
+      const updatedEstimateData = {
+        ...project.estimateData,
+        isDonation,
+        mileage: isDonation && showMileageInput ? mileageNumber : undefined,
+        mileageTotal: isDonation && showMileageInput ? mileageTotal : undefined,
+      };
+
+      await storage.updateProject(project.id, {
+        isDonation,
+        estimateData: updatedEstimateData,
+      });
+
+      setProject({
+        ...project,
+        isDonation,
+        estimateData: updatedEstimateData,
+      });
+
+      alert(isDonation ? "Invoice marked as donation!" : "Donation status removed.");
+    } catch (error) {
+      console.error("Error updating donation status:", error);
+      alert("Failed to update donation status. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const handleRecordFinalPayment = async () => {
@@ -282,6 +337,7 @@ export default function InvoicePage() {
   const invoiceNumber = project.estimateNumber || "—";
   const invoiceDate = new Date().toISOString().split("T")[0];
 
+  // Calculate totals
   const subtotal = estimate.subtotal || 0;
   const taxAmount = estimate.taxAmount || 0;
   const total = estimate.total || 0;
@@ -289,9 +345,16 @@ export default function InvoicePage() {
     ? project.depositPaidAmount || project.depositAmount || 0
     : 0;
   const finalPaid = project.paidInFull ? project.finalPaymentAmount || 0 : 0;
-  const amountDue = total - depositPaid - finalPaid;
 
-  const lineItems: { description: string; amount: number }[] = [];
+  // Calculate mileage total
+  const mileageNumber = parseFloat(mileage) || 0;
+  const mileageTotal = mileageNumber * CHARITABLE_MILEAGE_RATE;
+
+  // For donations, show different balance logic
+  const amountDue = isDonation ? 0 : (total - depositPaid - finalPaid);
+  const donationValue = isDonation ? total : 0;
+
+  const lineItems: { description: string; amount: number; deductible?: boolean }[] = [];
 
   if (estimate.quiltingTotal && estimate.quiltingTotal > 0) {
     lineItems.push({
@@ -299,6 +362,7 @@ export default function InvoicePage() {
         estimate.quiltingRate || 0
       }/sq in`,
       amount: estimate.quiltingTotal,
+      deductible: false, // Quilting services are not deductible
     });
   }
 
@@ -308,6 +372,7 @@ export default function InvoicePage() {
         estimate.battingLengthNeeded?.toFixed(0) || "0"
       }" length`,
       amount: estimate.battingTotal,
+      deductible: true, // Batting materials are deductible
     });
   }
 
@@ -324,6 +389,7 @@ export default function InvoicePage() {
         estimate.bindingPerimeter?.toFixed(0) || "0"
       }" × $${estimate.bindingRatePerInch || 0}/in`,
       amount: estimate.bindingTotal,
+      deductible: false, // Binding labor is not deductible
     });
   }
 
@@ -334,6 +400,7 @@ export default function InvoicePage() {
     lineItems.push({
       description: bobbinDesc,
       amount: estimate.bobbinTotal,
+      deductible: true, // Bobbin materials are deductible
     });
   }
 
@@ -343,9 +410,24 @@ export default function InvoicePage() {
       lineItems.push({
         description: `${charge.name}${!charge.taxable ? " *" : ""}`,
         amount: charge.amount,
+        deductible: undefined, // Case by case for extra charges
       });
     });
   }
+
+  // Add mileage if donation and mileage entered
+  if (isDonation && mileageNumber > 0) {
+    lineItems.push({
+      description: `Charitable Mileage (${mileageNumber} miles × $${CHARITABLE_MILEAGE_RATE}/mi)`,
+      amount: mileageTotal,
+      deductible: true,
+    });
+  }
+
+  // Calculate tax-deductible total (materials + mileage)
+  const taxDeductibleTotal = lineItems
+    .filter(item => item.deductible === true)
+    .reduce((sum, item) => sum + item.amount, 0);
 
   const businessAddress = formatBusinessAddress();
   const clientAddressLines = formatClientAddress();
@@ -370,6 +452,11 @@ export default function InvoicePage() {
                 ✓ PAID IN FULL
               </span>
             )}
+            {isDonation && (
+              <span className="px-4 py-2 bg-purple-100 text-purple-700 rounded-xl font-bold">
+                🎁 DONATION
+              </span>
+            )}
             <button
               onClick={handlePrint}
               className="px-6 py-2 bg-plum text-white rounded-xl font-bold hover:bg-plum/90"
@@ -381,8 +468,96 @@ export default function InvoicePage() {
       </div>
 
       <div className="max-w-4xl mx-auto p-4 print:p-0 print:max-w-none">
-        {/* Payment Recording Section - hidden when printing */}
-        {!project.paidInFull && amountDue > 0 && (
+        {/* Donation Settings Section - hidden when printing */}
+        <div className="print:hidden bg-white border border-line rounded-xl p-4 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-bold text-plum">🎁 Donation Settings</h3>
+              <p className="text-sm text-muted">
+                Configure donation status and tax-deductible options
+              </p>
+            </div>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={isDonation}
+                onChange={(e) => setIsDonation(e.target.checked)}
+                className="w-5 h-5 rounded border-line accent-purple-600"
+              />
+              <span className="font-bold text-sm">Mark as Donation</span>
+            </label>
+          </div>
+
+          {isDonation && (
+            <div className="border-t border-line pt-4">
+              <div className="mb-4">
+                <label className="flex items-center gap-2 mb-3">
+                  <input
+                    type="checkbox"
+                    checked={showMileageInput}
+                    onChange={(e) => setShowMileageInput(e.target.checked)}
+                    className="w-4 h-4 rounded border-line accent-purple-600"
+                  />
+                  <span className="text-sm font-bold">Add charitable mileage</span>
+                </label>
+                
+                {showMileageInput && (
+                  <div className="flex gap-3 items-center">
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-muted mb-1">
+                        Miles driven
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={mileage}
+                        onChange={(e) => setMileage(e.target.value)}
+                        placeholder="30"
+                        className="w-full px-3 py-2 border border-line rounded-xl"
+                      />
+                    </div>
+                    <div className="text-sm text-muted">
+                      × $0.14/mile<br />
+                      <span className="font-bold">
+                        = {formatCurrency(mileageTotal)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-purple-50 p-3 rounded-xl text-sm">
+                <p className="font-bold text-purple-700 mb-1">Tax Deductible Items:</p>
+                <p className="text-purple-600">
+                  Materials (batting, bobbins) and mileage may be tax-deductible. 
+                  Quilting services are not deductible per IRS rules.
+                </p>
+              </div>
+
+              <button
+                onClick={handleUpdateDonation}
+                disabled={updating}
+                className="mt-3 px-4 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors disabled:opacity-50"
+              >
+                {updating ? "Updating..." : "Update Donation Settings"}
+              </button>
+            </div>
+          )}
+
+          {!isDonation && (
+            <button
+              onClick={handleUpdateDonation}
+              disabled={updating}
+              className="px-4 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors disabled:opacity-50"
+            >
+              Remove Donation Status
+            </button>
+          )}
+        </div>
+
+        {/* Payment Recording Section - hidden when printing and for donations */}
+        {!isDonation && !project.paidInFull && amountDue > 0 && (
           <div className="print:hidden bg-white border border-line rounded-xl p-4 mb-4">
             <div className="flex items-center justify-between">
               <div>
@@ -474,7 +649,7 @@ export default function InvoicePage() {
         )}
 
         {/* Paid confirmation - hidden when printing */}
-        {project.paidInFull && project.finalPaymentAmount && (
+        {!isDonation && project.paidInFull && project.finalPaymentAmount && (
           <div className="print:hidden bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
             <div className="flex items-center justify-between">
               <div>
@@ -540,12 +715,16 @@ export default function InvoicePage() {
                 className="text-2xl font-bold"
                 style={{ color: settings.brandPrimaryColor || "#4e283a" }}
               >
-                INVOICE
+                {isDonation ? "DONATION RECEIPT" : "INVOICE"}
               </h2>
               <div className="text-xs mt-1 space-y-0.5">
                 <div>
-                  <span className="text-gray-500">Invoice #:</span>{" "}
-                  <span className="font-bold">{invoiceNumber}</span>
+                  <span className="text-gray-500">
+                    {isDonation ? "Receipt" : "Invoice"} #:
+                  </span>{" "}
+                  <span className="font-bold">
+                    {isDonation ? `🎁 ${invoiceNumber}` : invoiceNumber}
+                  </span>
                 </div>
                 <div>
                   <span className="text-gray-500">Date:</span>{" "}
@@ -562,7 +741,7 @@ export default function InvoicePage() {
                 className="text-xs font-bold uppercase tracking-wide mb-1"
                 style={{ color: settings.brandSecondaryColor || "#98823a" }}
               >
-                Bill To
+                {isDonation ? "Donated To" : "Bill To"}
               </div>
               <div className="font-bold">
                 {project.clientFirstName} {project.clientLastName}
@@ -666,11 +845,11 @@ export default function InvoicePage() {
                 className="flex justify-between py-2 text-base font-bold border-t-2"
                 style={{ borderColor: settings.brandPrimaryColor || "#4e283a" }}
               >
-                <span>Total</span>
+                <span>Total Value</span>
                 <span>{formatCurrency(total)}</span>
               </div>
 
-              {depositPaid > 0 && (
+              {depositPaid > 0 && !isDonation && (
                 <div className="flex justify-between py-1.5 text-sm bg-green-50 px-2 rounded mt-1">
                   <span className="text-green-700">
                     Deposit Paid
@@ -685,7 +864,7 @@ export default function InvoicePage() {
                 </div>
               )}
 
-              {finalPaid > 0 && (
+              {finalPaid > 0 && !isDonation && (
                 <div className="flex justify-between py-1.5 text-sm bg-green-50 px-2 rounded mt-1">
                   <span className="text-green-700">
                     Payment Received
@@ -702,31 +881,88 @@ export default function InvoicePage() {
 
               <div
                 className={`flex justify-between py-2 text-lg font-bold mt-1 px-2 rounded ${
-                  amountDue <= 0 ? "bg-green-600" : ""
+                  isDonation ? "bg-purple-600" : amountDue <= 0 ? "bg-green-600" : ""
                 }`}
                 style={
-                  amountDue > 0
+                  isDonation
+                    ? { backgroundColor: "#7c3aed", color: "white" }
+                    : amountDue > 0
                     ? {
-                        backgroundColor:
-                          settings.brandPrimaryColor || "#4e283a",
+                        backgroundColor: settings.brandPrimaryColor || "#4e283a",
                         color: "white",
                       }
                     : { color: "white" }
                 }
               >
-                <span>{amountDue <= 0 ? "Paid in Full" : "Amount Due"}</span>
                 <span>
-                  {amountDue <= 0 ? "✓" : formatCurrency(amountDue)}
+                  {isDonation 
+                    ? "Donation Value" 
+                    : amountDue <= 0 
+                    ? "Paid in Full" 
+                    : "Amount Due"
+                  }
+                </span>
+                <span>
+                  {isDonation 
+                    ? formatCurrency(donationValue)
+                    : amountDue <= 0 
+                    ? "✓" 
+                    : formatCurrency(amountDue)
+                  }
                 </span>
               </div>
+
+              {/* Tax-Deductible Breakdown for donations */}
+              {isDonation && taxDeductibleTotal > 0 && (
+                <div className="mt-3 p-3 bg-purple-50 rounded border border-purple-200">
+                  <div className="text-xs font-bold text-purple-700 mb-1 uppercase tracking-wide">
+                    Tax-Deductible Portion
+                  </div>
+                  <div className="space-y-1">
+                    {lineItems
+                      .filter(item => item.deductible === true)
+                      .map((item, index) => (
+                        <div key={index} className="flex justify-between text-xs">
+                          <span className="text-purple-600">{item.description}</span>
+                          <span className="font-medium text-purple-700">
+                            {formatCurrency(item.amount)}
+                          </span>
+                        </div>
+                      ))
+                    }
+                  </div>
+                  <div className="flex justify-between text-sm font-bold text-purple-700 border-t border-purple-200 pt-1 mt-2">
+                    <span>Total Deductible</span>
+                    <span>{formatCurrency(taxDeductibleTotal)}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Donation Disclaimer */}
+          {isDonation && (
+            <div className="border-t border-gray-200 pt-4 mb-4 text-xs text-gray-600 bg-purple-50 p-4 rounded">
+              <p className="font-bold mb-2">Important Tax Information:</p>
+              <p className="mb-2">
+                Tax deductions for donated materials and mileage only apply to donations 
+                made to qualified 501(c)(3) charitable organizations. The value of donated 
+                services (quilting labor) is not tax-deductible per IRS rules.
+              </p>
+              <p>
+                Consult your tax advisor for guidance on your specific situation.
+              </p>
+            </div>
+          )}
 
           {/* Footer - Compact */}
           <div className="border-t border-gray-200 pt-3 text-center text-xs text-gray-500">
             <p className="font-medium">Thank you for your business!</p>
             <p>
-              Payment is due upon receipt unless otherwise arranged.
+              {isDonation 
+                ? "This receipt is for your tax records."
+                : "Payment is due upon receipt unless otherwise arranged."
+              }
               {settings.email && ` Questions? Contact us at ${settings.email}`}
             </p>
           </div>
