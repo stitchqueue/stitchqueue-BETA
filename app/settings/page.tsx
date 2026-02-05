@@ -34,6 +34,743 @@ const SECTIONS: { key: SectionKey; label: string; icon: string }[] = [
   { key: "data", label: "Reports & Data", icon: "📊" },
 ];
 
+// Reports component
+function ReportsSection({ settings }: { settings: Settings }) {
+  const [selectedReport, setSelectedReport] = useState<string>("revenue");
+  const [dateRange, setDateRange] = useState<"month" | "quarter" | "year" | "custom">("month");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [reportData, setReportData] = useState<any>(null);
+
+  // Calculate date ranges
+  const getDateRange = () => {
+    const now = new Date();
+    let startDate: string;
+    let endDate: string;
+
+    switch (dateRange) {
+      case "month":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        break;
+      case "quarter":
+        const quarter = Math.floor(now.getMonth() / 3);
+        startDate = new Date(now.getFullYear(), quarter * 3, 1).toISOString().split('T')[0];
+        endDate = new Date(now.getFullYear(), quarter * 3 + 3, 0).toISOString().split('T')[0];
+        break;
+      case "year":
+        startDate = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+        endDate = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0];
+        break;
+      case "custom":
+        startDate = customStartDate || new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        endDate = customEndDate || new Date().toISOString().split('T')[0];
+        break;
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        endDate = new Date().toISOString().split('T')[0];
+    }
+
+    return { startDate, endDate };
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: settings?.currencyCode || "USD",
+    }).format(amount);
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const loadReportData = async () => {
+    setLoading(true);
+    try {
+      const { startDate, endDate } = getDateRange();
+
+      switch (selectedReport) {
+        case "revenue":
+          const revenueData = await storage.getRevenueAnalytics(startDate, endDate);
+          setReportData(revenueData);
+          break;
+        case "materials":
+          const materialsData = await storage.getMaterialsAnalytics(startDate, endDate);
+          setReportData(materialsData);
+          break;
+        case "clients":
+          const clientData = await storage.getClientAnalytics();
+          setReportData(clientData);
+          break;
+        case "tax":
+          const currentYear = new Date().getFullYear();
+          const taxData = await storage.getTaxSummary(currentYear);
+          setReportData(taxData);
+          break;
+        default:
+          setReportData(null);
+      }
+    } catch (error) {
+      console.error("Error loading report data:", error);
+      setReportData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReportData();
+  }, [selectedReport, dateRange, customStartDate, customEndDate]);
+
+  const handleExportCSV = async () => {
+    const projects = await storage.getProjects();
+
+    const headers = [
+      "ID",
+      "Stage",
+      "Client First Name",
+      "Client Last Name",
+      "Email",
+      "Phone",
+      "Street",
+      "City",
+      "State",
+      "Postal Code",
+      "Country",
+      "Intake Date",
+      "Due Date",
+      "Description",
+      "Quilt Width",
+      "Quilt Length",
+      "Is Donation",
+      "Total Value",
+      "Created At",
+    ];
+
+    const rows = projects.map((p) => [
+      p.id,
+      p.stage,
+      p.clientFirstName,
+      p.clientLastName,
+      p.clientEmail || "",
+      p.clientPhone || "",
+      p.clientStreet || "",
+      p.clientCity || "",
+      p.clientState || "",
+      p.clientPostalCode || "",
+      p.clientCountry || "",
+      p.intakeDate,
+      p.dueDate || "",
+      p.description || "",
+      p.quiltWidth || "",
+      p.quiltLength || "",
+      p.isDonation ? "Yes" : "No",
+      p.estimateData?.total || "",
+      p.createdAt,
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${cell}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `stitchqueue-export-${
+      new Date().toISOString().split("T")[0]
+    }.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleClearAllData = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to clear ALL data? This cannot be undone!"
+      )
+    )
+      return;
+    if (
+      !confirm("Really sure? All projects, settings, and data will be deleted!")
+    )
+      return;
+
+    try {
+      // Delete all projects from Supabase
+      const deleteResult = await storage.deleteAllProjects();
+      if (!deleteResult.success) {
+        alert("Error deleting projects: " + deleteResult.error);
+        return;
+      }
+
+      // Reset settings to defaults
+      await storage.saveSettings(DEFAULT_SETTINGS);
+
+      // Also clear localStorage just in case
+      localStorage.clear();
+
+      alert("All data cleared! Reloading...");
+      window.location.reload();
+    } catch (error) {
+      console.error("Error clearing data:", error);
+      alert("Error clearing data. Check console for details.");
+    }
+  };
+
+  const exportReportData = () => {
+    if (!reportData) return;
+    
+    let csvContent = "";
+    let filename = "";
+
+    switch (selectedReport) {
+      case "revenue":
+        filename = `revenue-report-${getDateRange().startDate}-${getDateRange().endDate}.csv`;
+        csvContent = [
+          ["Metric", "Amount"],
+          ["Total Revenue", reportData.totalRevenue],
+          ["Quilting Revenue", reportData.quiltingRevenue],
+          ["Batting Revenue", reportData.battingRevenue],
+          ["Bobbin Revenue", reportData.bobbinRevenue],
+          ["Extra Charges Revenue", reportData.extraChargesRevenue],
+          ["Donation Value", reportData.donationValue],
+          ["Project Count", reportData.projectCount],
+          ["Average Project Value", reportData.averageProjectValue],
+        ].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
+        break;
+      case "materials":
+        filename = `materials-report-${getDateRange().startDate}-${getDateRange().endDate}.csv`;
+        csvContent = [
+          ["Metric", "Value"],
+          ["Bobbins Sold", reportData.bobbinsSold],
+          ["Bobbin Revenue", reportData.bobbinRevenue],
+          ["Batting Yards Used", reportData.battingYardsUsed.toFixed(1)],
+          ["Batting Revenue", reportData.battingRevenue],
+        ].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
+        break;
+      case "clients":
+        filename = `client-report-${new Date().toISOString().split('T')[0]}.csv`;
+        const clientHeaders = ["Client Name", "Email", "Project Count", "Total Revenue", "Last Project Date"];
+        const clientRows = reportData.topClientsByRevenue.map((client: any) => [
+          client.name,
+          client.email || "",
+          client.projectCount,
+          client.totalRevenue,
+          formatDate(client.lastProjectDate)
+        ]);
+        csvContent = [clientHeaders, ...clientRows]
+          .map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
+        break;
+      case "tax":
+        filename = `tax-summary-${new Date().getFullYear()}.csv`;
+        csvContent = [
+          ["Tax Item", "Amount"],
+          ["Total Donation Value", reportData.totalDonationValue],
+          ["Materials Donated (Deductible)", reportData.materialsDonatedValue],
+          ["Services Donated (Non-Deductible)", reportData.servicesDonatedValue],
+          ["Charitable Mileage (Miles)", reportData.charitableMileage],
+          ["Charitable Mileage Value", reportData.charitableMileageValue],
+          ["Donation Count", reportData.donationCount],
+        ].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
+        break;
+    }
+
+    if (csvContent) {
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Report Type Selector */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <button
+          onClick={() => setSelectedReport("revenue")}
+          className={`p-4 rounded-xl border text-left transition-colors ${
+            selectedReport === "revenue"
+              ? "border-plum bg-plum/10"
+              : "border-line hover:bg-background"
+          }`}
+        >
+          <div className="font-bold text-sm">💰 Revenue</div>
+          <div className="text-xs text-muted mt-1">Income breakdown over time</div>
+        </button>
+        
+        <button
+          onClick={() => setSelectedReport("materials")}
+          className={`p-4 rounded-xl border text-left transition-colors ${
+            selectedReport === "materials"
+              ? "border-plum bg-plum/10"
+              : "border-line hover:bg-background"
+          }`}
+        >
+          <div className="font-bold text-sm">🧵 Materials</div>
+          <div className="text-xs text-muted mt-1">Bobbin & batting usage</div>
+        </button>
+        
+        <button
+          onClick={() => setSelectedReport("clients")}
+          className={`p-4 rounded-xl border text-left transition-colors ${
+            selectedReport === "clients"
+              ? "border-plum bg-plum/10"
+              : "border-line hover:bg-background"
+          }`}
+        >
+          <div className="font-bold text-sm">👥 Clients</div>
+          <div className="text-xs text-muted mt-1">Top clients & repeat business</div>
+        </button>
+        
+        <button
+          onClick={() => setSelectedReport("tax")}
+          className={`p-4 rounded-xl border text-left transition-colors ${
+            selectedReport === "tax"
+              ? "border-plum bg-plum/10"
+              : "border-line hover:bg-background"
+          }`}
+        >
+          <div className="font-bold text-sm">🎁 Tax Summary</div>
+          <div className="text-xs text-muted mt-1">Donation deductions</div>
+        </button>
+      </div>
+
+      {/* Date Range Selector */}
+      {selectedReport !== "clients" && selectedReport !== "tax" && (
+        <div className="flex flex-col sm:flex-row gap-4 p-4 bg-background rounded-xl">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setDateRange("month")}
+              className={`px-3 py-2 rounded-lg text-sm font-bold transition-colors ${
+                dateRange === "month"
+                  ? "bg-plum text-white"
+                  : "bg-white border border-line hover:bg-gray-50"
+              }`}
+            >
+              This Month
+            </button>
+            <button
+              onClick={() => setDateRange("quarter")}
+              className={`px-3 py-2 rounded-lg text-sm font-bold transition-colors ${
+                dateRange === "quarter"
+                  ? "bg-plum text-white"
+                  : "bg-white border border-line hover:bg-gray-50"
+              }`}
+            >
+              This Quarter
+            </button>
+            <button
+              onClick={() => setDateRange("year")}
+              className={`px-3 py-2 rounded-lg text-sm font-bold transition-colors ${
+                dateRange === "year"
+                  ? "bg-plum text-white"
+                  : "bg-white border border-line hover:bg-gray-50"
+              }`}
+            >
+              This Year
+            </button>
+            <button
+              onClick={() => setDateRange("custom")}
+              className={`px-3 py-2 rounded-lg text-sm font-bold transition-colors ${
+                dateRange === "custom"
+                  ? "bg-plum text-white"
+                  : "bg-white border border-line hover:bg-gray-50"
+              }`}
+            >
+              Custom
+            </button>
+          </div>
+          
+          {dateRange === "custom" && (
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-3 py-2 border border-line rounded-lg text-sm"
+              />
+              <span className="flex items-center text-sm text-muted">to</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-3 py-2 border border-line rounded-lg text-sm"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Report Content */}
+      <div className="border border-line rounded-xl p-6">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-plum mr-3"></div>
+            <span className="text-muted">Loading report...</span>
+          </div>
+        ) : reportData ? (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-plum">
+                {selectedReport === "revenue" && "Revenue Report"}
+                {selectedReport === "materials" && "Materials Usage Report"}
+                {selectedReport === "clients" && "Client Analysis"}
+                {selectedReport === "tax" && `Tax Summary ${new Date().getFullYear()}`}
+              </h3>
+              <button
+                onClick={exportReportData}
+                className="px-4 py-2 border border-plum text-plum rounded-xl text-sm font-bold hover:bg-plum hover:text-white transition-colors"
+              >
+                Export CSV
+              </button>
+            </div>
+
+            {/* Revenue Report */}
+            {selectedReport === "revenue" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+                    <div className="text-green-600 text-xs font-bold uppercase tracking-wide mb-1">
+                      Total Revenue
+                    </div>
+                    <div className="text-2xl font-bold text-green-700">
+                      {formatCurrency(reportData.totalRevenue)}
+                    </div>
+                    <div className="text-xs text-green-600 mt-1">
+                      {reportData.projectCount} projects completed
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                    <div className="text-blue-600 text-xs font-bold uppercase tracking-wide mb-1">
+                      Quilting Services
+                    </div>
+                    <div className="text-xl font-bold text-blue-700">
+                      {formatCurrency(reportData.quiltingRevenue)}
+                    </div>
+                    <div className="text-xs text-blue-600 mt-1">
+                      {reportData.totalRevenue > 0 
+                        ? ((reportData.quiltingRevenue / reportData.totalRevenue) * 100).toFixed(0)
+                        : 0}% of total
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                    <div className="text-purple-600 text-xs font-bold uppercase tracking-wide mb-1">
+                      Materials Income
+                    </div>
+                    <div className="text-xl font-bold text-purple-700">
+                      {formatCurrency(reportData.battingRevenue + reportData.bobbinRevenue)}
+                    </div>
+                    <div className="text-xs text-purple-600 mt-1">
+                      Batting + Bobbins
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-gold/10 border border-gold/20 rounded-xl">
+                    <div className="text-gold text-xs font-bold uppercase tracking-wide mb-1">
+                      Average Project
+                    </div>
+                    <div className="text-xl font-bold" style={{ color: "#98823a" }}>
+                      {formatCurrency(reportData.averageProjectValue)}
+                    </div>
+                    <div className="text-xs text-gold mt-1">
+                      Per completed project
+                    </div>
+                  </div>
+                </div>
+
+                {reportData.donationValue > 0 && (
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                    <h4 className="font-bold text-purple-700 mb-2">🎁 Charitable Donations</h4>
+                    <div className="text-lg font-bold text-purple-600">
+                      {formatCurrency(reportData.donationValue)}
+                    </div>
+                    <div className="text-xs text-purple-600 mt-1">
+                      Total value of donated services and materials
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Materials Report */}
+            {selectedReport === "materials" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h4 className="font-bold text-plum">🧵 Bobbin Sales</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted">Bobbins Sold</span>
+                        <span className="font-bold">{reportData.bobbinsSold}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted">Bobbin Revenue</span>
+                        <span className="font-bold">{formatCurrency(reportData.bobbinRevenue)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted">Avg Price per Bobbin</span>
+                        <span className="font-bold">
+                          {reportData.bobbinsSold > 0 
+                            ? formatCurrency(reportData.bobbinRevenue / reportData.bobbinsSold)
+                            : "$0.00"
+                          }
+                        </span>
+                      </div>
+                    </div>
+
+                    {reportData.popularBobbinTypes.length > 0 && (
+                      <div className="mt-4">
+                        <div className="text-sm font-bold text-muted mb-2">Popular Bobbin Types</div>
+                        <div className="space-y-1">
+                          {reportData.popularBobbinTypes.map((item: any, index: number) => (
+                            <div key={index} className="flex justify-between text-sm">
+                              <span>{item.name}</span>
+                              <span className="text-muted">{item.count} sold</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-bold text-plum">🛏️ Batting Usage</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted">Yards Used</span>
+                        <span className="font-bold">{reportData.battingYardsUsed.toFixed(1)} yds</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted">Batting Revenue</span>
+                        <span className="font-bold">{formatCurrency(reportData.battingRevenue)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted">Avg Price per Yard</span>
+                        <span className="font-bold">
+                          {reportData.battingYardsUsed > 0 
+                            ? formatCurrency(reportData.battingRevenue / reportData.battingYardsUsed)
+                            : "$0.00"
+                          }
+                        </span>
+                      </div>
+                    </div>
+
+                    {reportData.popularBattingTypes.length > 0 && (
+                      <div className="mt-4">
+                        <div className="text-sm font-bold text-muted mb-2">Popular Batting Types</div>
+                        <div className="space-y-1">
+                          {reportData.popularBattingTypes.map((item: any, index: number) => (
+                            <div key={index} className="flex justify-between text-sm">
+                              <span>{item.name}</span>
+                              <span className="text-muted">{item.count} projects</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Client Analysis */}
+            {selectedReport === "clients" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                    <div className="text-2xl font-bold text-blue-700">
+                      {reportData.totalUniqueClients}
+                    </div>
+                    <div className="text-blue-600 text-sm font-bold">Total Clients</div>
+                  </div>
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
+                    <div className="text-2xl font-bold text-green-700">
+                      {reportData.repeatClientPercentage.toFixed(0)}%
+                    </div>
+                    <div className="text-green-600 text-sm font-bold">Repeat Clients</div>
+                  </div>
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl text-center">
+                    <div className="text-2xl font-bold text-purple-700">
+                      {reportData.topClientsByRevenue.length}
+                    </div>
+                    <div className="text-purple-600 text-sm font-bold">Top Clients</div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-plum mb-4">Top Clients by Revenue</h4>
+                  <div className="space-y-2">
+                    {reportData.topClientsByRevenue.map((client: any, index: number) => (
+                      <div key={index} className="flex items-center justify-between p-3 border border-line rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-bold text-sm">{client.name}</div>
+                          {client.email && (
+                            <div className="text-xs text-muted">{client.email}</div>
+                          )}
+                          <div className="text-xs text-muted mt-1">
+                            Last project: {formatDate(client.lastProjectDate)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold">{formatCurrency(client.totalRevenue)}</div>
+                          <div className="text-xs text-muted">
+                            {client.projectCount} project{client.projectCount !== 1 ? "s" : ""}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {reportData.topClientsByRevenue.length === 0 && (
+                      <div className="text-center text-muted py-8">
+                        No client data available yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tax Summary */}
+            {selectedReport === "tax" && (
+              <div className="space-y-6">
+                {reportData.donationCount > 0 ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                        <h4 className="font-bold text-purple-700 mb-3">🎁 Donation Summary</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-muted">Total Donations</span>
+                            <span className="font-bold">{reportData.donationCount}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted">Total Value</span>
+                            <span className="font-bold">{formatCurrency(reportData.totalDonationValue)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+                        <h4 className="font-bold text-green-700 mb-3">📋 Tax Deductions</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-muted">Materials (Deductible)</span>
+                            <span className="font-bold text-green-600">
+                              {formatCurrency(reportData.materialsDonatedValue)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted">Services (Non-Deductible)</span>
+                            <span className="font-bold text-gray-500">
+                              {formatCurrency(reportData.servicesDonatedValue)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {reportData.charitableMileage > 0 && (
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                        <h4 className="font-bold text-blue-700 mb-3">🚗 Charitable Mileage</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-muted">Miles Driven</span>
+                            <span className="font-bold">{reportData.charitableMileage} miles</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted">Deductible Value</span>
+                            <span className="font-bold text-blue-600">
+                              {formatCurrency(reportData.charitableMileageValue)}
+                            </span>
+                          </div>
+                          <div className="text-xs text-blue-600 mt-2">
+                            @ $0.14 per mile (IRS charitable rate)
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="p-4 bg-gold/10 border border-gold/20 rounded-xl">
+                      <h4 className="font-bold text-gold mb-2">💰 Total Tax-Deductible Value</h4>
+                      <div className="text-2xl font-bold" style={{ color: "#98823a" }}>
+                        {formatCurrency(reportData.materialsDonatedValue + reportData.charitableMileageValue)}
+                      </div>
+                      <div className="text-xs text-gold mt-2">
+                        Materials donated + charitable mileage. Consult your tax advisor.
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center text-muted py-8">
+                    <div className="text-4xl mb-2">🎁</div>
+                    <div className="font-bold mb-2">No Donations Yet</div>
+                    <div className="text-sm">
+                      Mark projects as donations to track tax-deductible contributions.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center text-muted py-8">
+            <div className="text-4xl mb-2">📊</div>
+            <div className="font-bold mb-2">No Data Available</div>
+            <div className="text-sm">
+              Complete some projects to see reporting data.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Data Management Section */}
+      <div className="border-t border-line pt-6 space-y-4">
+        <h3 className="font-bold text-plum">Data Management</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 border border-line rounded-xl">
+            <h4 className="font-bold text-sm mb-2">Export All Data</h4>
+            <p className="text-xs text-muted mb-4">
+              Export all projects to CSV for backup or external use.
+            </p>
+            <button
+              onClick={handleExportCSV}
+              className="px-4 py-2 bg-plum text-white rounded-xl font-bold text-sm"
+            >
+              Export Projects CSV
+            </button>
+          </div>
+
+          <div className="p-4 border border-red-300 rounded-xl bg-red-50">
+            <h4 className="font-bold text-sm text-red-600 mb-2">Danger Zone</h4>
+            <p className="text-xs text-muted mb-4">
+              Clear all data including projects and settings. Cannot be undone!
+            </p>
+            <button
+              onClick={handleClearAllData}
+              className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold text-sm"
+            >
+              Clear All Data
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -335,100 +1072,6 @@ export default function SettingsPage() {
     setEditBattingName("");
     setEditBattingWidth("");
     setEditBattingPrice("");
-  };
-
-  const handleExportCSV = async () => {
-    const projects = await storage.getProjects();
-
-    const headers = [
-      "ID",
-      "Stage",
-      "Client First Name",
-      "Client Last Name",
-      "Email",
-      "Phone",
-      "Street",
-      "City",
-      "State",
-      "Postal Code",
-      "Country",
-      "Intake Date",
-      "Due Date",
-      "Description",
-      "Quilt Width",
-      "Quilt Length",
-      "Service Type",
-      "Created At",
-    ];
-
-    const rows = projects.map((p) => [
-      p.id,
-      p.stage,
-      p.clientFirstName,
-      p.clientLastName,
-      p.clientEmail || "",
-      p.clientPhone || "",
-      p.clientStreet || "",
-      p.clientCity || "",
-      p.clientState || "",
-      p.clientPostalCode || "",
-      p.clientCountry || "",
-      p.intakeDate,
-      p.dueDate || "",
-      p.description || "",
-      p.quiltWidth || "",
-      p.quiltLength || "",
-      p.serviceType || "",
-      p.createdAt,
-    ]);
-
-    const csv = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${cell}"`).join(","))
-      .join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `stitchqueue-export-${
-      new Date().toISOString().split("T")[0]
-    }.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleClearAllData = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to clear ALL data? This cannot be undone!"
-      )
-    )
-      return;
-    if (
-      !confirm("Really sure? All projects, settings, and data will be deleted!")
-    )
-      return;
-
-    try {
-      // Delete all projects from Supabase
-      const deleteResult = await storage.deleteAllProjects();
-      if (!deleteResult.success) {
-        alert("Error deleting projects: " + deleteResult.error);
-        return;
-      }
-
-      // Reset settings to defaults
-      await storage.saveSettings(DEFAULT_SETTINGS);
-
-      // Also clear localStorage just in case
-      localStorage.clear();
-
-      alert("All data cleared! Reloading...");
-      window.location.reload();
-    } catch (error) {
-      console.error("Error clearing data:", error);
-      alert("Error clearing data. Check console for details.");
-    }
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1502,50 +2145,10 @@ export default function SettingsPage() {
               sectionKey="data"
               label="Reports & Data"
               icon="📊"
-              subtitle="Export data and manage your account"
+              subtitle="Business analytics and data management"
             />
             <AccordionBody sectionKey="data">
-              <div className="space-y-6">
-                <div className="p-4 border border-line rounded-xl">
-                  <h3 className="font-bold text-sm mb-2">Export Data</h3>
-                  <p className="text-xs text-muted mb-4">
-                    Export all your projects to a CSV file for backup or use in
-                    other software.
-                  </p>
-                  <button
-                    onClick={handleExportCSV}
-                    className="px-4 py-2 bg-plum text-white rounded-xl font-bold"
-                  >
-                    Export to CSV
-                  </button>
-                </div>
-
-                <div className="p-4 border border-line rounded-xl bg-background">
-                  <h3 className="font-bold text-sm mb-2 text-muted">
-                    Reports
-                  </h3>
-                  <p className="text-xs text-muted">
-                    Income reports, quilting totals, and batting usage tracking
-                    coming soon.
-                  </p>
-                </div>
-
-                <div className="p-4 border border-red-300 rounded-xl bg-red-50">
-                  <h3 className="font-bold text-sm text-red-600 mb-2">
-                    Danger Zone
-                  </h3>
-                  <p className="text-xs text-muted mb-4">
-                    Clear all data including projects, settings, and preferences.
-                    This cannot be undone!
-                  </p>
-                  <button
-                    onClick={handleClearAllData}
-                    className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold"
-                  >
-                    Clear All Data
-                  </button>
-                </div>
-              </div>
+              <ReportsSection settings={settings} />
             </AccordionBody>
           </div>
         </div>
