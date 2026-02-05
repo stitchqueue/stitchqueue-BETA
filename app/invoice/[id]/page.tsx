@@ -302,13 +302,6 @@ export default function InvoicePage() {
     });
   }
 
-  if (estimate.threadCost && estimate.threadCost > 0) {
-    lineItems.push({
-      description: `Thread - ${project.threadChoice || "Standard"}`,
-      amount: estimate.threadCost,
-    });
-  }
-
   if (estimate.battingTotal && estimate.battingTotal > 0) {
     lineItems.push({
       description: `Batting - ${
@@ -335,14 +328,30 @@ export default function InvoicePage() {
   }
 
   if (estimate.bobbinTotal && estimate.bobbinTotal > 0) {
+    const bobbinDesc = estimate.bobbinName 
+      ? `Bobbins - ${estimate.bobbinName} (${estimate.bobbinCount || 1})`
+      : `Bobbins (${estimate.bobbinCount || 1})`;
     lineItems.push({
-      description: `Bobbins (${estimate.bobbinCount || 1})`,
+      description: bobbinDesc,
       amount: estimate.bobbinTotal,
+    });
+  }
+
+  // Add extra charges as line items
+  if (estimate.extraCharges && estimate.extraCharges.length > 0) {
+    estimate.extraCharges.forEach((charge) => {
+      lineItems.push({
+        description: `${charge.name}${!charge.taxable ? " *" : ""}`,
+        amount: charge.amount,
+      });
     });
   }
 
   const businessAddress = formatBusinessAddress();
   const clientAddressLines = formatClientAddress();
+
+  // Check if there are any non-taxable extra charges for the footnote
+  const hasNonTaxableCharges = estimate.extraCharges?.some((c) => !c.taxable);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -628,6 +637,11 @@ export default function InvoicePage() {
               ))}
             </tbody>
           </table>
+
+          {/* Non-taxable footnote */}
+          {hasNonTaxableCharges && (
+            <p className="text-xs text-gray-500 mb-4">* Non-taxable item</p>
+          )}
 
           {/* Totals - Compact, right aligned */}
           <div className="flex justify-end mb-4">
