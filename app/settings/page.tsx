@@ -514,17 +514,17 @@ function ReportsSection({ settings }: { settings: Settings }) {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-muted">Bobbins Sold</span>
-                        <span className="font-bold">{reportData.bobbinsSold}</span>
+                        <span className="font-bold">{reportData.bobbinsSold || 0}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted">Bobbin Revenue</span>
-                        <span className="font-bold">{formatCurrency(reportData.bobbinRevenue)}</span>
+                        <span className="font-bold">{formatCurrency(reportData.bobbinRevenue || 0)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted">Avg Price per Bobbin</span>
                         <span className="font-bold">
-                          {reportData.bobbinsSold > 0 
-                            ? formatCurrency(reportData.bobbinRevenue / reportData.bobbinsSold)
+                          {(reportData.bobbinsSold || 0) > 0 
+                            ? formatCurrency((reportData.bobbinRevenue || 0) / reportData.bobbinsSold)
                             : "$0.00"
                           }
                         </span>
@@ -551,17 +551,17 @@ function ReportsSection({ settings }: { settings: Settings }) {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-muted">Yards Used</span>
-                        <span className="font-bold">{reportData.battingYardsUsed.toFixed(1)} yds</span>
+                        <span className="font-bold">{(reportData.battingYardsUsed || 0).toFixed(1)} yds</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted">Batting Revenue</span>
-                        <span className="font-bold">{formatCurrency(reportData.battingRevenue)}</span>
+                        <span className="font-bold">{formatCurrency(reportData.battingRevenue || 0)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted">Avg Price per Yard</span>
                         <span className="font-bold">
-                          {reportData.battingYardsUsed > 0 
-                            ? formatCurrency(reportData.battingRevenue / reportData.battingYardsUsed)
+                          {(reportData.battingYardsUsed || 0) > 0 
+                            ? formatCurrency((reportData.battingRevenue || 0) / reportData.battingYardsUsed)
                             : "$0.00"
                           }
                         </span>
