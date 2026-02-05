@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import {
   storage,
@@ -24,15 +24,28 @@ const formatPhoneNumber = (value: string): string => {
   }
 };
 
+type SectionKey = "business" | "pricing" | "bobbin" | "batting" | "data";
+
+const SECTIONS: { key: SectionKey; label: string; icon: string }[] = [
+  { key: "business", label: "Business Info", icon: "🏢" },
+  { key: "pricing", label: "Pricing Rates", icon: "💲" },
+  { key: "bobbin", label: "Bobbin Options", icon: "🧵" },
+  { key: "batting", label: "Batting Options", icon: "🛏️" },
+  { key: "data", label: "Reports & Data", icon: "📊" },
+];
+
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<
-    "business" | "pricing" | "bobbin" | "batting" | "data"
-  >("business");
+
+  // Accordion: track which sections are open (multiple can be open)
+  const [openSections, setOpenSections] = useState<Set<SectionKey>>(
+    new Set()
+  );
 
   // Bobbin state
   const [newBobbinName, setNewBobbinName] = useState("");
@@ -60,6 +73,14 @@ export default function SettingsPage() {
     bindingTopAttached: "",
     bindingFullyAttached: "",
   });
+
+  // Read ?section= param and open that section
+  useEffect(() => {
+    const section = searchParams.get("section") as SectionKey | null;
+    if (section && SECTIONS.some((s) => s.key === section)) {
+      setOpenSections(new Set([section]));
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const init = async () => {
@@ -98,6 +119,19 @@ export default function SettingsPage() {
     };
     init();
   }, [router]);
+
+  // Toggle a section open/closed
+  const toggleSection = (key: SectionKey) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const handleRateChange = (field: keyof typeof rateStrings, value: string) => {
     setRateStrings((prev) => ({ ...prev, [field]: value }));
@@ -430,12 +464,68 @@ export default function SettingsPage() {
     await storage.saveSettings(updated);
   };
 
+  // ─── Accordion header component ───
+  const AccordionHeader = ({
+    sectionKey,
+    label,
+    icon,
+    subtitle,
+  }: {
+    sectionKey: SectionKey;
+    label: string;
+    icon: string;
+    subtitle?: string;
+  }) => {
+    const isOpen = openSections.has(sectionKey);
+    return (
+      <button
+        onClick={() => toggleSection(sectionKey)}
+        className={`w-full flex items-center justify-between px-5 py-4 bg-white border border-line rounded-xl hover:bg-plum/5 transition-colors ${
+          isOpen ? "rounded-b-none border-b-0" : ""
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-lg">{icon}</span>
+          <div className="text-left">
+            <span className="font-bold text-sm text-plum">{label}</span>
+            {subtitle && (
+              <p className="text-xs text-muted mt-0.5">{subtitle}</p>
+            )}
+          </div>
+        </div>
+        <span
+          className={`text-muted text-sm transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        >
+          ▼
+        </span>
+      </button>
+    );
+  };
+
+  // ─── Accordion body wrapper ───
+  const AccordionBody = ({
+    sectionKey,
+    children,
+  }: {
+    sectionKey: SectionKey;
+    children: React.ReactNode;
+  }) => {
+    if (!openSections.has(sectionKey)) return null;
+    return (
+      <div className="bg-white border border-line border-t-0 rounded-b-xl px-5 py-6 space-y-6">
+        {children}
+      </div>
+    );
+  };
+
   // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <main className="max-w-6xl mx-auto px-4 py-8">
+        <main className="max-w-4xl mx-auto px-4 py-8">
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-plum"></div>
             <span className="ml-3 text-muted">Loading settings...</span>
@@ -454,7 +544,8 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-plum">Settings</h1>
@@ -470,7 +561,8 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        <div className="bg-white border border-line rounded-card p-4 mb-6">
+        {/* Tier card */}
+        <div className="bg-white border border-line rounded-xl p-4 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="font-bold text-sm">
@@ -512,504 +604,326 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* Tab navigation - horizontal scroll on mobile */}
-        <div className="flex gap-2 mb-6 border-b border-line overflow-x-auto pb-px -mx-4 px-4 sm:mx-0 sm:px-0">
-          <button
-            onClick={() => setActiveTab("business")}
-            className={`px-4 py-3 font-bold text-sm whitespace-nowrap flex-shrink-0 ${
-              activeTab === "business"
-                ? "text-plum border-b-2 border-plum"
-                : "text-muted hover:text-plum"
-            }`}
-          >
-            Business Info
-          </button>
-          <button
-            onClick={() => setActiveTab("pricing")}
-            className={`px-4 py-3 font-bold text-sm whitespace-nowrap flex-shrink-0 ${
-              activeTab === "pricing"
-                ? "text-plum border-b-2 border-plum"
-                : "text-muted hover:text-plum"
-            }`}
-          >
-            Pricing Rates
-          </button>
-          <button
-            onClick={() => setActiveTab("bobbin")}
-            className={`px-4 py-3 font-bold text-sm whitespace-nowrap flex-shrink-0 ${
-              activeTab === "bobbin"
-                ? "text-plum border-b-2 border-plum"
-                : "text-muted hover:text-plum"
-            }`}
-          >
-            Bobbin Options
-          </button>
-          <button
-            onClick={() => setActiveTab("batting")}
-            className={`px-4 py-3 font-bold text-sm whitespace-nowrap flex-shrink-0 ${
-              activeTab === "batting"
-                ? "text-plum border-b-2 border-plum"
-                : "text-muted hover:text-plum"
-            }`}
-          >
-            Batting Options
-          </button>
-          <button
-            onClick={() => setActiveTab("data")}
-            className={`px-4 py-3 font-bold text-sm whitespace-nowrap flex-shrink-0 ${
-              activeTab === "data"
-                ? "text-plum border-b-2 border-plum"
-                : "text-muted hover:text-plum"
-            }`}
-          >
-            Data Management
-          </button>
-        </div>
-
-        {activeTab === "business" && (
-          <div className="bg-white border border-line rounded-card p-4 sm:p-6 space-y-6">
-            <h2 className="text-lg font-bold text-plum mb-4">
-              Business Information
-            </h2>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Business Name
-                </label>
-                <input
-                  type="text"
-                  value={settings.businessName || ""}
-                  onChange={(e) =>
-                    handleFieldChange("businessName", e.target.value)
-                  }
-                  placeholder="Stitched By Susan"
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Street Address
-                </label>
-                <input
-                  type="text"
-                  value={settings.street || ""}
-                  onChange={(e) => handleFieldChange("street", e.target.value)}
-                  placeholder="123 Main Street"
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
-              </div>
-
-              {/* Address grid - responsive layout */}
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.city || ""}
-                    onChange={(e) => handleFieldChange("city", e.target.value)}
-                    placeholder="Spokane"
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
-                </div>
+        {/* ═══════════════════════════════════════════════
+            ACCORDION SECTIONS
+            ═══════════════════════════════════════════════ */}
+        <div className="space-y-3">
+          {/* ─── BUSINESS INFO ─── */}
+          <div>
+            <AccordionHeader
+              sectionKey="business"
+              label="Business Info"
+              icon="🏢"
+              subtitle={settings.businessName || "Set up your business details"}
+            />
+            <AccordionBody sectionKey="business">
+              <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-bold text-muted mb-2">
-                    State
+                    Business Name
                   </label>
                   <input
                     type="text"
-                    value={settings.state || ""}
-                    onChange={(e) => handleFieldChange("state", e.target.value)}
-                    placeholder="WA"
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Postal Code
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.postalCode || ""}
+                    value={settings.businessName || ""}
                     onChange={(e) =>
-                      handleFieldChange("postalCode", e.target.value)
+                      handleFieldChange("businessName", e.target.value)
                     }
-                    placeholder="99201"
+                    placeholder="Stitched By Susan"
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
                 </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Country
-                  </label>
-                  <select
-                    value={settings.country || "United States"}
-                    onChange={(e) =>
-                      handleFieldChange("country", e.target.value)
-                    }
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  >
-                    {COUNTRY_OPTIONS.map((country) => (
-                      <option key={country} value={country}>
-                        {country}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-muted mb-2">
-                    Email
+                    Street Address
                   </label>
                   <input
-                    type="email"
-                    value={settings.email || ""}
-                    onChange={(e) => handleFieldChange("email", e.target.value)}
-                    placeholder="susan@stitchedbysusan.com"
+                    type="text"
+                    value={settings.street || ""}
+                    onChange={(e) => handleFieldChange("street", e.target.value)}
+                    placeholder="123 Main Street"
                     className="w-full px-4 py-2 border border-line rounded-xl"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={settings.phone || ""}
-                    onChange={(e) => handlePhoneChange(e.target.value)}
-                    placeholder="509-828-2945"
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
-                </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Website
-                </label>
-                <input
-                  type="url"
-                  value={settings.website || ""}
-                  onChange={(e) => handleFieldChange("website", e.target.value)}
-                  placeholder="https://stitchedbysusan.com"
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Business Logo
-                </label>
-                {settings.logoUrl ? (
-                  <div className="flex items-center gap-4">
-                    <img
-                      src={settings.logoUrl}
-                      alt="Business logo"
-                      className="h-20 w-20 object-contain border border-line rounded-xl p-2"
-                    />
-                    <button
-                      onClick={handleRemoveLogo}
-                      className="px-4 py-2 border border-line rounded-xl hover:bg-background transition-colors text-sm"
-                    >
-                      Remove Logo
-                    </button>
-                  </div>
-                ) : (
-                  <div>
+                {/* Address grid */}
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-sm font-bold text-muted mb-2">
+                      City
+                    </label>
                     <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
+                      type="text"
+                      value={settings.city || ""}
+                      onChange={(e) => handleFieldChange("city", e.target.value)}
+                      placeholder="Spokane"
                       className="w-full px-4 py-2 border border-line rounded-xl"
                     />
-                    <p className="text-xs text-muted mt-2">
-                      Max file size: 500KB. Recommended: Square image, PNG with
-                      transparency.
-                    </p>
                   </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Primary Brand Color
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={settings.brandPrimaryColor || "#4e283a"}
-                      onChange={(e) =>
-                        handleFieldChange("brandPrimaryColor", e.target.value)
-                      }
-                      className="h-10 w-20 border border-line rounded-xl cursor-pointer"
-                    />
+                  <div>
+                    <label className="block text-sm font-bold text-muted mb-2">
+                      State
+                    </label>
                     <input
                       type="text"
-                      value={settings.brandPrimaryColor || "#4e283a"}
+                      value={settings.state || ""}
                       onChange={(e) =>
-                        handleFieldChange("brandPrimaryColor", e.target.value)
+                        handleFieldChange("state", e.target.value)
                       }
-                      placeholder="#4e283a"
-                      className="flex-1 px-4 py-2 border border-line rounded-xl font-mono text-sm"
+                      placeholder="WA"
+                      className="w-full px-4 py-2 border border-line rounded-xl"
                     />
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Secondary Brand Color
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={settings.brandSecondaryColor || "#98823a"}
-                      onChange={(e) =>
-                        handleFieldChange("brandSecondaryColor", e.target.value)
-                      }
-                      className="h-10 w-20 border border-line rounded-xl cursor-pointer"
-                    />
+                  <div>
+                    <label className="block text-sm font-bold text-muted mb-2">
+                      Postal Code
+                    </label>
                     <input
                       type="text"
-                      value={settings.brandSecondaryColor || "#98823a"}
+                      value={settings.postalCode || ""}
                       onChange={(e) =>
-                        handleFieldChange("brandSecondaryColor", e.target.value)
+                        handleFieldChange("postalCode", e.target.value)
                       }
-                      placeholder="#98823a"
-                      className="flex-1 px-4 py-2 border border-line rounded-xl font-mono text-sm"
+                      placeholder="99201"
+                      className="w-full px-4 py-2 border border-line rounded-xl"
                     />
                   </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Measurement System
-                </label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      checked={settings.measurementSystem === "imperial"}
-                      onChange={() =>
-                        handleFieldChange("measurementSystem", "imperial")
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-sm font-bold text-muted mb-2">
+                      Country
+                    </label>
+                    <select
+                      value={settings.country || "United States"}
+                      onChange={(e) =>
+                        handleFieldChange("country", e.target.value)
                       }
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm">Imperial (inches)</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      checked={settings.measurementSystem === "metric"}
-                      onChange={() =>
-                        handleFieldChange("measurementSystem", "metric")
-                      }
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm">Metric (centimeters)</span>
-                  </label>
+                      className="w-full px-4 py-2 border border-line rounded-xl"
+                    >
+                      {COUNTRY_OPTIONS.map((country) => (
+                        <option key={country} value={country}>
+                          {country}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-bold text-muted mb-2">
-                  Currency
-                </label>
-                <select
-                  value={settings.currencyCode || "USD"}
-                  onChange={(e) =>
-                    handleFieldChange("currencyCode", e.target.value)
-                  }
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                >
-                  <option value="USD">USD - US Dollar ($)</option>
-                  <option value="CAD">CAD - Canadian Dollar ($)</option>
-                  <option value="GBP">GBP - British Pound (£)</option>
-                  <option value="EUR">EUR - Euro (€)</option>
-                  <option value="AUD">AUD - Australian Dollar ($)</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Tax Rate (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={settings.taxRate || 0}
-                    onChange={(e) =>
-                      handleFieldChange(
-                        "taxRate",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                    placeholder="8.5"
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-muted mb-2">
-                    Tax Label
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.taxLabel || "Sales Tax"}
-                    onChange={(e) =>
-                      handleFieldChange("taxLabel", e.target.value)
-                    }
-                    placeholder="Sales Tax"
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
-                </div>
-              </div>
-
-              <div className="border-t border-line pt-6 mt-6">
-                <h3 className="text-md font-bold text-plum mb-4">
-                  Estimate Numbering
-                </h3>
-                <div className="space-y-2">
-                  <label className="block text-sm font-bold text-muted">
-                    Next Estimate Number
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={settings.nextEstimateNumber || 1001}
-                    onChange={(e) =>
-                      handleFieldChange(
-                        "nextEstimateNumber",
-                        parseInt(e.target.value) || 1001
-                      )
-                    }
-                    className="w-full px-4 py-2 border border-line rounded-xl"
-                  />
-                  <p className="text-xs text-muted">
-                    The next estimate you create will use this number. Change
-                    this to match your accounting system.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "pricing" && (
-          <div className="bg-white border border-line rounded-card p-4 sm:p-6">
-            <div className="mb-4">
-              <h2 className="text-lg font-bold text-plum">Quilting Rates</h2>
-              <p className="text-sm text-muted mt-1">
-                {settings.isPaidTier
-                  ? "Set your pricing rates (per square inch) - values save when you click out of field"
-                  : "Available in PAID tier"}
-              </p>
-            </div>
-
-            {!settings.isPaidTier ? (
-              <div className="p-6 bg-gold/10 rounded-xl text-center">
-                <p className="text-sm text-muted mb-4">
-                  Upgrade to PAID tier to save pricing rates and auto-populate
-                  the calculator
-                </p>
-                <button
-                  onClick={async () => {
-                    const updated = { ...settings, isPaidTier: true };
-                    setSettings(updated);
-                    await storage.saveSettings(updated);
-                  }}
-                  className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
-                >
-                  Enable PAID Tier (Demo)
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-bold text-muted mb-2">
-                      Light Edge-to-Edge ($/sq in)
+                      Email
                     </label>
                     <input
-                      type="text"
-                      inputMode="decimal"
-                      value={rateStrings.lightE2E}
+                      type="email"
+                      value={settings.email || ""}
                       onChange={(e) =>
-                        handleRateChange("lightE2E", e.target.value)
+                        handleFieldChange("email", e.target.value)
                       }
-                      onBlur={() => handleRateBlur("lightE2E")}
-                      placeholder="0.015"
+                      placeholder="susan@stitchedbysusan.com"
                       className="w-full px-4 py-2 border border-line rounded-xl"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-muted mb-2">
-                      Standard Edge-to-Edge ($/sq in)
+                      Phone
                     </label>
                     <input
-                      type="text"
-                      inputMode="decimal"
-                      value={rateStrings.standardE2E}
+                      type="tel"
+                      value={settings.phone || ""}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      placeholder="509-828-2945"
+                      className="w-full px-4 py-2 border border-line rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Website
+                  </label>
+                  <input
+                    type="url"
+                    value={settings.website || ""}
+                    onChange={(e) =>
+                      handleFieldChange("website", e.target.value)
+                    }
+                    placeholder="https://stitchedbysusan.com"
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Business Logo
+                  </label>
+                  {settings.logoUrl ? (
+                    <div className="flex items-center gap-4">
+                      <img
+                        src={settings.logoUrl}
+                        alt="Business logo"
+                        className="h-20 w-20 object-contain border border-line rounded-xl p-2"
+                      />
+                      <button
+                        onClick={handleRemoveLogo}
+                        className="px-4 py-2 border border-line rounded-xl hover:bg-background transition-colors text-sm"
+                      >
+                        Remove Logo
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="w-full px-4 py-2 border border-line rounded-xl"
+                      />
+                      <p className="text-xs text-muted mt-2">
+                        Max file size: 500KB. Recommended: Square image, PNG
+                        with transparency.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-muted mb-2">
+                      Primary Brand Color
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={settings.brandPrimaryColor || "#4e283a"}
+                        onChange={(e) =>
+                          handleFieldChange("brandPrimaryColor", e.target.value)
+                        }
+                        className="h-10 w-20 border border-line rounded-xl cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={settings.brandPrimaryColor || "#4e283a"}
+                        onChange={(e) =>
+                          handleFieldChange("brandPrimaryColor", e.target.value)
+                        }
+                        placeholder="#4e283a"
+                        className="flex-1 px-4 py-2 border border-line rounded-xl font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-muted mb-2">
+                      Secondary Brand Color
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={settings.brandSecondaryColor || "#98823a"}
+                        onChange={(e) =>
+                          handleFieldChange(
+                            "brandSecondaryColor",
+                            e.target.value
+                          )
+                        }
+                        className="h-10 w-20 border border-line rounded-xl cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={settings.brandSecondaryColor || "#98823a"}
+                        onChange={(e) =>
+                          handleFieldChange(
+                            "brandSecondaryColor",
+                            e.target.value
+                          )
+                        }
+                        placeholder="#98823a"
+                        className="flex-1 px-4 py-2 border border-line rounded-xl font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Measurement System
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        checked={settings.measurementSystem === "imperial"}
+                        onChange={() =>
+                          handleFieldChange("measurementSystem", "imperial")
+                        }
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">Imperial (inches)</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        checked={settings.measurementSystem === "metric"}
+                        onChange={() =>
+                          handleFieldChange("measurementSystem", "metric")
+                        }
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">Metric (centimeters)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-muted mb-2">
+                    Currency
+                  </label>
+                  <select
+                    value={settings.currencyCode || "USD"}
+                    onChange={(e) =>
+                      handleFieldChange("currencyCode", e.target.value)
+                    }
+                    className="w-full px-4 py-2 border border-line rounded-xl"
+                  >
+                    <option value="USD">USD - US Dollar ($)</option>
+                    <option value="CAD">CAD - Canadian Dollar ($)</option>
+                    <option value="GBP">GBP - British Pound (£)</option>
+                    <option value="EUR">EUR - Euro (€)</option>
+                    <option value="AUD">AUD - Australian Dollar ($)</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-muted mb-2">
+                      Tax Rate (%)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={settings.taxRate || 0}
                       onChange={(e) =>
-                        handleRateChange("standardE2E", e.target.value)
+                        handleFieldChange(
+                          "taxRate",
+                          parseFloat(e.target.value) || 0
+                        )
                       }
-                      onBlur={() => handleRateBlur("standardE2E")}
-                      placeholder="0.02"
+                      placeholder="8.5"
                       className="w-full px-4 py-2 border border-line rounded-xl"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-muted mb-2">
-                      Light Custom ($/sq in)
+                      Tax Label
                     </label>
                     <input
                       type="text"
-                      inputMode="decimal"
-                      value={rateStrings.lightCustom}
+                      value={settings.taxLabel || "Sales Tax"}
                       onChange={(e) =>
-                        handleRateChange("lightCustom", e.target.value)
+                        handleFieldChange("taxLabel", e.target.value)
                       }
-                      onBlur={() => handleRateBlur("lightCustom")}
-                      placeholder="0.025"
-                      className="w-full px-4 py-2 border border-line rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-muted mb-2">
-                      Custom ($/sq in)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={rateStrings.custom}
-                      onChange={(e) =>
-                        handleRateChange("custom", e.target.value)
-                      }
-                      onBlur={() => handleRateBlur("custom")}
-                      placeholder="0.03"
-                      className="w-full px-4 py-2 border border-line rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-muted mb-2">
-                      Dense Custom ($/sq in)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={rateStrings.denseCustom}
-                      onChange={(e) =>
-                        handleRateChange("denseCustom", e.target.value)
-                      }
-                      onBlur={() => handleRateBlur("denseCustom")}
-                      placeholder="0.04"
+                      placeholder="Sales Tax"
                       className="w-full px-4 py-2 border border-line rounded-xl"
                     />
                   </div>
@@ -1017,347 +931,320 @@ export default function SettingsPage() {
 
                 <div className="border-t border-line pt-6 mt-6">
                   <h3 className="text-md font-bold text-plum mb-4">
-                    Binding Rates (per inch)
+                    Estimate Numbering
                   </h3>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-bold text-muted">
+                      Next Estimate Number
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={settings.nextEstimateNumber || 1001}
+                      onChange={(e) =>
+                        handleFieldChange(
+                          "nextEstimateNumber",
+                          parseInt(e.target.value) || 1001
+                        )
+                      }
+                      className="w-full px-4 py-2 border border-line rounded-xl"
+                    />
+                    <p className="text-xs text-muted">
+                      The next estimate you create will use this number. Change
+                      this to match your accounting system.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </AccordionBody>
+          </div>
+
+          {/* ─── PRICING RATES ─── */}
+          <div>
+            <AccordionHeader
+              sectionKey="pricing"
+              label="Pricing Rates"
+              icon="💲"
+              subtitle={
+                settings.isPaidTier
+                  ? "Per square inch quilting rates"
+                  : "Available in PAID tier"
+              }
+            />
+            <AccordionBody sectionKey="pricing">
+              {!settings.isPaidTier ? (
+                <div className="p-6 bg-gold/10 rounded-xl text-center">
+                  <p className="text-sm text-muted mb-4">
+                    Upgrade to PAID tier to save pricing rates and auto-populate
+                    the calculator
+                  </p>
+                  <button
+                    onClick={async () => {
+                      const updated = { ...settings, isPaidTier: true };
+                      setSettings(updated);
+                      await storage.saveSettings(updated);
+                    }}
+                    className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
+                  >
+                    Enable PAID Tier (Demo)
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-md font-bold text-plum mb-3">
+                      Quilting Rates
+                    </h3>
+                    <p className="text-xs text-muted mb-4">
+                      Values save when you click out of a field
+                    </p>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-muted mb-2">
-                        Top Attached Only ($/in)
+                        Light Edge-to-Edge ($/sq in)
                       </label>
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={rateStrings.bindingTopAttached}
+                        value={rateStrings.lightE2E}
                         onChange={(e) =>
-                          handleRateChange("bindingTopAttached", e.target.value)
+                          handleRateChange("lightE2E", e.target.value)
                         }
-                        onBlur={() => handleRateBlur("bindingTopAttached")}
-                        placeholder="0.10"
+                        onBlur={() => handleRateBlur("lightE2E")}
+                        placeholder="0.015"
                         className="w-full px-4 py-2 border border-line rounded-xl"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-muted mb-2">
-                        Fully Attached ($/in)
+                        Standard Edge-to-Edge ($/sq in)
                       </label>
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={rateStrings.bindingFullyAttached}
+                        value={rateStrings.standardE2E}
                         onChange={(e) =>
-                          handleRateChange(
-                            "bindingFullyAttached",
-                            e.target.value
-                          )
+                          handleRateChange("standardE2E", e.target.value)
                         }
-                        onBlur={() => handleRateBlur("bindingFullyAttached")}
-                        placeholder="0.20"
+                        onBlur={() => handleRateBlur("standardE2E")}
+                        placeholder="0.02"
+                        className="w-full px-4 py-2 border border-line rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-muted mb-2">
+                        Light Custom ($/sq in)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={rateStrings.lightCustom}
+                        onChange={(e) =>
+                          handleRateChange("lightCustom", e.target.value)
+                        }
+                        onBlur={() => handleRateBlur("lightCustom")}
+                        placeholder="0.025"
+                        className="w-full px-4 py-2 border border-line rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-muted mb-2">
+                        Custom ($/sq in)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={rateStrings.custom}
+                        onChange={(e) =>
+                          handleRateChange("custom", e.target.value)
+                        }
+                        onBlur={() => handleRateBlur("custom")}
+                        placeholder="0.03"
+                        className="w-full px-4 py-2 border border-line rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-muted mb-2">
+                        Dense Custom ($/sq in)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={rateStrings.denseCustom}
+                        onChange={(e) =>
+                          handleRateChange("denseCustom", e.target.value)
+                        }
+                        onBlur={() => handleRateBlur("denseCustom")}
+                        placeholder="0.04"
                         className="w-full px-4 py-2 border border-line rounded-xl"
                       />
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
-        {activeTab === "bobbin" && (
-          <div className="bg-white border border-line rounded-card p-4 sm:p-6">
-            <div className="mb-4">
-              <h2 className="text-lg font-bold text-plum">Bobbin Options</h2>
-              <p className="text-sm text-muted mt-1">
-                {settings.isPaidTier
-                  ? "Manage your bobbin types and pricing"
-                  : "Available in PAID tier"}
-              </p>
-            </div>
-
-            {!settings.isPaidTier ? (
-              <div className="p-6 bg-gold/10 rounded-xl text-center">
-                <p className="text-sm text-muted mb-4">
-                  Upgrade to PAID tier to save bobbin options
-                </p>
-                <button
-                  onClick={async () => {
-                    const updated = { ...settings, isPaidTier: true };
-                    setSettings(updated);
-                    await storage.saveSettings(updated);
-                  }}
-                  className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
-                >
-                  Enable PAID Tier (Demo)
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="mb-6 p-4 bg-background rounded-xl">
-                  <h3 className="text-sm font-bold text-plum mb-3">
-                    Add Bobbin Option
-                  </h3>
-                  {/* Bobbin input - stack on mobile */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <input
-                      type="text"
-                      placeholder="Bobbin name (e.g., Prewound White)"
-                      value={newBobbinName}
-                      onChange={(e) => setNewBobbinName(e.target.value)}
-                      className="flex-1 px-4 py-2 border border-line rounded-xl"
-                    />
-                    <div className="flex gap-3">
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
-                          $
-                        </span>
+                  <div className="border-t border-line pt-6 mt-6">
+                    <h3 className="text-md font-bold text-plum mb-4">
+                      Binding Rates (per inch)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-bold text-muted mb-2">
+                          Top Attached Only ($/in)
+                        </label>
                         <input
                           type="text"
                           inputMode="decimal"
-                          placeholder="Price"
-                          value={newBobbinPrice}
-                          onChange={(e) => setNewBobbinPrice(e.target.value)}
-                          className="w-24 sm:w-32 pl-7 pr-3 py-2 border border-line rounded-xl"
+                          value={rateStrings.bindingTopAttached}
+                          onChange={(e) =>
+                            handleRateChange(
+                              "bindingTopAttached",
+                              e.target.value
+                            )
+                          }
+                          onBlur={() => handleRateBlur("bindingTopAttached")}
+                          placeholder="0.10"
+                          className="w-full px-4 py-2 border border-line rounded-xl"
                         />
                       </div>
-                      <button
-                        onClick={handleAddBobbin}
-                        className="px-6 py-2 bg-plum text-white rounded-xl font-bold whitespace-nowrap"
-                      >
-                        Add
-                      </button>
+                      <div>
+                        <label className="block text-sm font-bold text-muted mb-2">
+                          Fully Attached ($/in)
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={rateStrings.bindingFullyAttached}
+                          onChange={(e) =>
+                            handleRateChange(
+                              "bindingFullyAttached",
+                              e.target.value
+                            )
+                          }
+                          onBlur={() => handleRateBlur("bindingFullyAttached")}
+                          placeholder="0.20"
+                          className="w-full px-4 py-2 border border-line rounded-xl"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  {(settings.bobbinOptions || []).length === 0 ? (
-                    <p className="text-sm text-muted text-center py-8">
-                      No bobbin options yet. Add one above!
-                    </p>
-                  ) : (
-                    (settings.bobbinOptions || []).map((bobbin) => (
-                      <div
-                        key={bobbin.name}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-line rounded-xl"
-                      >
-                        {editingBobbin === bobbin.name ? (
-                          // Edit mode
-                          <div className="flex-1 flex flex-col sm:flex-row gap-3">
-                            <input
-                              type="text"
-                              value={editBobbinName}
-                              onChange={(e) =>
-                                setEditBobbinName(e.target.value)
-                              }
-                              className="flex-1 px-3 py-2 border border-line rounded-lg"
-                            />
-                            <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
-                                $
-                              </span>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={editBobbinPrice}
-                                onChange={(e) =>
-                                  setEditBobbinPrice(e.target.value)
-                                }
-                                className="w-24 pl-7 pr-3 py-2 border border-line rounded-lg"
-                              />
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() =>
-                                  handleSaveEditBobbin(bobbin.name)
-                                }
-                                className="px-3 py-1 text-xs bg-plum text-white rounded-lg"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={handleCancelEditBobbin}
-                                className="px-3 py-1 text-xs border border-line rounded-lg"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          // View mode
-                          <>
-                            <div className="flex-1">
-                              <div className="font-bold text-sm">
-                                {bobbin.name}
-                              </div>
-                              <div className="text-xs text-muted mt-1">
-                                ${bobbin.price.toFixed(2)} each
-                                {bobbin.isDefault && (
-                                  <span className="ml-2 px-2 py-0.5 bg-gold/20 text-gold rounded text-xs font-bold">
-                                    DEFAULT
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleStartEditBobbin(bobbin)}
-                                className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
-                              >
-                                Edit
-                              </button>
-                              {!bobbin.isDefault && (
-                                <button
-                                  onClick={() =>
-                                    handleSetDefaultBobbin(bobbin.name)
-                                  }
-                                  className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
-                                >
-                                  Set Default
-                                </button>
-                              )}
-                              <button
-                                onClick={() => handleDeleteBobbin(bobbin.name)}
-                                className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
+              )}
+            </AccordionBody>
           </div>
-        )}
 
-        {activeTab === "batting" && (
-          <div className="bg-white border border-line rounded-card p-4 sm:p-6">
-            <div className="mb-4">
-              <h2 className="text-lg font-bold text-plum">Batting Options</h2>
-              <p className="text-sm text-muted mt-1">
-                {settings.isPaidTier
-                  ? "Manage your batting options and pricing"
-                  : "Available in PAID tier"}
-              </p>
-            </div>
-
-            {!settings.isPaidTier ? (
-              <div className="p-6 bg-gold/10 rounded-xl text-center">
-                <p className="text-sm text-muted mb-4">
-                  Upgrade to PAID tier to save batting options
-                </p>
-                <button
-                  onClick={async () => {
-                    const updated = { ...settings, isPaidTier: true };
-                    setSettings(updated);
-                    await storage.saveSettings(updated);
-                  }}
-                  className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
-                >
-                  Enable PAID Tier (Demo)
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="mb-6 p-4 bg-background rounded-xl">
-                  <h3 className="text-sm font-bold text-plum mb-3">
-                    Add Batting Option
-                  </h3>
-                  {/* Batting inputs - responsive grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      placeholder="Batting name (e.g., Warm & Natural)"
-                      value={newBattingName}
-                      onChange={(e) => setNewBattingName(e.target.value)}
-                      className="sm:col-span-2 px-4 py-2 border border-line rounded-xl"
-                    />
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="Width (in)"
-                      value={newBattingWidth}
-                      onChange={(e) => setNewBattingWidth(e.target.value)}
-                      className="px-4 py-2 border border-line rounded-xl"
-                    />
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="$/inch"
-                      value={newBattingPrice}
-                      onChange={(e) => setNewBattingPrice(e.target.value)}
-                      className="px-4 py-2 border border-line rounded-xl"
-                    />
-                    <button
-                      onClick={handleAddBatting}
-                      className="sm:col-span-2 px-6 py-2 bg-plum text-white rounded-xl font-bold"
-                    >
-                      Add Batting Option
-                    </button>
-                  </div>
+          {/* ─── BOBBIN OPTIONS ─── */}
+          <div>
+            <AccordionHeader
+              sectionKey="bobbin"
+              label="Bobbin Options"
+              icon="🧵"
+              subtitle={
+                settings.isPaidTier
+                  ? `${(settings.bobbinOptions || []).length} option${(settings.bobbinOptions || []).length !== 1 ? "s" : ""} saved`
+                  : "Available in PAID tier"
+              }
+            />
+            <AccordionBody sectionKey="bobbin">
+              {!settings.isPaidTier ? (
+                <div className="p-6 bg-gold/10 rounded-xl text-center">
+                  <p className="text-sm text-muted mb-4">
+                    Upgrade to PAID tier to save bobbin options
+                  </p>
+                  <button
+                    onClick={async () => {
+                      const updated = { ...settings, isPaidTier: true };
+                      setSettings(updated);
+                      await storage.saveSettings(updated);
+                    }}
+                    className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
+                  >
+                    Enable PAID Tier (Demo)
+                  </button>
                 </div>
+              ) : (
+                <>
+                  <div className="p-4 bg-background rounded-xl">
+                    <h3 className="text-sm font-bold text-plum mb-3">
+                      Add Bobbin Option
+                    </h3>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="text"
+                        placeholder="Bobbin name (e.g., Prewound White)"
+                        value={newBobbinName}
+                        onChange={(e) => setNewBobbinName(e.target.value)}
+                        className="flex-1 px-4 py-2 border border-line rounded-xl"
+                      />
+                      <div className="flex gap-3">
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+                            $
+                          </span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="Price"
+                            value={newBobbinPrice}
+                            onChange={(e) => setNewBobbinPrice(e.target.value)}
+                            className="w-24 sm:w-32 pl-7 pr-3 py-2 border border-line rounded-xl"
+                          />
+                        </div>
+                        <button
+                          onClick={handleAddBobbin}
+                          className="px-6 py-2 bg-plum text-white rounded-xl font-bold whitespace-nowrap"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
-                <div className="space-y-2">
-                  {settings.battingOptions.length === 0 ? (
-                    <p className="text-sm text-muted text-center py-8">
-                      No batting options yet. Add one above!
-                    </p>
-                  ) : (
-                    settings.battingOptions.map((batting) => {
-                      const key = `${batting.name}-${batting.widthInches}`;
-                      return (
+                  <div className="space-y-2">
+                    {(settings.bobbinOptions || []).length === 0 ? (
+                      <p className="text-sm text-muted text-center py-8">
+                        No bobbin options yet. Add one above!
+                      </p>
+                    ) : (
+                      (settings.bobbinOptions || []).map((bobbin) => (
                         <div
-                          key={key}
+                          key={bobbin.name}
                           className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-line rounded-xl"
                         >
-                          {editingBatting === key ? (
-                            // Edit mode
-                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          {editingBobbin === bobbin.name ? (
+                            <div className="flex-1 flex flex-col sm:flex-row gap-3">
                               <input
                                 type="text"
-                                value={editBattingName}
+                                value={editBobbinName}
                                 onChange={(e) =>
-                                  setEditBattingName(e.target.value)
+                                  setEditBobbinName(e.target.value)
                                 }
-                                className="sm:col-span-2 px-3 py-2 border border-line rounded-lg"
-                                placeholder="Name"
+                                className="flex-1 px-3 py-2 border border-line rounded-lg"
                               />
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={editBattingWidth}
-                                onChange={(e) =>
-                                  setEditBattingWidth(e.target.value)
-                                }
-                                className="px-3 py-2 border border-line rounded-lg"
-                                placeholder="Width"
-                              />
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={editBattingPrice}
-                                onChange={(e) =>
-                                  setEditBattingPrice(e.target.value)
-                                }
-                                className="px-3 py-2 border border-line rounded-lg"
-                                placeholder="$/in"
-                              />
-                              <div className="sm:col-span-4 flex gap-2">
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+                                  $
+                                </span>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={editBobbinPrice}
+                                  onChange={(e) =>
+                                    setEditBobbinPrice(e.target.value)
+                                  }
+                                  className="w-24 pl-7 pr-3 py-2 border border-line rounded-lg"
+                                />
+                              </div>
+                              <div className="flex gap-2">
                                 <button
                                   onClick={() =>
-                                    handleSaveEditBatting(
-                                      batting.name,
-                                      batting.widthInches
-                                    )
+                                    handleSaveEditBobbin(bobbin.name)
                                   }
                                   className="px-3 py-1 text-xs bg-plum text-white rounded-lg"
                                 >
                                   Save
                                 </button>
                                 <button
-                                  onClick={handleCancelEditBatting}
+                                  onClick={handleCancelEditBobbin}
                                   className="px-3 py-1 text-xs border border-line rounded-lg"
                                 >
                                   Cancel
@@ -1365,15 +1252,14 @@ export default function SettingsPage() {
                               </div>
                             </div>
                           ) : (
-                            // View mode
                             <>
                               <div className="flex-1">
                                 <div className="font-bold text-sm">
-                                  {batting.name} - {batting.widthInches}" wide
+                                  {bobbin.name}
                                 </div>
                                 <div className="text-xs text-muted mt-1">
-                                  ${batting.pricePerInch.toFixed(4)}/inch
-                                  {batting.isDefault && (
+                                  ${bobbin.price.toFixed(2)} each
+                                  {bobbin.isDefault && (
                                     <span className="ml-2 px-2 py-0.5 bg-gold/20 text-gold rounded text-xs font-bold">
                                       DEFAULT
                                     </span>
@@ -1382,18 +1268,15 @@ export default function SettingsPage() {
                               </div>
                               <div className="flex gap-2">
                                 <button
-                                  onClick={() => handleStartEditBatting(batting)}
+                                  onClick={() => handleStartEditBobbin(bobbin)}
                                   className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
                                 >
                                   Edit
                                 </button>
-                                {!batting.isDefault && (
+                                {!bobbin.isDefault && (
                                   <button
                                     onClick={() =>
-                                      handleSetDefaultBatting(
-                                        batting.name,
-                                        batting.widthInches
-                                      )
+                                      handleSetDefaultBobbin(bobbin.name)
                                     }
                                     className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
                                   >
@@ -1402,10 +1285,7 @@ export default function SettingsPage() {
                                 )}
                                 <button
                                   onClick={() =>
-                                    handleDeleteBatting(
-                                      batting.name,
-                                      batting.widthInches
-                                    )
+                                    handleDeleteBobbin(bobbin.name)
                                   }
                                   className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
                                 >
@@ -1415,54 +1295,260 @@ export default function SettingsPage() {
                             </>
                           )}
                         </div>
-                      );
-                    })
-                  )}
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </AccordionBody>
+          </div>
+
+          {/* ─── BATTING OPTIONS ─── */}
+          <div>
+            <AccordionHeader
+              sectionKey="batting"
+              label="Batting Options"
+              icon="🛏️"
+              subtitle={
+                settings.isPaidTier
+                  ? `${settings.battingOptions.length} option${settings.battingOptions.length !== 1 ? "s" : ""} saved`
+                  : "Available in PAID tier"
+              }
+            />
+            <AccordionBody sectionKey="batting">
+              {!settings.isPaidTier ? (
+                <div className="p-6 bg-gold/10 rounded-xl text-center">
+                  <p className="text-sm text-muted mb-4">
+                    Upgrade to PAID tier to save batting options
+                  </p>
+                  <button
+                    onClick={async () => {
+                      const updated = { ...settings, isPaidTier: true };
+                      setSettings(updated);
+                      await storage.saveSettings(updated);
+                    }}
+                    className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
+                  >
+                    Enable PAID Tier (Demo)
+                  </button>
                 </div>
-              </>
-            )}
+              ) : (
+                <>
+                  <div className="p-4 bg-background rounded-xl">
+                    <h3 className="text-sm font-bold text-plum mb-3">
+                      Add Batting Option
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        placeholder="Batting name (e.g., Warm & Natural)"
+                        value={newBattingName}
+                        onChange={(e) => setNewBattingName(e.target.value)}
+                        className="sm:col-span-2 px-4 py-2 border border-line rounded-xl"
+                      />
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Width (in)"
+                        value={newBattingWidth}
+                        onChange={(e) => setNewBattingWidth(e.target.value)}
+                        className="px-4 py-2 border border-line rounded-xl"
+                      />
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="$/inch"
+                        value={newBattingPrice}
+                        onChange={(e) => setNewBattingPrice(e.target.value)}
+                        className="px-4 py-2 border border-line rounded-xl"
+                      />
+                      <button
+                        onClick={handleAddBatting}
+                        className="sm:col-span-2 px-6 py-2 bg-plum text-white rounded-xl font-bold"
+                      >
+                        Add Batting Option
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {settings.battingOptions.length === 0 ? (
+                      <p className="text-sm text-muted text-center py-8">
+                        No batting options yet. Add one above!
+                      </p>
+                    ) : (
+                      settings.battingOptions.map((batting) => {
+                        const key = `${batting.name}-${batting.widthInches}`;
+                        return (
+                          <div
+                            key={key}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-line rounded-xl"
+                          >
+                            {editingBatting === key ? (
+                              <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                <input
+                                  type="text"
+                                  value={editBattingName}
+                                  onChange={(e) =>
+                                    setEditBattingName(e.target.value)
+                                  }
+                                  className="sm:col-span-2 px-3 py-2 border border-line rounded-lg"
+                                  placeholder="Name"
+                                />
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={editBattingWidth}
+                                  onChange={(e) =>
+                                    setEditBattingWidth(e.target.value)
+                                  }
+                                  className="px-3 py-2 border border-line rounded-lg"
+                                  placeholder="Width"
+                                />
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={editBattingPrice}
+                                  onChange={(e) =>
+                                    setEditBattingPrice(e.target.value)
+                                  }
+                                  className="px-3 py-2 border border-line rounded-lg"
+                                  placeholder="$/in"
+                                />
+                                <div className="sm:col-span-4 flex gap-2">
+                                  <button
+                                    onClick={() =>
+                                      handleSaveEditBatting(
+                                        batting.name,
+                                        batting.widthInches
+                                      )
+                                    }
+                                    className="px-3 py-1 text-xs bg-plum text-white rounded-lg"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={handleCancelEditBatting}
+                                    className="px-3 py-1 text-xs border border-line rounded-lg"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex-1">
+                                  <div className="font-bold text-sm">
+                                    {batting.name} - {batting.widthInches}" wide
+                                  </div>
+                                  <div className="text-xs text-muted mt-1">
+                                    ${batting.pricePerInch.toFixed(4)}/inch
+                                    {batting.isDefault && (
+                                      <span className="ml-2 px-2 py-0.5 bg-gold/20 text-gold rounded text-xs font-bold">
+                                        DEFAULT
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() =>
+                                      handleStartEditBatting(batting)
+                                    }
+                                    className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
+                                  >
+                                    Edit
+                                  </button>
+                                  {!batting.isDefault && (
+                                    <button
+                                      onClick={() =>
+                                        handleSetDefaultBatting(
+                                          batting.name,
+                                          batting.widthInches
+                                        )
+                                      }
+                                      className="px-3 py-1 text-xs border border-line rounded-lg hover:bg-background"
+                                    >
+                                      Set Default
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() =>
+                                      handleDeleteBatting(
+                                        batting.name,
+                                        batting.widthInches
+                                      )
+                                    }
+                                    className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              )}
+            </AccordionBody>
           </div>
-        )}
 
-        {activeTab === "data" && (
-          <div className="bg-white border border-line rounded-card p-4 sm:p-6">
-            <h2 className="text-lg font-bold text-plum mb-4">
-              Data Management
-            </h2>
+          {/* ─── REPORTS & DATA ─── */}
+          <div>
+            <AccordionHeader
+              sectionKey="data"
+              label="Reports & Data"
+              icon="📊"
+              subtitle="Export data and manage your account"
+            />
+            <AccordionBody sectionKey="data">
+              <div className="space-y-6">
+                <div className="p-4 border border-line rounded-xl">
+                  <h3 className="font-bold text-sm mb-2">Export Data</h3>
+                  <p className="text-xs text-muted mb-4">
+                    Export all your projects to a CSV file for backup or use in
+                    other software.
+                  </p>
+                  <button
+                    onClick={handleExportCSV}
+                    className="px-4 py-2 bg-plum text-white rounded-xl font-bold"
+                  >
+                    Export to CSV
+                  </button>
+                </div>
 
-            <div className="space-y-6">
-              <div className="p-4 border border-line rounded-xl">
-                <h3 className="font-bold text-sm mb-2">Export Data</h3>
-                <p className="text-xs text-muted mb-4">
-                  Export all your projects to a CSV file for backup or use in
-                  other software.
-                </p>
-                <button
-                  onClick={handleExportCSV}
-                  className="px-4 py-2 bg-plum text-white rounded-xl font-bold"
-                >
-                  Export to CSV
-                </button>
+                <div className="p-4 border border-line rounded-xl bg-background">
+                  <h3 className="font-bold text-sm mb-2 text-muted">
+                    Reports
+                  </h3>
+                  <p className="text-xs text-muted">
+                    Income reports, quilting totals, and batting usage tracking
+                    coming soon.
+                  </p>
+                </div>
+
+                <div className="p-4 border border-red-300 rounded-xl bg-red-50">
+                  <h3 className="font-bold text-sm text-red-600 mb-2">
+                    Danger Zone
+                  </h3>
+                  <p className="text-xs text-muted mb-4">
+                    Clear all data including projects, settings, and preferences.
+                    This cannot be undone!
+                  </p>
+                  <button
+                    onClick={handleClearAllData}
+                    className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold"
+                  >
+                    Clear All Data
+                  </button>
+                </div>
               </div>
-
-              <div className="p-4 border border-red-300 rounded-xl bg-red-50">
-                <h3 className="font-bold text-sm text-red-600 mb-2">
-                  Danger Zone
-                </h3>
-                <p className="text-xs text-muted mb-4">
-                  Clear all data including projects, settings, and preferences.
-                  This cannot be undone!
-                </p>
-                <button
-                  onClick={handleClearAllData}
-                  className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold"
-                >
-                  Clear All Data
-                </button>
-              </div>
-            </div>
+            </AccordionBody>
           </div>
-        )}
+        </div>
       </main>
     </div>
   );
