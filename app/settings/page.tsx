@@ -531,7 +531,7 @@ function ReportsSection({ settings }: { settings: Settings }) {
                       </div>
                     </div>
 
-                    {reportData.popularBobbinTypes.length > 0 && (
+                    {reportData.popularBobbinTypes && reportData.popularBobbinTypes.length > 0 && (
                       <div className="mt-4">
                         <div className="text-sm font-bold text-muted mb-2">Popular Bobbin Types</div>
                         <div className="space-y-1">
@@ -568,7 +568,7 @@ function ReportsSection({ settings }: { settings: Settings }) {
                       </div>
                     </div>
 
-                    {reportData.popularBattingTypes.length > 0 && (
+                    {reportData.popularBattingTypes && reportData.popularBattingTypes.length > 0 && (
                       <div className="mt-4">
                         <div className="text-sm font-bold text-muted mb-2">Popular Batting Types</div>
                         <div className="space-y-1">
