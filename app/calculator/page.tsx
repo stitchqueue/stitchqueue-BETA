@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import { storage } from "../lib/storage";
 import { supabase } from "../lib/supabase";
-import type { Settings, Project } from "../types";
+import type { Settings, Project, ExtraCharge } from "../types";
 import { COUNTRY_OPTIONS } from "../types";
 import {
   getRegionsForCountry,
@@ -86,16 +86,23 @@ function CalculatorPage() {
   const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
   const [quiltingType, setQuiltingType] = useState("");
   const [quiltingRateManual, setQuiltingRateManual] = useState("");
-  const [threadChoice, setThreadChoice] = useState("");
-  const [threadPriceManual, setThreadPriceManual] = useState("");
   const [battingChoice, setBattingChoice] = useState("");
   const [battingPriceManual, setBattingPriceManual] = useState("");
   const [battingLengthAddition, setBattingLengthAddition] = useState("4");
   const [clientSuppliesBatting, setClientSuppliesBatting] = useState(false);
   const [bindingType, setBindingType] = useState("");
   const [bindingRateManual, setBindingRateManual] = useState("");
+  
+  // Bobbin state
+  const [bobbinChoice, setBobbinChoice] = useState("");
   const [bobbinCount, setBobbinCount] = useState("1");
   const [bobbinPriceManual, setBobbinPriceManual] = useState("");
+
+  // Extra charges state
+  const [extraCharges, setExtraCharges] = useState<ExtraCharge[]>([]);
+  const [newChargeName, setNewChargeName] = useState("");
+  const [newChargeAmount, setNewChargeAmount] = useState("");
+  const [newChargeTaxable, setNewChargeTaxable] = useState(true);
 
   // Deposit state
   const [depositType, setDepositType] = useState<"percentage" | "flat">("percentage");
@@ -105,10 +112,11 @@ function CalculatorPage() {
 
   // Calculated values
   const [quiltingTotal, setQuiltingTotal] = useState(0);
-  const [threadTotal, setThreadTotal] = useState(0);
   const [battingTotal, setBattingTotal] = useState(0);
   const [bindingTotal, setBindingTotal] = useState(0);
   const [bobbinTotal, setBobbinTotal] = useState(0);
+  const [extraChargesTotal, setExtraChargesTotal] = useState(0);
+  const [extraChargesTaxable, setExtraChargesTaxable] = useState(0);
   const [subtotal, setSubtotal] = useState(0);
   const [taxAmount, setTaxAmount] = useState(0);
   const [total, setTotal] = useState(0);
@@ -123,8 +131,8 @@ function CalculatorPage() {
       (settings.pricingRates.lightCustom ?? 0) > 0 ||
       (settings.pricingRates.custom ?? 0) > 0 ||
       (settings.pricingRates.denseCustom ?? 0) > 0);
-  const hasThreadOptions =
-    settings?.threadOptions && settings.threadOptions.length > 0;
+  const hasBobbinOptions =
+    settings?.bobbinOptions && settings.bobbinOptions.length > 0;
   const hasBattingOptions =
     settings?.battingOptions && settings.battingOptions.length > 0;
 
@@ -161,6 +169,30 @@ function CalculatorPage() {
     setClientPhone(formatted);
   };
 
+  // Extra charge handlers
+  const handleAddExtraCharge = () => {
+    if (!newChargeName || !newChargeAmount) {
+      alert("Please enter charge name and amount");
+      return;
+    }
+
+    const newCharge: ExtraCharge = {
+      id: crypto.randomUUID(),
+      name: newChargeName,
+      amount: parseFloat(newChargeAmount) || 0,
+      taxable: newChargeTaxable,
+    };
+
+    setExtraCharges([...extraCharges, newCharge]);
+    setNewChargeName("");
+    setNewChargeAmount("");
+    setNewChargeTaxable(true);
+  };
+
+  const handleRemoveExtraCharge = (id: string) => {
+    setExtraCharges(extraCharges.filter((c) => c.id !== id));
+  };
+
   useEffect(() => {
     const loadData = async () => {
       const savedSettings = await storage.getSettings();
@@ -192,11 +224,12 @@ function CalculatorPage() {
           setRequestedDateType(project.requestedDateType || "no_date");
           setRequestedCompletionDate(project.requestedCompletionDate || "");
           setQuiltingType(project.quiltingType || "");
-          setThreadChoice(project.threadChoice || "");
           setBattingChoice(project.battingChoice || "");
           setBattingLengthAddition(project.battingLengthAddition || "4");
           setClientSuppliesBatting(project.clientSuppliesBatting || false);
           setBindingType(project.bindingType || "");
+          setBobbinChoice(project.bobbinChoice || "");
+          setExtraCharges(project.extraCharges || []);
 
           // If project already has estimate number, use it
           if (project.estimateNumber) {
@@ -218,16 +251,16 @@ function CalculatorPage() {
     quiltLength,
     quiltingType,
     quiltingRateManual,
-    threadChoice,
-    threadPriceManual,
     battingChoice,
     battingPriceManual,
     battingLengthAddition,
     clientSuppliesBatting,
     bindingType,
     bindingRateManual,
+    bobbinChoice,
     bobbinCount,
     bobbinPriceManual,
+    extraCharges,
     depositType,
     depositValue,
     settings,
@@ -237,7 +270,6 @@ function CalculatorPage() {
     if (!settings) return;
 
     let quilting = 0;
-    let thread = 0;
     let batting = 0;
     let binding = 0;
     let bobbin = 0;
@@ -257,16 +289,6 @@ function CalculatorPage() {
       } else if (quiltingRateManual) {
         quilting = area * (parseFloat(quiltingRateManual) || 0);
       }
-    }
-
-    // Thread calculation
-    if (isPaidTier && hasThreadOptions && threadChoice) {
-      const threadOption = settings.threadOptions?.find(
-        (t) => t.name === threadChoice
-      );
-      thread = threadOption?.price || 0;
-    } else if (threadPriceManual) {
-      thread = parseFloat(threadPriceManual) || 0;
     }
 
     // Batting calculation
@@ -307,14 +329,33 @@ function CalculatorPage() {
 
     // Bobbin calculation
     const bobbins = parseInt(bobbinCount) || 0;
-    if (isPaidTier && settings.bobbinPrice) {
-      bobbin = bobbins * settings.bobbinPrice;
-    } else if (bobbinPriceManual) {
-      bobbin = bobbins * (parseFloat(bobbinPriceManual) || 0);
+    if (bobbins > 0) {
+      if (isPaidTier && hasBobbinOptions && bobbinChoice) {
+        const bobbinOption = settings.bobbinOptions?.find(
+          (b) => b.name === bobbinChoice
+        );
+        bobbin = bobbins * (bobbinOption?.price || 0);
+      } else if (bobbinPriceManual) {
+        bobbin = bobbins * (parseFloat(bobbinPriceManual) || 0);
+      }
     }
 
-    const sub = quilting + thread + batting + binding + bobbin;
-    const tax = sub * ((settings.taxRate || 0) / 100);
+    // Extra charges calculation
+    let extraTotal = 0;
+    let extraTaxable = 0;
+    extraCharges.forEach((charge) => {
+      extraTotal += charge.amount;
+      if (charge.taxable) {
+        extraTaxable += charge.amount;
+      }
+    });
+
+    // Subtotal (before tax)
+    const sub = quilting + batting + binding + bobbin + extraTotal;
+    
+    // Tax calculation: apply tax to quilting, batting, binding, bobbin, and taxable extra charges
+    const taxableAmount = quilting + batting + binding + bobbin + extraTaxable;
+    const tax = taxableAmount * ((settings.taxRate || 0) / 100);
     const tot = sub + tax;
 
     // Deposit calculation
@@ -330,10 +371,11 @@ function CalculatorPage() {
     const balance = tot - deposit;
 
     setQuiltingTotal(quilting);
-    setThreadTotal(thread);
     setBattingTotal(batting);
     setBindingTotal(binding);
     setBobbinTotal(bobbin);
+    setExtraChargesTotal(extraTotal);
+    setExtraChargesTaxable(extraTaxable);
     setSubtotal(sub);
     setTaxAmount(tax);
     setTotal(tot);
@@ -378,6 +420,20 @@ function CalculatorPage() {
         estimateNumber = await getNextEstimateNumberAtomic();
       }
 
+      // Get bobbin details
+      let bobbinName = "";
+      let bobbinPrice = 0;
+      if (isPaidTier && hasBobbinOptions && bobbinChoice) {
+        const bobbinOption = settings.bobbinOptions?.find(
+          (b) => b.name === bobbinChoice
+        );
+        bobbinName = bobbinOption?.name || "";
+        bobbinPrice = bobbinOption?.price || 0;
+      } else {
+        bobbinName = "Manual Entry";
+        bobbinPrice = parseFloat(bobbinPriceManual) || 0;
+      }
+
       const estimateData = {
         quiltArea:
           (parseFloat(quiltWidth) || 0) * (parseFloat(quiltLength) || 0),
@@ -388,7 +444,6 @@ function CalculatorPage() {
               ] || 0
             : parseFloat(quiltingRateManual) || 0,
         quiltingTotal,
-        threadCost: threadTotal,
         battingLengthNeeded:
           (parseFloat(quiltLength) || 0) +
           (parseFloat(battingLengthAddition) || 4),
@@ -403,9 +458,13 @@ function CalculatorPage() {
             ? settings.pricingRates?.bindingFullyAttached || 0.2
             : 0,
         bindingTotal,
+        bobbinName,
         bobbinCount: parseInt(bobbinCount) || 0,
-        bobbinPrice: settings.bobbinPrice || 0,
+        bobbinPrice,
         bobbinTotal,
+        extraCharges,
+        extraChargesTotal,
+        extraChargesTaxable,
         subtotal,
         taxRate: settings.taxRate || 0,
         taxAmount,
@@ -447,10 +506,6 @@ function CalculatorPage() {
           isPaidTier && hasQuiltingRates
             ? quiltingType
             : quiltingType || "Manual Entry",
-        threadChoice:
-          isPaidTier && hasThreadOptions
-            ? threadChoice
-            : threadChoice || "Manual Entry",
         battingChoice:
           isPaidTier && hasBattingOptions
             ? battingChoice
@@ -458,6 +513,11 @@ function CalculatorPage() {
         battingLengthAddition,
         clientSuppliesBatting,
         bindingType,
+        bobbinChoice:
+          isPaidTier && hasBobbinOptions
+            ? bobbinChoice
+            : "Manual Entry",
+        extraCharges,
         depositType: depositAmount > 0 ? depositType : null,
         depositPercentage:
           depositType === "percentage" ? parseFloat(depositValue) || 0 : undefined,
@@ -930,45 +990,6 @@ function CalculatorPage() {
             )}
           </div>
 
-          {/* Thread */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-muted mb-2">
-              Thread
-            </label>
-            {isPaidTier && hasThreadOptions ? (
-              <select
-                value={threadChoice}
-                onChange={(e) => setThreadChoice(e.target.value)}
-                className="w-full px-4 py-2 border border-line rounded-xl"
-              >
-                <option value="">Select thread...</option>
-                {settings?.threadOptions?.map((t) => (
-                  <option key={t.name} value={t.name}>
-                    {t.name} (${t.price.toFixed(2)})
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="Thread type (e.g., So Fine #50)"
-                  value={threadChoice}
-                  onChange={(e) => setThreadChoice(e.target.value)}
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="Thread price (e.g., 5.00)"
-                  value={threadPriceManual}
-                  onChange={(e) => setThreadPriceManual(e.target.value)}
-                  className="w-full px-4 py-2 border border-line rounded-xl"
-                />
-              </div>
-            )}
-          </div>
-
           {/* Client Supplies Batting Toggle */}
           <div className="mb-6">
             <label className="flex items-center gap-3">
@@ -1108,8 +1129,20 @@ function CalculatorPage() {
             <label className="block text-sm font-bold text-muted mb-2">
               Bobbins
             </label>
-            {isPaidTier && settings?.bobbinPrice ? (
+            {isPaidTier && hasBobbinOptions ? (
               <div className="space-y-2">
+                <select
+                  value={bobbinChoice}
+                  onChange={(e) => setBobbinChoice(e.target.value)}
+                  className="w-full px-4 py-2 border border-line rounded-xl"
+                >
+                  <option value="">Select bobbin type...</option>
+                  {settings?.bobbinOptions?.map((b) => (
+                    <option key={b.name} value={b.name}>
+                      {b.name} (${b.price.toFixed(2)} each)
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="number"
                   min="0"
@@ -1118,9 +1151,6 @@ function CalculatorPage() {
                   placeholder="Number of bobbins"
                   className="w-full px-4 py-2 border border-line rounded-xl"
                 />
-                <p className="text-xs text-muted">
-                  ${settings.bobbinPrice.toFixed(2)} each (from Settings)
-                </p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -1141,6 +1171,88 @@ function CalculatorPage() {
                   className="w-full px-4 py-2 border border-line rounded-xl"
                 />
               </div>
+            )}
+          </div>
+
+          {/* Extra Charges Section */}
+          <div className="mb-6 p-4 bg-background border border-line rounded-xl">
+            <h3 className="text-sm font-bold text-plum mb-3">
+              Extra Charges (Shipping, Rush, Custom Fees, etc.)
+            </h3>
+
+            {/* Add new charge form */}
+            <div className="space-y-3 mb-4">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  placeholder="Charge name (e.g., Shipping, Rush Fee)"
+                  value={newChargeName}
+                  onChange={(e) => setNewChargeName(e.target.value)}
+                  className="flex-1 px-4 py-2 border border-line rounded-xl bg-white"
+                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+                    $
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Amount"
+                    value={newChargeAmount}
+                    onChange={(e) => setNewChargeAmount(e.target.value)}
+                    className="w-full sm:w-32 pl-7 pr-3 py-2 border border-line rounded-xl bg-white"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={newChargeTaxable}
+                    onChange={(e) => setNewChargeTaxable(e.target.checked)}
+                    className="w-4 h-4 rounded border-line"
+                  />
+                  <span className="text-sm text-muted">Taxable</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAddExtraCharge}
+                  className="px-4 py-2 bg-plum text-white rounded-xl text-sm font-bold"
+                >
+                  Add Charge
+                </button>
+              </div>
+            </div>
+
+            {/* List of extra charges */}
+            {extraCharges.length > 0 ? (
+              <div className="space-y-2">
+                {extraCharges.map((charge) => (
+                  <div
+                    key={charge.id}
+                    className="flex items-center justify-between p-3 bg-white border border-line rounded-lg"
+                  >
+                    <div className="flex-1">
+                      <div className="text-sm font-bold">{charge.name}</div>
+                      <div className="text-xs text-muted">
+                        {formatCurrency(charge.amount)}
+                        {charge.taxable ? " (taxable)" : " (non-taxable)"}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExtraCharge(charge.id)}
+                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted text-center py-2">
+                No extra charges added yet.
+              </p>
             )}
           </div>
 
@@ -1288,10 +1400,6 @@ function CalculatorPage() {
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted">Thread</span>
-                <span className="font-bold">{formatCurrency(threadTotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
                 <span className="text-muted">
                   Batting {clientSuppliesBatting && "(Client Supplied)"}
                 </span>
@@ -1309,6 +1417,27 @@ function CalculatorPage() {
                 <span className="text-muted">Bobbins</span>
                 <span className="font-bold">{formatCurrency(bobbinTotal)}</span>
               </div>
+              {extraCharges.length > 0 && (
+                <>
+                  <div className="border-t border-line pt-2 mt-2">
+                    <div className="text-xs font-bold text-muted mb-1">Extra Charges:</div>
+                  </div>
+                  {extraCharges.map((charge) => (
+                    <div key={charge.id} className="flex justify-between text-sm pl-2">
+                      <span className="text-muted">
+                        {charge.name}
+                        {!charge.taxable && " *"}
+                      </span>
+                      <span className="font-bold">
+                        {formatCurrency(charge.amount)}
+                      </span>
+                    </div>
+                  ))}
+                  {extraCharges.some((c) => !c.taxable) && (
+                    <p className="text-xs text-muted pl-2">* Non-taxable</p>
+                  )}
+                </>
+              )}
             </div>
 
             <div className="border-t border-line pt-3 space-y-2">

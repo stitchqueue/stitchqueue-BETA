@@ -20,13 +20,17 @@ export const STAGES: Stage[] = [
 ];
 
 // Country options for dropdown (simplified - detailed data in locations.ts)
-export const COUNTRY_OPTIONS = [
-  "United States",
-  "Canada",
-  "Other",
-] as const;
+export const COUNTRY_OPTIONS = ["United States", "Canada", "Other"] as const;
 
 export type Country = (typeof COUNTRY_OPTIONS)[number] | string;
+
+// Extra charge for estimates/invoices (shipping, rush fees, custom charges, etc.)
+export interface ExtraCharge {
+  id: string;
+  name: string;
+  amount: number;
+  taxable: boolean;
+}
 
 export interface Project {
   id: string;
@@ -58,11 +62,14 @@ export interface Project {
   backingLength?: number;
   serviceType?: string;
   quiltingType?: string;
-  threadChoice?: string;
   battingChoice?: string;
   battingLengthAddition?: string;
   clientSuppliesBatting?: boolean;
   bindingType?: string;
+  // Bobbin fields
+  bobbinChoice?: string;
+  // Extra charges (shipping, rush, custom fees)
+  extraCharges?: ExtraCharge[];
   // Deposit fields
   depositType?: "percentage" | "flat";
   depositPercentage?: number;
@@ -84,8 +91,6 @@ export interface Project {
     quiltingTotal?: number;
     squareInches?: number;
     quiltingCost?: number;
-    threadName?: string;
-    threadCost?: number;
     battingName?: string;
     battingLength?: number;
     battingCost?: number;
@@ -98,10 +103,17 @@ export interface Project {
     bindingCost?: number;
     bindingRatePerInch?: number;
     bindingTotal?: number;
+    // Bobbin fields
+    bobbinName?: string;
     bobbinCount?: number;
     bobbinPrice?: number;
     bobbinCost?: number;
     bobbinTotal?: number;
+    // Extra charges
+    extraCharges?: ExtraCharge[];
+    extraChargesTotal?: number;
+    extraChargesTaxable?: number;
+    // Totals
     subtotal?: number;
     taxRate?: number;
     taxAmount?: number;
@@ -133,7 +145,8 @@ export interface Attachment {
   createdAt: string;
 }
 
-export interface ThreadOption {
+// Bobbin option for PRO tier (multiple bobbin types)
+export interface BobbinOption {
   name: string;
   price: number;
   isDefault?: boolean;
@@ -187,10 +200,9 @@ export interface Settings {
 
   // Pricing (PAID tier only)
   pricingRates?: PricingRates;
-  bobbinPrice?: number;
 
-  // Thread & Batting Options (PAID tier only)
-  threadOptions: ThreadOption[];
+  // Bobbin & Batting Options (PAID tier only)
+  bobbinOptions: BobbinOption[];
   battingOptions: BattingOption[];
 
   // Tier
@@ -203,7 +215,7 @@ export const DEFAULT_SETTINGS: Settings = {
   taxRate: 0,
   taxLabel: "Sales Tax",
   nextEstimateNumber: 1001,
-  threadOptions: [],
+  bobbinOptions: [],
   battingOptions: [],
   isPaidTier: false,
   brandPrimaryColor: "#4e283a",
