@@ -10,6 +10,8 @@ export type MeasurementSystem = "imperial" | "metric";
 
 export type RequestedDateType = "asap" | "no_date" | "specific_date";
 
+export type InvoiceType = "regular" | "gift" | "charitable";
+
 export const STAGES: Stage[] = [
   "Intake",
   "Estimate",
@@ -70,8 +72,9 @@ export interface Project {
   bobbinChoice?: string;
   // Extra charges (shipping, rush, custom fees)
   extraCharges?: ExtraCharge[];
-  // Donation fields
+  // Donation/Gift fields
   isDonation?: boolean;
+  invoiceType?: InvoiceType;
   // Deposit fields
   depositType?: "percentage" | "flat";
   depositPercentage?: number;
@@ -117,6 +120,7 @@ export interface Project {
     extraChargesTaxable?: number;
     // Donation fields
     isDonation?: boolean;
+    invoiceType?: InvoiceType;
     mileage?: number;
     mileageTotal?: number;
     // Totals

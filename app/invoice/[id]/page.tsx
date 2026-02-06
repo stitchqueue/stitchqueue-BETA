@@ -26,8 +26,9 @@ export default function InvoicePage() {
     new Date().toISOString().split("T")[0]
   );
 
-  // Donation state (can be toggled on invoice)
-  const [isDonation, setIsDonation] = useState(false);
+  // Invoice type state (replaces simple isDonation boolean)
+  // "regular" | "gift" | "charitable"
+  const [invoiceType, setInvoiceType] = useState<"regular" | "gift" | "charitable">("regular");
   const [mileage, setMileage] = useState("");
   const [showMileageInput, setShowMileageInput] = useState(false);
 
@@ -37,13 +38,17 @@ export default function InvoicePage() {
   // Set document title for PDF naming
   useEffect(() => {
     if (project?.estimateNumber) {
-      const docType = isDonation ? "Donation" : "Invoice";
+      const docType = invoiceType === "charitable" 
+        ? "Donation" 
+        : invoiceType === "gift" 
+        ? "Gift" 
+        : "Invoice";
       document.title = `StitchQueue ${docType} #${project.estimateNumber}`;
     }
     return () => {
       document.title = "StitchQueue";
     };
-  }, [project?.estimateNumber, isDonation]);
+  }, [project?.estimateNumber, invoiceType]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -64,9 +69,12 @@ export default function InvoicePage() {
         setProject(proj || null);
         setSettings(savedSettings);
 
-        // Initialize donation state from project data
-        if (proj?.isDonation) {
-          setIsDonation(true);
+        // Initialize invoice type from project data
+        if (proj?.invoiceType) {
+          setInvoiceType(proj.invoiceType);
+        } else if (proj?.isDonation) {
+          // Legacy support: if old isDonation flag is set, default to charitable
+          setInvoiceType("charitable");
         }
         
         // Initialize mileage from estimate data if present
@@ -163,7 +171,7 @@ export default function InvoicePage() {
     window.print();
   };
 
-  const handleUpdateDonation = async () => {
+  const handleUpdateInvoiceType = async () => {
     if (!project) return;
 
     setUpdating(true);
@@ -171,29 +179,40 @@ export default function InvoicePage() {
       const mileageNumber = parseFloat(mileage) || 0;
       const mileageTotal = mileageNumber * CHARITABLE_MILEAGE_RATE;
 
-      // Update project with donation settings
+      const isCharitable = invoiceType === "charitable";
+      const isGiftOrDonation = invoiceType !== "regular";
+
+      // Update project with invoice type settings
       const updatedEstimateData = {
         ...project.estimateData,
-        isDonation,
-        mileage: isDonation && showMileageInput ? mileageNumber : undefined,
-        mileageTotal: isDonation && showMileageInput ? mileageTotal : undefined,
+        invoiceType,
+        isDonation: isGiftOrDonation, // Legacy support
+        mileage: isCharitable && showMileageInput ? mileageNumber : undefined,
+        mileageTotal: isCharitable && showMileageInput ? mileageTotal : undefined,
       };
 
       await storage.updateProject(project.id, {
-        isDonation,
+        invoiceType,
+        isDonation: isGiftOrDonation, // Legacy support
         estimateData: updatedEstimateData,
       });
 
       setProject({
         ...project,
-        isDonation,
+        invoiceType,
+        isDonation: isGiftOrDonation,
         estimateData: updatedEstimateData,
       });
 
-      alert(isDonation ? "Invoice marked as donation!" : "Donation status removed.");
+      const messages = {
+        regular: "Invoice type set to regular.",
+        gift: "Invoice marked as gift - no payment due.",
+        charitable: "Invoice marked as charitable donation.",
+      };
+      alert(messages[invoiceType]);
     } catch (error) {
-      console.error("Error updating donation status:", error);
-      alert("Failed to update donation status. Please try again.");
+      console.error("Error updating invoice type:", error);
+      alert("Failed to update invoice type. Please try again.");
     } finally {
       setUpdating(false);
     }
@@ -348,6 +367,11 @@ export default function InvoicePage() {
   const invoiceNumber = project.estimateNumber || "—";
   const invoiceDate = new Date().toISOString().split("T")[0];
 
+  // Invoice type helpers
+  const isGift = invoiceType === "gift";
+  const isCharitable = invoiceType === "charitable";
+  const isGiftOrDonation = invoiceType !== "regular";
+
   // Calculate totals
   const subtotal = estimate.subtotal || 0;
   const taxAmount = estimate.taxAmount || 0;
@@ -361,9 +385,9 @@ export default function InvoicePage() {
   const mileageNumber = parseFloat(mileage) || 0;
   const mileageTotal = mileageNumber * CHARITABLE_MILEAGE_RATE;
 
-  // For donations, show different balance logic
-  const amountDue = isDonation ? 0 : (total - depositPaid - finalPaid);
-  const donationValue = isDonation ? total : 0;
+  // For gifts and donations, show different balance logic
+  const amountDue = isGiftOrDonation ? 0 : (total - depositPaid - finalPaid);
+  const giftValue = isGiftOrDonation ? total : 0;
 
   const lineItems: { description: string; amount: number; deductible?: boolean }[] = [];
 
@@ -422,8 +446,8 @@ export default function InvoicePage() {
     });
   }
 
-  // Add mileage if donation and mileage entered
-  if (isDonation && mileageNumber > 0) {
+  // Add mileage if charitable donation and mileage entered
+  if (isCharitable && mileageNumber > 0) {
     lineItems.push({
       description: `Charitable Mileage (${mileageNumber} miles × ${CHARITABLE_MILEAGE_RATE}/mi)`,
       amount: mileageTotal,
@@ -459,9 +483,14 @@ export default function InvoicePage() {
                 ✓ PAID IN FULL
               </span>
             )}
-            {isDonation && (
+            {isGift && (
+              <span className="px-4 py-2 bg-pink-100 text-pink-700 rounded-xl font-bold">
+                🎁 GIFT
+              </span>
+            )}
+            {isCharitable && (
               <span className="px-4 py-2 bg-purple-100 text-purple-700 rounded-xl font-bold">
-                🎁 DONATION
+                💜 CHARITABLE DONATION
               </span>
             )}
             <button
@@ -475,28 +504,38 @@ export default function InvoicePage() {
       </div>
 
       <div className="max-w-4xl mx-auto p-4 print:p-0 print:max-w-none">
-        {/* Donation Settings Section - hidden when printing */}
+        {/* Invoice Type Section - hidden when printing */}
         <div className="print:hidden bg-white border border-line rounded-xl p-4 mb-4">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <h3 className="font-bold text-plum">🎁 Donation Settings</h3>
+              <h3 className="font-bold text-plum">Invoice Type</h3>
               <p className="text-sm text-muted">
-                Configure donation status and tax-deductible options
+                Set whether this is a regular invoice, gift, or charitable donation
               </p>
             </div>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={isDonation}
-                onChange={(e) => setIsDonation(e.target.checked)}
-                className="w-5 h-5 rounded border-line accent-purple-600"
-              />
-              <span className="font-bold text-sm">Mark as Donation</span>
-            </label>
+            <div className="flex items-center gap-3">
+              <select
+                value={invoiceType}
+                onChange={(e) => setInvoiceType(e.target.value as "regular" | "gift" | "charitable")}
+                className="px-4 py-2 border border-line rounded-xl font-medium min-w-[200px]"
+              >
+                <option value="regular">Regular Invoice</option>
+                <option value="gift">🎁 Gift (no payment due)</option>
+                <option value="charitable">💜 Charitable Donation</option>
+              </select>
+              <button
+                onClick={handleUpdateInvoiceType}
+                disabled={updating}
+                className="px-4 py-2 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors disabled:opacity-50"
+              >
+                {updating ? "Saving..." : "Save"}
+              </button>
+            </div>
           </div>
 
-          {isDonation && (
-            <div className="border-t border-line pt-4">
+          {/* Charitable donation options */}
+          {isCharitable && (
+            <div className="border-t border-line pt-4 mt-4">
               <div className="mb-4">
                 <label className="flex items-center gap-2 mb-3">
                   <input
@@ -510,7 +549,7 @@ export default function InvoicePage() {
                 
                 {showMileageInput && (
                   <div className="flex gap-3 items-center">
-                    <div className="flex-1">
+                    <div className="flex-1 max-w-[200px]">
                       <label className="block text-xs font-bold text-muted mb-1">
                         Miles driven
                       </label>
@@ -525,10 +564,7 @@ export default function InvoicePage() {
                       />
                     </div>
                     <div className="text-sm text-muted">
-                      × $0.14/mile<br />
-                      <span className="font-bold">
-                        = {formatCurrency(mileageTotal)}
-                      </span>
+                      × $0.14/mile = <span className="font-bold">{formatCurrency(mileageTotal)}</span>
                     </div>
                   </div>
                 )}
@@ -541,30 +577,25 @@ export default function InvoicePage() {
                   Quilting services are not deductible per IRS rules.
                 </p>
               </div>
-
-              <button
-                onClick={handleUpdateDonation}
-                disabled={updating}
-                className="mt-3 px-4 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors disabled:opacity-50"
-              >
-                {updating ? "Updating..." : "Update Donation Settings"}
-              </button>
             </div>
           )}
 
-          {!isDonation && (
-            <button
-              onClick={handleUpdateDonation}
-              disabled={updating}
-              className="px-4 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors disabled:opacity-50"
-            >
-              Remove Donation Status
-            </button>
+          {/* Gift info */}
+          {isGift && (
+            <div className="border-t border-line pt-4 mt-4">
+              <div className="bg-pink-50 p-3 rounded-xl text-sm">
+                <p className="font-bold text-pink-700 mb-1">Gift Invoice</p>
+                <p className="text-pink-600">
+                  This invoice shows the value of work donated to a friend or family member. 
+                  No payment is expected and no tax deduction applies.
+                </p>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Payment Recording Section - hidden when printing and for donations */}
-        {!isDonation && !project.paidInFull && amountDue > 0 && (
+        {/* Payment Recording Section - hidden when printing and for gifts/donations */}
+        {!isGiftOrDonation && !project.paidInFull && amountDue > 0 && (
           <div className="print:hidden bg-white border border-line rounded-xl p-4 mb-4">
             <div className="flex items-center justify-between">
               <div>
@@ -656,7 +687,7 @@ export default function InvoicePage() {
         )}
 
         {/* Paid confirmation - hidden when printing */}
-        {!isDonation && project.paidInFull && project.finalPaymentAmount && (
+        {!isGiftOrDonation && project.paidInFull && project.finalPaymentAmount && (
           <div className="print:hidden bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
             <div className="flex items-center justify-between">
               <div>
@@ -721,15 +752,15 @@ export default function InvoicePage() {
                 className="text-2xl font-bold print:text-xl"
                 style={{ color: settings.brandPrimaryColor || "#4e283a" }}
               >
-                {isDonation ? "DONATION RECEIPT" : "INVOICE"}
+                {isCharitable ? "DONATION RECEIPT" : isGift ? "GIFT RECEIPT" : "INVOICE"}
               </h2>
               <div className="text-xs mt-1 space-y-0.5">
                 <div>
                   <span className="text-gray-500">
-                    {isDonation ? "Receipt" : "Invoice"} #:
+                    {isGiftOrDonation ? "Receipt" : "Invoice"} #:
                   </span>{" "}
                   <span className="font-bold">
-                    {isDonation ? `🎁 ${invoiceNumber}` : invoiceNumber}
+                    {isCharitable ? `💜 ${invoiceNumber}` : isGift ? `🎁 ${invoiceNumber}` : invoiceNumber}
                   </span>
                 </div>
                 <div>
@@ -747,7 +778,7 @@ export default function InvoicePage() {
                 className="text-xs font-bold uppercase tracking-wide mb-1"
                 style={{ color: settings.brandSecondaryColor || "#98823a" }}
               >
-                {isDonation ? "Donated To" : "Bill To"}
+                {isCharitable ? "Donated To" : isGift ? "Gift For" : "Bill To"}
               </div>
               <div className="font-bold">
                 {project.clientFirstName} {project.clientLastName}
@@ -855,7 +886,7 @@ export default function InvoicePage() {
                 <span>{formatCurrency(total)}</span>
               </div>
 
-              {depositPaid > 0 && !isDonation && (
+              {depositPaid > 0 && !isGiftOrDonation && (
                 <div className="flex justify-between py-1.5 text-sm bg-green-50 px-2 rounded mt-1 print:bg-transparent print:border print:border-green-300">
                   <span className="text-green-700">
                     Deposit Paid
@@ -870,7 +901,7 @@ export default function InvoicePage() {
                 </div>
               )}
 
-              {finalPaid > 0 && !isDonation && (
+              {finalPaid > 0 && !isGiftOrDonation && (
                 <div className="flex justify-between py-1.5 text-sm bg-green-50 px-2 rounded mt-1 print:bg-transparent print:border print:border-green-300">
                   <span className="text-green-700">
                     Payment Received
@@ -887,11 +918,13 @@ export default function InvoicePage() {
 
               <div
                 className={`flex justify-between py-2 text-lg font-bold mt-1 px-2 rounded print:rounded-sm ${
-                  isDonation ? "bg-purple-600" : amountDue <= 0 ? "bg-green-600" : ""
+                  isCharitable ? "bg-purple-600" : isGift ? "bg-pink-500" : amountDue <= 0 ? "bg-green-600" : ""
                 }`}
                 style={
-                  isDonation
+                  isCharitable
                     ? { backgroundColor: "#7c3aed", color: "white" }
+                    : isGift
+                    ? { backgroundColor: "#ec4899", color: "white" }
                     : amountDue > 0
                     ? {
                         backgroundColor: settings.brandPrimaryColor || "#4e283a",
@@ -901,16 +934,18 @@ export default function InvoicePage() {
                 }
               >
                 <span>
-                  {isDonation 
+                  {isCharitable 
                     ? "Donation Value" 
+                    : isGift
+                    ? "Gift Value"
                     : amountDue <= 0 
                     ? "Paid in Full" 
                     : "Amount Due"
                   }
                 </span>
                 <span>
-                  {isDonation 
-                    ? formatCurrency(donationValue)
+                  {isGiftOrDonation 
+                    ? formatCurrency(giftValue)
                     : amountDue <= 0 
                     ? "✓" 
                     : formatCurrency(amountDue)
@@ -918,8 +953,8 @@ export default function InvoicePage() {
                 </span>
               </div>
 
-              {/* Tax-Deductible Breakdown for donations */}
-              {isDonation && taxDeductibleTotal > 0 && (
+              {/* Tax-Deductible Breakdown for charitable donations only */}
+              {isCharitable && taxDeductibleTotal > 0 && (
                 <div className="mt-3 p-3 bg-purple-50 rounded border border-purple-200 print:bg-transparent">
                   <div className="text-xs font-bold text-purple-700 mb-1 uppercase tracking-wide">
                     Tax-Deductible Portion
@@ -946,8 +981,8 @@ export default function InvoicePage() {
             </div>
           </div>
 
-          {/* Donation Disclaimer */}
-          {isDonation && (
+          {/* Charitable Donation Disclaimer */}
+          {isCharitable && (
             <div className="border-t border-gray-200 pt-4 mb-4 text-xs text-gray-600 bg-purple-50 p-4 rounded print:bg-transparent print:border print:border-purple-200">
               <p className="font-bold mb-2">Important Tax Information:</p>
               <p className="mb-2">
@@ -963,10 +998,12 @@ export default function InvoicePage() {
 
           {/* Footer - Compact */}
           <div className="border-t border-gray-200 pt-3 text-center text-xs text-gray-500">
-            <p className="font-medium">Thank you for your business!</p>
+            <p className="font-medium">Thank you{isGift ? " for the opportunity to create this gift!" : " for your business!"}</p>
             <p>
-              {isDonation 
+              {isCharitable 
                 ? "This receipt is for your tax records."
+                : isGift
+                ? "This receipt shows the value of the gifted quilting work."
                 : "Payment is due upon receipt unless otherwise arranged."
               }
               {settings.email && ` Questions? Contact us at ${settings.email}`}
