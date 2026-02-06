@@ -3,12 +3,14 @@
  * 
  * Collects client contact information: name, email, phone, and address.
  * Handles country-specific address formatting (US states, Canadian provinces, etc.)
+ * Features client autocomplete for repeat clients.
  * 
  * @module calculator/components/ClientInfoSection
  */
 
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { COUNTRY_OPTIONS } from "../../types";
 import {
   getRegionsForCountry,
@@ -17,6 +19,8 @@ import {
   getPostalCodeLabel,
   getPostalCodePlaceholder,
 } from "../../lib/locations";
+import { storage } from "../../lib/storage";
+import type { Project } from "../../types";
 
 interface ClientInfoSectionProps {
   // Name fields
@@ -44,6 +48,19 @@ interface ClientInfoSectionProps {
   onCountryChange: (value: string) => void;
 }
 
+interface ClientMatch {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  street?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
+
 /**
  * Form section for collecting client contact and address information.
  * 
@@ -51,6 +68,7 @@ interface ClientInfoSectionProps {
  * - Phone number auto-formatting (XXX-XXX-XXXX)
  * - Country-aware state/province dropdown
  * - Dynamic postal code labels (ZIP Code, Postal Code, etc.)
+ * - Client autocomplete for repeat clients
  */
 export default function ClientInfoSection({
   clientFirstName,
@@ -72,6 +90,12 @@ export default function ClientInfoSection({
   clientCountry,
   onCountryChange,
 }: ClientInfoSectionProps) {
+  // Autocomplete state
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [matchingClients, setMatchingClients] = useState<ClientMatch[]>([]);
+  const [isRepeatClient, setIsRepeatClient] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   // Get location-specific labels and options based on selected country
   const regions = getRegionsForCountry(clientCountry);
   const showRegionDropdown = countryHasRegionDropdown(clientCountry);
@@ -79,38 +103,179 @@ export default function ClientInfoSection({
   const postalCodeLabel = getPostalCodeLabel(clientCountry);
   const postalCodePlaceholder = getPostalCodePlaceholder(clientCountry);
 
+  /**
+   * Search for matching clients based on name input
+   */
+  const searchClients = async (firstName: string, lastName: string) => {
+    if (!firstName && !lastName) {
+      setMatchingClients([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const projects = await storage.getProjects();
+    
+    // Build unique clients map (keyed by first+last name)
+    const clientsMap = new Map<string, ClientMatch>();
+    
+    projects.forEach((project) => {
+      const key = `${project.clientFirstName}-${project.clientLastName}`.toLowerCase();
+      
+      // Skip if already have this client or if no name
+      if (clientsMap.has(key) || !project.clientFirstName || !project.clientLastName) {
+        return;
+      }
+
+      // Check if this project matches the search
+      const firstMatch = !firstName || 
+        project.clientFirstName.toLowerCase().startsWith(firstName.toLowerCase());
+      const lastMatch = !lastName || 
+        project.clientLastName.toLowerCase().startsWith(lastName.toLowerCase());
+
+      if (firstMatch && lastMatch) {
+        clientsMap.set(key, {
+          id: project.id,
+          firstName: project.clientFirstName,
+          lastName: project.clientLastName,
+          email: project.clientEmail,
+          phone: project.clientPhone,
+          street: project.clientStreet,
+          city: project.clientCity,
+          state: project.clientState,
+          postalCode: project.clientPostalCode,
+          country: project.clientCountry,
+        });
+      }
+    });
+
+    const matches = Array.from(clientsMap.values());
+    setMatchingClients(matches);
+    setShowSuggestions(matches.length > 0);
+  };
+
+  /**
+   * Debounced search effect - triggers 300ms after user stops typing
+   */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchClients(clientFirstName, clientLastName);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [clientFirstName, clientLastName]);
+
+  /**
+   * Handle clicking outside dropdown to close it
+   */
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  /**
+   * Auto-fill all client info when selecting from suggestions
+   */
+  const selectClient = (client: ClientMatch) => {
+    setClientFirstName(client.firstName);
+    setClientLastName(client.lastName);
+    setClientEmail(client.email || "");
+    if (client.phone) {
+      onPhoneChange(client.phone);
+    }
+    setClientStreet(client.street || "");
+    setClientCity(client.city || "");
+    setClientState(client.state || "");
+    setClientPostalCode(client.postalCode || "");
+    if (client.country) {
+      onCountryChange(client.country);
+    }
+    setIsRepeatClient(true);
+    setShowSuggestions(false);
+  };
+
   return (
     <>
-      <h2 className="text-lg font-bold text-plum mb-4">
-        Client Information
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-plum">
+          Client Information
+        </h2>
+        {isRepeatClient && (
+          <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+            ✓ REPEAT CLIENT
+          </span>
+        )}
+      </div>
 
-      {/* Name Fields */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block text-sm font-bold text-muted mb-2">
-            First Name *
-          </label>
-          <input
-            type="text"
-            value={clientFirstName}
-            onChange={(e) => setClientFirstName(e.target.value)}
-            placeholder="Jane"
-            className="w-full px-4 py-2 border border-line rounded-xl"
-          />
+      {/* Name Fields with Autocomplete */}
+      <div className="relative" ref={dropdownRef}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-bold text-muted mb-2">
+              First Name *
+            </label>
+            <input
+              type="text"
+              value={clientFirstName}
+              onChange={(e) => {
+                setClientFirstName(e.target.value);
+                setIsRepeatClient(false);
+              }}
+              placeholder="Jane"
+              className="w-full px-4 py-2 border border-line rounded-xl"
+              autoComplete="off"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-muted mb-2">
+              Last Name *
+            </label>
+            <input
+              type="text"
+              value={clientLastName}
+              onChange={(e) => {
+                setClientLastName(e.target.value);
+                setIsRepeatClient(false);
+              }}
+              placeholder="Doe"
+              className="w-full px-4 py-2 border border-line rounded-xl"
+              autoComplete="off"
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-bold text-muted mb-2">
-            Last Name *
-          </label>
-          <input
-            type="text"
-            value={clientLastName}
-            onChange={(e) => setClientLastName(e.target.value)}
-            placeholder="Doe"
-            className="w-full px-4 py-2 border border-line rounded-xl"
-          />
-        </div>
+
+        {/* Autocomplete Dropdown */}
+        {showSuggestions && matchingClients.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-line rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+            <div className="p-2">
+              <div className="text-xs font-bold text-muted px-2 py-1">
+                Previous Clients:
+              </div>
+              {matchingClients.map((client) => (
+                <button
+                  key={client.id}
+                  type="button"
+                  onClick={() => selectClient(client)}
+                  className="w-full text-left px-3 py-2 hover:bg-purple-50 rounded-lg transition-colors"
+                >
+                  <div className="font-bold text-plum">
+                    {client.firstName} {client.lastName}
+                  </div>
+                  <div className="text-xs text-muted">
+                    {[client.email, client.phone, client.city, client.state]
+                      .filter(Boolean)
+                      .join(" • ")}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Contact Fields */}
