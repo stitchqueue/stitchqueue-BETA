@@ -48,6 +48,19 @@ export default function ProjectDetailPage() {
     new Date().toISOString().split("T")[0]
   );
 
+  // Set document title for PDF naming
+  useEffect(() => {
+    if (project?.estimateNumber) {
+      document.title = `StitchQueue Job #${project.estimateNumber}`;
+    } else if (project) {
+      const name = `${project.clientFirstName || ""} ${project.clientLastName || ""}`.trim();
+      document.title = name ? `StitchQueue - ${name}` : "StitchQueue Project";
+    }
+    return () => {
+      document.title = "StitchQueue";
+    };
+  }, [project?.estimateNumber, project?.clientFirstName, project?.clientLastName]);
+
   useEffect(() => {
     const loadProject = async () => {
       try {

@@ -34,6 +34,17 @@ export default function InvoicePage() {
   // Constants
   const CHARITABLE_MILEAGE_RATE = 0.14; // IRS charitable mileage rate
 
+  // Set document title for PDF naming
+  useEffect(() => {
+    if (project?.estimateNumber) {
+      const docType = isDonation ? "Donation" : "Invoice";
+      document.title = `StitchQueue ${docType} #${project.estimateNumber}`;
+    }
+    return () => {
+      document.title = "StitchQueue";
+    };
+  }, [project?.estimateNumber, isDonation]);
+
   useEffect(() => {
     const loadData = async () => {
       try {
