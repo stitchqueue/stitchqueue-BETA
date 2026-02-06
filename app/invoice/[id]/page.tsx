@@ -436,7 +436,7 @@ export default function InvoicePage() {
   const hasNonTaxableCharges = estimate.extraCharges?.some((c) => !c.taxable);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 print:bg-white print:min-h-0">
       {/* Header - hidden when printing */}
       <div className="print:hidden bg-white border-b border-line sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -461,7 +461,7 @@ export default function InvoicePage() {
               onClick={handlePrint}
               className="px-6 py-2 bg-plum text-white rounded-xl font-bold hover:bg-plum/90"
             >
-              Print / Save PDF
+              🖨️ Print Invoice
             </button>
           </div>
         </div>
@@ -672,11 +672,10 @@ export default function InvoicePage() {
           </div>
         )}
 
-        {/* Invoice Document */}
+        {/* Invoice Document - This is what prints */}
         <div
           ref={invoiceRef}
-          className="bg-white shadow-lg print:shadow-none rounded-lg print:rounded-none p-6 print:p-8"
-          style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
+          className="bg-white shadow-lg print:shadow-none rounded-lg print:rounded-none p-6 print:p-0"
         >
           {/* Header - Logo beside business info */}
           <div
@@ -688,12 +687,12 @@ export default function InvoicePage() {
                 <img
                   src={settings.logoUrl}
                   alt="Logo"
-                  className="h-12 w-auto"
+                  className="h-12 w-auto print:h-10"
                 />
               )}
               <div>
                 <h1
-                  className="text-xl font-bold"
+                  className="text-xl font-bold print:text-lg"
                   style={{ color: settings.brandPrimaryColor || "#4e283a" }}
                 >
                   {settings.businessName || "Your Business Name"}
@@ -712,7 +711,7 @@ export default function InvoicePage() {
             </div>
             <div className="text-right">
               <h2
-                className="text-2xl font-bold"
+                className="text-2xl font-bold print:text-xl"
                 style={{ color: settings.brandPrimaryColor || "#4e283a" }}
               >
                 {isDonation ? "DONATION RECEIPT" : "INVOICE"}
@@ -796,8 +795,8 @@ export default function InvoicePage() {
                   color: "white",
                 }}
               >
-                <th className="py-2 px-3 rounded-tl">Description</th>
-                <th className="py-2 px-3 text-right rounded-tr">Amount</th>
+                <th className="py-2 px-3 rounded-tl print:rounded-none">Description</th>
+                <th className="py-2 px-3 text-right rounded-tr print:rounded-none">Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -824,7 +823,7 @@ export default function InvoicePage() {
 
           {/* Totals - Compact, right aligned */}
           <div className="flex justify-end mb-4">
-            <div className="w-64">
+            <div className="w-64 print:w-56">
               <div className="flex justify-between py-1 text-sm">
                 <span className="text-gray-600">Subtotal</span>
                 <span className="font-medium">{formatCurrency(subtotal)}</span>
@@ -850,7 +849,7 @@ export default function InvoicePage() {
               </div>
 
               {depositPaid > 0 && !isDonation && (
-                <div className="flex justify-between py-1.5 text-sm bg-green-50 px-2 rounded mt-1">
+                <div className="flex justify-between py-1.5 text-sm bg-green-50 px-2 rounded mt-1 print:bg-transparent print:border print:border-green-300">
                   <span className="text-green-700">
                     Deposit Paid
                     {project.depositPaidDate &&
@@ -865,7 +864,7 @@ export default function InvoicePage() {
               )}
 
               {finalPaid > 0 && !isDonation && (
-                <div className="flex justify-between py-1.5 text-sm bg-green-50 px-2 rounded mt-1">
+                <div className="flex justify-between py-1.5 text-sm bg-green-50 px-2 rounded mt-1 print:bg-transparent print:border print:border-green-300">
                   <span className="text-green-700">
                     Payment Received
                     {project.finalPaymentDate &&
@@ -880,7 +879,7 @@ export default function InvoicePage() {
               )}
 
               <div
-                className={`flex justify-between py-2 text-lg font-bold mt-1 px-2 rounded ${
+                className={`flex justify-between py-2 text-lg font-bold mt-1 px-2 rounded print:rounded-sm ${
                   isDonation ? "bg-purple-600" : amountDue <= 0 ? "bg-green-600" : ""
                 }`}
                 style={
@@ -914,7 +913,7 @@ export default function InvoicePage() {
 
               {/* Tax-Deductible Breakdown for donations */}
               {isDonation && taxDeductibleTotal > 0 && (
-                <div className="mt-3 p-3 bg-purple-50 rounded border border-purple-200">
+                <div className="mt-3 p-3 bg-purple-50 rounded border border-purple-200 print:bg-transparent">
                   <div className="text-xs font-bold text-purple-700 mb-1 uppercase tracking-wide">
                     Tax-Deductible Portion
                   </div>
@@ -942,7 +941,7 @@ export default function InvoicePage() {
 
           {/* Donation Disclaimer */}
           {isDonation && (
-            <div className="border-t border-gray-200 pt-4 mb-4 text-xs text-gray-600 bg-purple-50 p-4 rounded">
+            <div className="border-t border-gray-200 pt-4 mb-4 text-xs text-gray-600 bg-purple-50 p-4 rounded print:bg-transparent print:border print:border-purple-200">
               <p className="font-bold mb-2">Important Tax Information:</p>
               <p className="mb-2">
                 Tax deductions for donated materials and mileage only apply to donations 
@@ -968,22 +967,6 @@ export default function InvoicePage() {
           </div>
         </div>
       </div>
-
-      <style jsx global>{`
-        @media print {
-          body {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          .print\\:hidden {
-            display: none !important;
-          }
-          @page {
-            size: letter;
-            margin: 0.4in;
-          }
-        }
-      `}</style>
     </div>
   );
 }

@@ -6,3 +6,235 @@ body {
   background-color: #fbfaf8;
   color: #1f1f1f;
 }
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  /* Force background colors and images to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+
+  /* Reset body for print */
+  body {
+    background-color: white !important;
+    color: black !important;
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+
+  /* Hide non-printable elements */
+  .print\\:hidden,
+  .no-print,
+  header,
+  nav,
+  button,
+  input,
+  select,
+  textarea,
+  [role="button"],
+  .sticky {
+    display: none !important;
+  }
+
+  /* But allow buttons inside print areas if explicitly marked */
+  .print-visible {
+    display: block !important;
+  }
+
+  /* Main content should fill the page */
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Remove shadows and borders that don't print well */
+  .shadow-lg,
+  .shadow-md,
+  .shadow-sm,
+  .shadow {
+    box-shadow: none !important;
+  }
+
+  /* Clean up rounded corners for print */
+  .rounded-xl,
+  .rounded-lg,
+  .rounded-card {
+    border-radius: 4px !important;
+  }
+
+  /* Ensure invoice/estimate document fills width */
+  .print-document {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Tables should have visible borders */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th, td {
+    border: 1px solid #e5e5e5;
+    padding: 8px;
+  }
+
+  thead {
+    background-color: #4e283a !important;
+    color: white !important;
+  }
+
+  /* Page break controls */
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+
+  /* Keep sections together */
+  .bg-white,
+  .border {
+    page-break-inside: avoid;
+  }
+
+  /* Links should show URL in print (optional - commented out) */
+  /* a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  } */
+
+  /* Remove link styling */
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  /* Ensure text is black for readability */
+  .text-muted {
+    color: #666 !important;
+  }
+
+  /* Keep brand colors for headers */
+  .text-plum {
+    color: #4e283a !important;
+  }
+
+  .text-gold {
+    color: #98823a !important;
+  }
+
+  /* Print-specific header for documents */
+  .print-header {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #4e283a;
+  }
+
+  /* Totals section styling */
+  .print-totals {
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 2px solid #4e283a;
+  }
+
+  /* Footer */
+  .print-footer {
+    margin-top: 30px;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+    text-align: center;
+    font-size: 10pt;
+    color: #666;
+  }
+
+  /* Status badges should print */
+  .bg-green-100,
+  .bg-green-50,
+  .bg-red-100,
+  .bg-red-50,
+  .bg-orange-100,
+  .bg-purple-100,
+  .bg-purple-50,
+  .bg-gold\\/10 {
+    background-color: inherit !important;
+    border: 1px solid currentColor !important;
+  }
+
+  /* Make sure paid badges are visible */
+  .bg-green-600,
+  .bg-plum,
+  .bg-purple-600 {
+    background-color: inherit !important;
+    color: white !important;
+  }
+
+  /* Grid layouts should stack on print if needed */
+  @media (max-width: 100%) {
+    .grid {
+      display: block;
+    }
+    
+    .grid > * {
+      margin-bottom: 10px;
+    }
+  }
+
+  /* Estimate/Invoice specific */
+  .invoice-line-item {
+    page-break-inside: avoid;
+  }
+
+  /* Hide the gray background wrapper */
+  .bg-gray-100 {
+    background-color: white !important;
+  }
+
+  /* Compact spacing for print */
+  .mb-6 {
+    margin-bottom: 12px !important;
+  }
+
+  .mb-4 {
+    margin-bottom: 8px !important;
+  }
+
+  .p-6 {
+    padding: 12px !important;
+  }
+
+  .p-4 {
+    padding: 8px !important;
+  }
+
+  /* Project detail print styles */
+  .project-detail-print {
+    padding: 0 !important;
+  }
+
+  .project-detail-print .bg-white {
+    border: 1px solid #ddd !important;
+    margin-bottom: 15px !important;
+  }
+}

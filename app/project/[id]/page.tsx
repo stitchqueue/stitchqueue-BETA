@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Header from "../../components/Header";
 import { storage } from "../../lib/storage";
 import { STAGES } from "../../types";
-import type { Project, Stage } from "../../types";
+import type { Project, Stage, Settings } from "../../types";
 
 function formatDate(dateStr: string | undefined): string {
   if (!dateStr) return "—";
@@ -35,6 +35,7 @@ export default function ProjectDetailPage() {
   const projectId = decodeURIComponent(params.id as string);
 
   const [project, setProject] = useState<Project | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -58,9 +59,13 @@ export default function ProjectDetailPage() {
         }
         setIsAuthenticated(true);
 
-        // Load project
-        const savedProject = await storage.getProjectById(projectId);
+        // Load project and settings
+        const [savedProject, savedSettings] = await Promise.all([
+          storage.getProjectById(projectId),
+          storage.getSettings(),
+        ]);
         setProject(savedProject || null);
+        setSettings(savedSettings);
 
         // Pre-fill payment amount with balance due
         if (savedProject?.estimateData?.total) {
@@ -80,6 +85,10 @@ export default function ProjectDetailPage() {
 
     loadProject();
   }, [projectId, router]);
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   if (loading) {
     return (
@@ -305,12 +314,40 @@ export default function ProjectDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <div className="min-h-screen bg-background print:bg-white print:min-h-0">
+      {/* Header - hidden when printing */}
+      <div className="print:hidden">
+        <Header />
+      </div>
 
-      <main className="max-w-4xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-6">
+      <main className="max-w-4xl mx-auto px-4 py-6 print:px-0 print:py-0 print:max-w-none">
+        {/* Print Header - only visible when printing */}
+        <div className="hidden print:block mb-6 pb-4 border-b-2 border-plum">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-xl font-bold text-plum">
+                {settings?.businessName || "StitchQueue"}
+              </h1>
+              <p className="text-xs text-gray-600">
+                {[settings?.phone, settings?.email].filter(Boolean).join(" • ")}
+              </p>
+            </div>
+            <div className="text-right">
+              <h2 className="text-lg font-bold text-plum">PROJECT DETAILS</h2>
+              {project.estimateNumber && (
+                <p className="text-sm text-gold font-bold">
+                  Estimate #{project.estimateNumber}
+                </p>
+              )}
+              <p className="text-xs text-gray-500">
+                Printed: {new Date().toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Header - hidden when printing */}
+        <div className="flex items-start justify-between mb-6 print:hidden">
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-plum">
@@ -331,17 +368,34 @@ export default function ProjectDetailPage() {
               Intake: {formatDate(project.intakeDate)}
             </p>
           </div>
-          <button
-            onClick={() => router.push("/board")}
-            className="px-4 py-2 border border-line rounded-xl hover:bg-white transition-colors"
-          >
-            Back to Board
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handlePrint}
+              className="px-4 py-2 border border-line rounded-xl hover:bg-gray-50 transition-colors"
+              title="Print project details"
+            >
+              🖨️ Print
+            </button>
+            <button
+              onClick={() => router.push("/board")}
+              className="px-4 py-2 border border-line rounded-xl hover:bg-white transition-colors"
+            >
+              Back to Board
+            </button>
+          </div>
+        </div>
+
+        {/* Print-only client name header */}
+        <div className="hidden print:block mb-4">
+          <h2 className="text-xl font-bold text-plum">{fullName || "Unnamed Client"}</h2>
+          {project.paidInFull && (
+            <span className="text-green-700 font-bold">✓ PAID IN FULL</span>
+          )}
         </div>
 
         {/* ASAP / HIGH PRIORITY Banner */}
         {projectIsAsap && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3 print:bg-transparent print:border-red-300">
             <span className="text-2xl">🔥</span>
             <div>
               <div className="font-bold text-red-700">HIGH PRIORITY</div>
@@ -353,9 +407,9 @@ export default function ProjectDetailPage() {
         )}
 
         {/* Project Info Card */}
-        <div className="bg-white border border-line rounded-xl p-6 mb-6">
-          {/* Stage */}
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-4">
+          {/* Stage - hidden when printing */}
+          <div className="flex items-center justify-between mb-6 print:hidden">
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted">Stage:</span>
               <span className="px-4 py-2 bg-gray-100 border border-line rounded-xl font-bold">
@@ -374,7 +428,13 @@ export default function ProjectDetailPage() {
             </button>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          {/* Print-only stage display */}
+          <div className="hidden print:block mb-4">
+            <span className="text-sm text-muted">Stage: </span>
+            <span className="font-bold">{project.stage}</span>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6 print:gap-4">
             {/* Client Information */}
             <div>
               <h2 className="font-bold text-plum mb-3">Client Information</h2>
@@ -435,7 +495,7 @@ export default function ProjectDetailPage() {
                     {getCompletionDateDisplay()}
                   </span>
                   {projectIsAsap && (
-                    <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                    <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium print:bg-transparent print:border print:border-red-300">
                       🔥 ASAP
                     </span>
                   )}
@@ -444,7 +504,7 @@ export default function ProjectDetailPage() {
                   <span className="text-muted">Quilt Size:</span>{" "}
                   <span className="font-medium">
                     {project.quiltWidth && project.quiltLength
-                      ? `${project.quiltWidth} × ${project.quiltLength} inches`
+                      ? `${project.quiltWidth}" × ${project.quiltLength}"`
                       : "—"}
                   </span>
                 </div>
@@ -454,7 +514,7 @@ export default function ProjectDetailPage() {
 
           {/* Description */}
           {(project.description || project.cardLabel) && (
-            <div className="mt-6 pt-6 border-t border-line">
+            <div className="mt-6 pt-6 border-t border-line print:mt-4 print:pt-4">
               <h2 className="font-bold text-plum mb-2">Description</h2>
               <p className="text-sm">
                 {project.description || project.cardLabel}
@@ -465,15 +525,16 @@ export default function ProjectDetailPage() {
 
         {/* Estimate Summary (if estimate exists) */}
         {hasEstimate && estimate && (
-          <div className="bg-white border border-line rounded-xl p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-4">
+            <div className="flex items-center justify-between mb-4 print:mb-3">
               <h2 className="font-bold text-plum flex items-center gap-2">
                 Estimate{" "}
                 {project.estimateNumber && (
                   <span className="text-gold">#{project.estimateNumber}</span>
                 )}
               </h2>
-              <div className="flex gap-2">
+              {/* Buttons hidden when printing */}
+              <div className="flex gap-2 print:hidden">
                 <button
                   onClick={() =>
                     router.push(`/invoice/${encodeURIComponent(project.id)}`)
@@ -575,7 +636,7 @@ export default function ProjectDetailPage() {
 
         {/* Payment Summary Card */}
         {hasEstimate && estimate && (
-          <div className="bg-white border border-line rounded-xl p-6 mb-6">
+          <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-4">
             <h2 className="font-bold text-plum mb-4">Payment Summary</h2>
 
             <div className="space-y-3">
@@ -589,7 +650,7 @@ export default function ProjectDetailPage() {
 
               {/* Deposit Section */}
               {project.depositAmount && project.depositAmount > 0 && (
-                <div className="p-3 bg-gold/10 rounded-xl space-y-2">
+                <div className="p-3 bg-gold/10 rounded-xl space-y-2 print:bg-transparent print:border print:border-gold/30">
                   <div className="flex justify-between text-sm">
                     <span className="font-bold text-gold">Deposit</span>
                     <span className="font-bold text-gold">
@@ -597,13 +658,13 @@ export default function ProjectDetailPage() {
                     </span>
                   </div>
                   {project.depositPaid ? (
-                    <div className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded">
+                    <div className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded print:bg-transparent">
                       ✓ Paid on {formatDate(project.depositPaidDate)}
                       {project.depositPaidMethod &&
                         ` via ${project.depositPaidMethod}`}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between print:hidden">
                       <span className="text-xs text-orange-600">
                         Not yet received
                       </span>
@@ -621,7 +682,7 @@ export default function ProjectDetailPage() {
 
               {/* Final Payment Section */}
               {project.finalPaymentAmount && project.finalPaymentAmount > 0 ? (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-xl space-y-2">
+                <div className="p-3 bg-green-50 border border-green-200 rounded-xl space-y-2 print:bg-transparent">
                   <div className="flex justify-between text-sm">
                     <span className="font-bold text-green-700">
                       Final Payment
@@ -635,19 +696,20 @@ export default function ProjectDetailPage() {
                     {project.finalPaymentMethod &&
                       ` via ${project.finalPaymentMethod}`}
                   </div>
+                  {/* Clear button hidden when printing */}
                   <button
                     onClick={handleClearFinalPayment}
                     disabled={updating}
-                    className="text-xs text-red-600 hover:text-red-800 underline"
+                    className="text-xs text-red-600 hover:text-red-800 underline print:hidden"
                   >
                     Clear payment
                   </button>
                 </div>
               ) : (
-                /* Record Payment Form/Button */
+                /* Record Payment Form/Button - hidden when printing */
                 !project.paidInFull &&
                 balanceDue > 0 && (
-                  <div className="p-3 bg-gray-50 rounded-xl">
+                  <div className="p-3 bg-gray-50 rounded-xl print:hidden">
                     {showPaymentForm ? (
                       <div className="space-y-3">
                         <div className="font-bold text-sm text-plum">
@@ -746,8 +808,8 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {/* Stage Actions */}
-        <div className="bg-white border border-line rounded-xl p-6">
+        {/* Stage Actions - hidden when printing */}
+        <div className="bg-white border border-line rounded-xl p-6 print:hidden">
           <h2 className="font-bold text-plum mb-4">Stage Actions</h2>
 
           <div className="flex flex-wrap gap-3">
@@ -797,6 +859,11 @@ export default function ProjectDetailPage() {
               Archive Project
             </button>
           </div>
+        </div>
+
+        {/* Print footer */}
+        <div className="hidden print:block mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
+          <p>Printed from StitchQueue • {settings?.businessName || ""}</p>
         </div>
       </main>
     </div>
