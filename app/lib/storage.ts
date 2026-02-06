@@ -334,6 +334,313 @@ export const storage = {
 
     return { success: true, estimateNumber: currentNumber };
   },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // REPORTING FUNCTIONS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Get projects within a date range for reporting
+   */
+  getProjectsByDateRange: async (
+    startDate: string,
+    endDate: string,
+    stageFilter?: string[]
+  ): Promise<Project[]> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) return [];
+
+    let query = supabase
+      .from("projects")
+      .select("*")
+      .eq("organization_id", orgId)
+      .gte("created_at", startDate)
+      .lte("created_at", endDate + "T23:59:59.999Z")
+      .order("created_at", { ascending: false });
+
+    // Optional stage filtering
+    if (stageFilter && stageFilter.length > 0) {
+      query = query.in("stage", stageFilter);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Error fetching projects by date range:", error.message);
+      return [];
+    }
+
+    return (data || []).map(mapProjectFromDb);
+  },
+
+  /**
+   * Get revenue analytics for completed projects
+   */
+  getRevenueAnalytics: async (
+    startDate: string,
+    endDate: string
+  ): Promise<{
+    totalRevenue: number;
+    quiltingRevenue: number;
+    battingRevenue: number;
+    bobbinRevenue: number;
+    extraChargesRevenue: number;
+    donationValue: number;
+    projectCount: number;
+    averageProjectValue: number;
+  }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return {
+        totalRevenue: 0,
+        quiltingRevenue: 0,
+        battingRevenue: 0,
+        bobbinRevenue: 0,
+        extraChargesRevenue: 0,
+        donationValue: 0,
+        projectCount: 0,
+        averageProjectValue: 0,
+      };
+    }
+
+    // Get completed projects (Paid/Shipped or Archived with payments)
+    const completedProjects = await storage.getProjectsByDateRange(
+      startDate,
+      endDate,
+      ["Paid/Shipped", "Archived"]
+    );
+
+    let totalRevenue = 0;
+    let quiltingRevenue = 0;
+    let battingRevenue = 0;
+    let bobbinRevenue = 0;
+    let extraChargesRevenue = 0;
+    let donationValue = 0;
+    let projectCount = 0;
+
+    completedProjects.forEach((project) => {
+      const estimate = project.estimateData;
+      if (!estimate?.total) return;
+
+      projectCount++;
+
+      if (project.isDonation) {
+        donationValue += estimate.total;
+      } else {
+        totalRevenue += estimate.total;
+      }
+
+      quiltingRevenue += estimate.quiltingTotal || 0;
+      battingRevenue += estimate.battingTotal || 0;
+      bobbinRevenue += estimate.bobbinTotal || 0;
+      extraChargesRevenue += estimate.extraChargesTotal || 0;
+    });
+
+    return {
+      totalRevenue,
+      quiltingRevenue,
+      battingRevenue,
+      bobbinRevenue,
+      extraChargesRevenue,
+      donationValue,
+      projectCount,
+      averageProjectValue: projectCount > 0 ? totalRevenue / projectCount : 0,
+    };
+  },
+
+  /**
+   * Get client analysis data
+   */
+  getClientAnalytics: async (): Promise<{
+    topClientsByRevenue: Array<{
+      name: string;
+      email?: string;
+      projectCount: number;
+      totalRevenue: number;
+      lastProjectDate: string;
+    }>;
+    repeatClientPercentage: number;
+    totalUniqueClients: number;
+  }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return {
+        topClientsByRevenue: [],
+        repeatClientPercentage: 0,
+        totalUniqueClients: 0,
+      };
+    }
+
+    const allProjects = await storage.getProjects();
+    const clientMap = new Map<string, {
+      name: string;
+      email?: string;
+      projectCount: number;
+      totalRevenue: number;
+      lastProjectDate: string;
+    }>();
+
+    allProjects.forEach((project) => {
+      const clientKey = `${project.clientFirstName} ${project.clientLastName}`.toLowerCase();
+      const revenue = project.estimateData?.total || 0;
+      
+      if (clientMap.has(clientKey)) {
+        const existing = clientMap.get(clientKey)!;
+        existing.projectCount++;
+        existing.totalRevenue += project.isDonation ? 0 : revenue;
+        existing.lastProjectDate = project.createdAt > existing.lastProjectDate 
+          ? project.createdAt : existing.lastProjectDate;
+      } else {
+        clientMap.set(clientKey, {
+          name: `${project.clientFirstName} ${project.clientLastName}`,
+          email: project.clientEmail,
+          projectCount: 1,
+          totalRevenue: project.isDonation ? 0 : revenue,
+          lastProjectDate: project.createdAt,
+        });
+      }
+    });
+
+    const clientData = Array.from(clientMap.values());
+    const topClientsByRevenue = clientData
+      .sort((a, b) => b.totalRevenue - a.totalRevenue)
+      .slice(0, 10);
+
+    const repeatClients = clientData.filter(client => client.projectCount > 1).length;
+    const repeatClientPercentage = clientData.length > 0 
+      ? (repeatClients / clientData.length) * 100 : 0;
+
+    return {
+      topClientsByRevenue,
+      repeatClientPercentage,
+      totalUniqueClients: clientData.length,
+    };
+  },
+
+  /**
+   * Get materials usage analytics
+   */
+  getMaterialsAnalytics: async (
+    startDate: string,
+    endDate: string
+  ): Promise<{
+    bobbinsSold: number;
+    bobbinRevenue: number;
+    battingYardsUsed: number;
+    battingRevenue: number;
+    popularBattingTypes: Array<{ name: string; count: number }>;
+    popularBobbinTypes: Array<{ name: string; count: number }>;
+  }> => {
+    const projects = await storage.getProjectsByDateRange(
+      startDate,
+      endDate,
+      ["Paid/Shipped", "Archived"]
+    );
+
+    let bobbinsSold = 0;
+    let bobbinRevenue = 0;
+    let battingYardsUsed = 0;
+    let battingRevenue = 0;
+    
+    const battingTypeCount = new Map<string, number>();
+    const bobbinTypeCount = new Map<string, number>();
+
+    projects.forEach((project) => {
+      const estimate = project.estimateData;
+      if (!estimate) return;
+
+      // Bobbin analytics
+      if (estimate.bobbinCount && estimate.bobbinCount > 0) {
+        bobbinsSold += estimate.bobbinCount;
+        bobbinRevenue += project.isDonation ? 0 : (estimate.bobbinTotal || 0);
+        
+        const bobbinType = estimate.bobbinName || project.bobbinChoice || "Unknown";
+        bobbinTypeCount.set(bobbinType, (bobbinTypeCount.get(bobbinType) || 0) + estimate.bobbinCount);
+      }
+
+      // Batting analytics (if not client supplied)
+      if (!project.clientSuppliesBatting && estimate.battingLengthNeeded && estimate.battingLengthNeeded > 0) {
+        battingYardsUsed += estimate.battingLengthNeeded / 36; // Convert inches to yards
+        battingRevenue += project.isDonation ? 0 : (estimate.battingTotal || 0);
+        
+        const battingType = project.battingChoice || "Unknown";
+        battingTypeCount.set(battingType, (battingTypeCount.get(battingType) || 0) + 1);
+      }
+    });
+
+    // Convert maps to sorted arrays
+    const popularBattingTypes = Array.from(battingTypeCount.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const popularBobbinTypes = Array.from(bobbinTypeCount.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      bobbinsSold,
+      bobbinRevenue,
+      battingYardsUsed,
+      battingRevenue,
+      popularBattingTypes,
+      popularBobbinTypes,
+    };
+  },
+
+  /**
+   * Get tax preparation summary for donations
+   */
+  getTaxSummary: async (year: number): Promise<{
+    totalDonationValue: number;
+    materialsDonatedValue: number;
+    servicesDonatedValue: number;
+    charitableMileage: number;
+    charitableMileageValue: number;
+    donationCount: number;
+  }> => {
+    const startDate = `${year}-01-01`;
+    const endDate = `${year}-12-31`;
+    
+    const donationProjects = await storage.getProjectsByDateRange(startDate, endDate);
+    const donations = donationProjects.filter(p => p.isDonation);
+
+    let totalDonationValue = 0;
+    let materialsDonatedValue = 0;
+    let servicesDonatedValue = 0;
+    let charitableMileage = 0;
+    let charitableMileageValue = 0;
+
+    donations.forEach((project) => {
+      const estimate = project.estimateData;
+      if (!estimate?.total) return;
+
+      totalDonationValue += estimate.total;
+      
+      // Materials (batting + bobbins) are deductible
+      const materialsValue = (estimate.battingTotal || 0) + (estimate.bobbinTotal || 0);
+      materialsDonatedValue += materialsValue;
+      
+      // Services (quilting + binding + extra charges) are not deductible
+      servicesDonatedValue += estimate.total - materialsValue;
+
+      // Mileage
+      if (estimate.mileage && estimate.mileage > 0) {
+        charitableMileage += estimate.mileage;
+        charitableMileageValue += estimate.mileageTotal || 0;
+      }
+    });
+
+    return {
+      totalDonationValue,
+      materialsDonatedValue,
+      servicesDonatedValue,
+      charitableMileage,
+      charitableMileageValue,
+      donationCount: donations.length,
+    };
+  },
 };
 
 function mapProjectFromDb(row: any): Project {
@@ -365,6 +672,9 @@ function mapProjectFromDb(row: any): Project {
     battingLengthAddition: row.batting_length_addition,
     clientSuppliesBatting: row.client_supplies_batting,
     bindingType: row.binding_type,
+    bobbinChoice: row.bobbin_choice,
+    extraCharges: row.extra_charges,
+    isDonation: row.is_donation,
     depositType: row.deposit_type,
     depositPercentage: row.deposit_percentage,
     depositAmount: row.deposit_amount,
@@ -372,6 +682,10 @@ function mapProjectFromDb(row: any): Project {
     depositPaidDate: row.deposit_paid_date,
     depositPaidMethod: row.deposit_paid_method,
     depositPaidAmount: row.deposit_paid_amount,
+    finalPaymentAmount: row.final_payment_amount,
+    finalPaymentDate: row.final_payment_date,
+    finalPaymentMethod: row.final_payment_method,
+    paidInFull: row.paid_in_full,
     estimateData: row.estimate_data,
     notes: row.notes || [],
     createdAt: row.created_at,
@@ -409,6 +723,9 @@ function mapProjectToDb(project: Project, orgId: string): any {
     batting_length_addition: project.battingLengthAddition,
     client_supplies_batting: project.clientSuppliesBatting,
     binding_type: project.bindingType,
+    bobbin_choice: project.bobbinChoice,
+    extra_charges: project.extraCharges,
+    is_donation: project.isDonation,
     deposit_type: project.depositType,
     deposit_percentage: project.depositPercentage,
     deposit_amount: project.depositAmount,
@@ -416,6 +733,10 @@ function mapProjectToDb(project: Project, orgId: string): any {
     deposit_paid_date: project.depositPaidDate,
     deposit_paid_method: project.depositPaidMethod,
     deposit_paid_amount: project.depositPaidAmount,
+    final_payment_amount: project.finalPaymentAmount,
+    final_payment_date: project.finalPaymentDate,
+    final_payment_method: project.finalPaymentMethod,
+    paid_in_full: project.paidInFull,
     estimate_data: project.estimateData,
     notes: project.notes,
     created_at: project.createdAt,
@@ -475,6 +796,12 @@ function mapUpdatesToDb(updates: Partial<Project>): any {
     dbUpdates.client_supplies_batting = updates.clientSuppliesBatting;
   if (updates.bindingType !== undefined)
     dbUpdates.binding_type = updates.bindingType;
+  if (updates.bobbinChoice !== undefined)
+    dbUpdates.bobbin_choice = updates.bobbinChoice;
+  if (updates.extraCharges !== undefined)
+    dbUpdates.extra_charges = updates.extraCharges;
+  if (updates.isDonation !== undefined)
+    dbUpdates.is_donation = updates.isDonation;
   if (updates.depositType !== undefined)
     dbUpdates.deposit_type = updates.depositType;
   if (updates.depositPercentage !== undefined)
@@ -489,6 +816,14 @@ function mapUpdatesToDb(updates: Partial<Project>): any {
     dbUpdates.deposit_paid_method = updates.depositPaidMethod;
   if (updates.depositPaidAmount !== undefined)
     dbUpdates.deposit_paid_amount = updates.depositPaidAmount;
+  if (updates.finalPaymentAmount !== undefined)
+    dbUpdates.final_payment_amount = updates.finalPaymentAmount;
+  if (updates.finalPaymentDate !== undefined)
+    dbUpdates.final_payment_date = updates.finalPaymentDate;
+  if (updates.finalPaymentMethod !== undefined)
+    dbUpdates.final_payment_method = updates.finalPaymentMethod;
+  if (updates.paidInFull !== undefined)
+    dbUpdates.paid_in_full = updates.paidInFull;
   if (updates.estimateData !== undefined)
     dbUpdates.estimate_data = updates.estimateData;
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
@@ -516,7 +851,7 @@ function mapSettingsFromDb(row: any): Settings {
     taxLabel: row.tax_label || "Sales Tax",
     nextEstimateNumber: row.next_estimate_number || 1001,
     pricingRates: row.pricing_rates || {},
-    bobbinPrice: row.pricing_rates?.bobbinPrice,
+    bobbinOptions: row.bobbin_options || [],
     threadOptions: row.thread_options || [],
     battingOptions: row.batting_options || [],
     isPaidTier: row.subscription_tier === "pro",
@@ -552,6 +887,8 @@ function mapSettingsToDb(settings: Partial<Settings>): any {
     dbSettings.next_estimate_number = settings.nextEstimateNumber;
   if (settings.pricingRates !== undefined)
     dbSettings.pricing_rates = settings.pricingRates;
+  if (settings.bobbinOptions !== undefined)
+    dbSettings.bobbin_options = settings.bobbinOptions;
   if (settings.threadOptions !== undefined)
     dbSettings.thread_options = settings.threadOptions;
   if (settings.battingOptions !== undefined)
