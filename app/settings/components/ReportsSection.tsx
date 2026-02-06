@@ -21,7 +21,7 @@ interface ReportsSectionProps {
   onToggle: (key: SectionKey) => void;
 }
 
-type ReportType = "revenue" | "materials" | "clients" | "tax";
+type ReportType = "revenue" | "payments" | "materials" | "clients" | "tax";
 type DateRangeType = "month" | "quarter" | "year" | "custom";
 
 /**
@@ -133,6 +133,13 @@ export default function ReportsSection({
           );
           setReportData(revenueData);
           break;
+        case "payments":
+          const paymentsData = await storage.getPaymentAnalytics(
+            startDate,
+            endDate
+          );
+          setReportData(paymentsData);
+          break;
         case "materials":
           const materialsData = await storage.getMaterialsAnalytics(
             startDate,
@@ -191,6 +198,40 @@ export default function ReportsSection({
           ["Donation Value", reportData.donationValue],
           ["Project Count", reportData.projectCount],
           ["Average Project Value", reportData.averageProjectValue],
+        ]
+          .map((row) => row.map((cell) => `"${cell}"`).join(","))
+          .join("\n");
+        break;
+
+      case "payments":
+        filename = `payments-report-${startDate}-${endDate}.csv`;
+        const paymentRows = (reportData.recentPayments || []).map(
+          (payment: any) => [
+            payment.clientName,
+            payment.type === "deposit" ? "Deposit" : "Final Payment",
+            payment.amount,
+            payment.date,
+            payment.method || "",
+          ]
+        );
+        csvContent = [
+          ["Payments Report", `${startDate} to ${endDate}`],
+          [],
+          ["Summary", ""],
+          ["Total Cash Received", reportData.totalCashReceived || 0],
+          ["Deposits Received", reportData.depositsReceived || 0],
+          ["Deposit Count", reportData.depositCount || 0],
+          ["Final Payments Received", reportData.finalPaymentsReceived || 0],
+          ["Final Payment Count", reportData.finalPaymentCount || 0],
+          [],
+          ["Outstanding", ""],
+          ["Outstanding Balances", reportData.outstandingBalances || 0],
+          ["Pending Deposits", reportData.pendingDeposits || 0],
+          ["Pending Deposit Count", reportData.pendingDepositCount || 0],
+          [],
+          ["Recent Payments"],
+          ["Client", "Type", "Amount", "Date", "Method"],
+          ...paymentRows,
         ]
           .map((row) => row.map((cell) => `"${cell}"`).join(","))
           .join("\n");
@@ -382,6 +423,7 @@ export default function ReportsSection({
           <div className="flex flex-wrap gap-2">
             {[
               { key: "revenue" as ReportType, label: "Revenue", icon: "💰" },
+              { key: "payments" as ReportType, label: "Payments", icon: "💵" },
               { key: "materials" as ReportType, label: "Materials", icon: "🧵" },
               { key: "clients" as ReportType, label: "Clients", icon: "👥" },
               { key: "tax" as ReportType, label: "Tax Summary", icon: "📋" },
@@ -458,6 +500,7 @@ export default function ReportsSection({
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-bold text-plum">
                     {selectedReport === "revenue" && "Revenue Report"}
+                    {selectedReport === "payments" && "Payments Report"}
                     {selectedReport === "materials" && "Materials Usage Report"}
                     {selectedReport === "clients" && "Client Analysis"}
                     {selectedReport === "tax" &&
@@ -549,6 +592,126 @@ export default function ReportsSection({
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Payments Report */}
+                {selectedReport === "payments" && (
+                  <div className="space-y-6">
+                    {/* Cash Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+                        <div className="text-green-600 text-xs font-bold uppercase tracking-wide mb-1">
+                          Total Cash Received
+                        </div>
+                        <div className="text-2xl font-bold text-green-700">
+                          {formatCurrency(reportData.totalCashReceived || 0)}
+                        </div>
+                        <div className="text-xs text-green-600 mt-1">
+                          Deposits + Final Payments
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                        <div className="text-blue-600 text-xs font-bold uppercase tracking-wide mb-1">
+                          Deposits Received
+                        </div>
+                        <div className="text-xl font-bold text-blue-700">
+                          {formatCurrency(reportData.depositsReceived || 0)}
+                        </div>
+                        <div className="text-xs text-blue-600 mt-1">
+                          {reportData.depositCount || 0} deposits
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                        <div className="text-purple-600 text-xs font-bold uppercase tracking-wide mb-1">
+                          Final Payments
+                        </div>
+                        <div className="text-xl font-bold text-purple-700">
+                          {formatCurrency(reportData.finalPaymentsReceived || 0)}
+                        </div>
+                        <div className="text-xs text-purple-600 mt-1">
+                          {reportData.finalPaymentCount || 0} payments
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                        <div className="text-orange-600 text-xs font-bold uppercase tracking-wide mb-1">
+                          Outstanding Balances
+                        </div>
+                        <div className="text-xl font-bold text-orange-700">
+                          {formatCurrency(reportData.outstandingBalances || 0)}
+                        </div>
+                        <div className="text-xs text-orange-600 mt-1">
+                          Active projects
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pending Deposits Alert */}
+                    {(reportData.pendingDepositCount || 0) > 0 && (
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                        <h4 className="font-bold text-yellow-700 mb-2">
+                          ⏳ Pending Deposits
+                        </h4>
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <div className="text-lg font-bold text-yellow-700">
+                              {formatCurrency(reportData.pendingDeposits || 0)}
+                            </div>
+                            <div className="text-xs text-yellow-600">
+                              {reportData.pendingDepositCount} project{(reportData.pendingDepositCount || 0) !== 1 ? "s" : ""} awaiting deposit
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recent Payments */}
+                    <div>
+                      <h4 className="font-bold text-plum mb-4">
+                        Recent Payments
+                      </h4>
+                      {(reportData.recentPayments || []).length > 0 ? (
+                        <div className="space-y-2">
+                          {(reportData.recentPayments || []).map(
+                            (payment: any, index: number) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between p-3 border border-line rounded-lg"
+                              >
+                                <div className="flex-1">
+                                  <div className="font-bold text-sm">
+                                    {payment.clientName}
+                                  </div>
+                                  <div className="text-xs text-muted">
+                                    {payment.type === "deposit" ? "💵 Deposit" : "✅ Final Payment"}
+                                    {payment.method && ` • ${payment.method}`}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className={`font-bold ${payment.type === "deposit" ? "text-blue-600" : "text-green-600"}`}>
+                                    {formatCurrency(payment.amount)}
+                                  </div>
+                                  <div className="text-xs text-muted">
+                                    {formatDate(payment.date)}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center text-muted py-8">
+                          <div className="text-4xl mb-2">💵</div>
+                          <div className="font-bold mb-2">No Payments Yet</div>
+                          <div className="text-sm">
+                            Payments will appear here as they are recorded.
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 

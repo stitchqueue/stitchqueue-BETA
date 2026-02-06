@@ -641,6 +641,160 @@ export const storage = {
       donationCount: donations.length,
     };
   },
+
+  /**
+   * Get payment/cash flow analytics
+   * Shows deposits received, final payments, outstanding balances
+   */
+  getPaymentAnalytics: async (
+    startDate: string,
+    endDate: string
+  ): Promise<{
+    depositsReceived: number;
+    depositCount: number;
+    finalPaymentsReceived: number;
+    finalPaymentCount: number;
+    totalCashReceived: number;
+    outstandingBalances: number;
+    pendingDeposits: number;
+    pendingDepositCount: number;
+    recentPayments: Array<{
+      clientName: string;
+      amount: number;
+      type: "deposit" | "final";
+      date: string;
+      method?: string;
+      projectId: string;
+    }>;
+  }> => {
+    const orgId = await getOrganizationId();
+    if (!orgId) {
+      return {
+        depositsReceived: 0,
+        depositCount: 0,
+        finalPaymentsReceived: 0,
+        finalPaymentCount: 0,
+        totalCashReceived: 0,
+        outstandingBalances: 0,
+        pendingDeposits: 0,
+        pendingDepositCount: 0,
+        recentPayments: [],
+      };
+    }
+
+    // Get all non-archived, non-donation projects
+    const allProjects = await storage.getProjects();
+    const activeProjects = allProjects.filter(
+      (p) => p.stage !== "Archived" && !p.isDonation
+    );
+
+    let depositsReceived = 0;
+    let depositCount = 0;
+    let finalPaymentsReceived = 0;
+    let finalPaymentCount = 0;
+    let outstandingBalances = 0;
+    let pendingDeposits = 0;
+    let pendingDepositCount = 0;
+    const recentPayments: Array<{
+      clientName: string;
+      amount: number;
+      type: "deposit" | "final";
+      date: string;
+      method?: string;
+      projectId: string;
+    }> = [];
+
+    // Parse date range for filtering recent payments
+    const rangeStart = new Date(startDate);
+    const rangeEnd = new Date(endDate + "T23:59:59.999Z");
+
+    allProjects.forEach((project) => {
+      if (project.isDonation) return;
+
+      const estimate = project.estimateData;
+      const total = estimate?.total || 0;
+      const clientName = `${project.clientFirstName} ${project.clientLastName}`.trim();
+
+      // Calculate deposit amounts
+      let expectedDeposit = 0;
+      if (project.depositType === "percentage" && project.depositPercentage) {
+        expectedDeposit = (total * project.depositPercentage) / 100;
+      } else if (project.depositType === "flat" && project.depositAmount) {
+        expectedDeposit = project.depositAmount;
+      }
+
+      // Track deposits received
+      if (project.depositPaid && project.depositPaidAmount) {
+        depositsReceived += project.depositPaidAmount;
+        depositCount++;
+
+        // Check if deposit was paid within date range
+        if (project.depositPaidDate) {
+          const paidDate = new Date(project.depositPaidDate);
+          if (paidDate >= rangeStart && paidDate <= rangeEnd) {
+            recentPayments.push({
+              clientName,
+              amount: project.depositPaidAmount,
+              type: "deposit",
+              date: project.depositPaidDate,
+              method: project.depositPaidMethod,
+              projectId: project.id,
+            });
+          }
+        }
+      } else if (expectedDeposit > 0 && project.stage !== "Archived") {
+        // Deposit expected but not yet paid
+        pendingDeposits += expectedDeposit;
+        pendingDepositCount++;
+      }
+
+      // Track final payments received
+      if (project.finalPaymentAmount && project.finalPaymentAmount > 0) {
+        finalPaymentsReceived += project.finalPaymentAmount;
+        finalPaymentCount++;
+
+        // Check if final payment was within date range
+        if (project.finalPaymentDate) {
+          const paidDate = new Date(project.finalPaymentDate);
+          if (paidDate >= rangeStart && paidDate <= rangeEnd) {
+            recentPayments.push({
+              clientName,
+              amount: project.finalPaymentAmount,
+              type: "final",
+              date: project.finalPaymentDate,
+              method: project.finalPaymentMethod,
+              projectId: project.id,
+            });
+          }
+        }
+      }
+
+      // Calculate outstanding balance for active projects
+      if (project.stage !== "Archived" && project.stage !== "Paid/Shipped" && total > 0) {
+        const depositPaid = project.depositPaidAmount || 0;
+        const finalPaid = project.finalPaymentAmount || 0;
+        const balance = total - depositPaid - finalPaid;
+        if (balance > 0) {
+          outstandingBalances += balance;
+        }
+      }
+    });
+
+    // Sort recent payments by date (newest first)
+    recentPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    return {
+      depositsReceived,
+      depositCount,
+      finalPaymentsReceived,
+      finalPaymentCount,
+      totalCashReceived: depositsReceived + finalPaymentsReceived,
+      outstandingBalances,
+      pendingDeposits,
+      pendingDepositCount,
+      recentPayments: recentPayments.slice(0, 10), // Return top 10 recent
+    };
+  },
 };
 
 function mapProjectFromDb(row: any): Project {
