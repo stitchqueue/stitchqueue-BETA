@@ -564,7 +564,7 @@ export default function ProjectDetailPage() {
             </div>
 
             <div className="space-y-0 text-sm">
-              {estimate.quiltingTotal && estimate.quiltingTotal > 0 && (
+              {estimate.quiltingTotal > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>
                     Quilting ({(estimate.quiltArea || 0).toLocaleString()} sq in × ${estimate.quiltingRate}/sq in)
@@ -572,13 +572,13 @@ export default function ProjectDetailPage() {
                   <span>{formatCurrency(estimate.quiltingTotal)}</span>
                 </div>
               )}
-              {estimate.threadCost && estimate.threadCost > 0 && (
+              {estimate.threadCost > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>Thread</span>
                   <span>{formatCurrency(estimate.threadCost)}</span>
                 </div>
               )}
-              {estimate.battingTotal && estimate.battingTotal > 0 && (
+              {estimate.battingTotal > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>
                     Batting ({Math.round(estimate.battingLengthNeeded || 0)}" length)
@@ -592,7 +592,7 @@ export default function ProjectDetailPage() {
                   <span>$0.00</span>
                 </div>
               )}
-              {estimate.bindingTotal && estimate.bindingTotal > 0 && (
+              {estimate.bindingTotal > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>
                     Binding ({Math.round(estimate.bindingPerimeter || 0)}" × ${estimate.bindingRatePerInch}/in)
@@ -600,7 +600,7 @@ export default function ProjectDetailPage() {
                   <span>{formatCurrency(estimate.bindingTotal)}</span>
                 </div>
               )}
-              {estimate.bobbinTotal && estimate.bobbinTotal > 0 && (
+              {estimate.bobbinTotal > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>
                     Bobbins ({estimate.bobbinCount} × ${estimate.bobbinPrice})
@@ -615,7 +615,7 @@ export default function ProjectDetailPage() {
                 <span className="text-muted">Subtotal</span>
                 <span className="font-medium">{formatCurrency(estimate.subtotal)}</span>
               </div>
-              {estimate.taxAmount && estimate.taxAmount > 0 && (
+              {estimate.taxAmount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted">Tax ({estimate.taxRate}%)</span>
                   <span className="font-medium">{formatCurrency(estimate.taxAmount)}</span>

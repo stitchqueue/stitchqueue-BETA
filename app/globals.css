@@ -20,15 +20,17 @@ body {
   /* Page setup */
   @page {
     size: letter;
-    margin: 0.5in;
+    margin: 0.4in;
   }
 
-  /* Reset body for print */
-  body {
+  /* Reset body for print - remove min-height that causes extra page */
+  html, body {
     background-color: white !important;
     color: black !important;
-    font-size: 12pt;
-    line-height: 1.4;
+    font-size: 11pt;
+    line-height: 1.3;
+    min-height: 0 !important;
+    height: auto !important;
   }
 
   /* Hide non-printable elements */
@@ -39,15 +41,30 @@ body {
   input,
   select,
   textarea,
+  footer,
   .sticky {
     display: none !important;
   }
 
-  /* Main content should fill the page */
+  /* Main content should fill only what's needed */
   main {
     max-width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
+    min-height: 0 !important;
+  }
+
+  /* Remove min-height from flex containers */
+  .min-h-screen {
+    min-height: 0 !important;
+  }
+
+  .flex-1 {
+    flex: none !important;
+  }
+
+  .flex-col {
+    min-height: 0 !important;
   }
 
   /* Remove shadows */
@@ -64,17 +81,6 @@ body {
     border-radius: 4px !important;
   }
 
-  /* Ensure document fills width */
-  .print-document {
-    width: 100% !important;
-    max-width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-    border-radius: 0 !important;
-  }
-
   /* Tables should have visible borders */
   table {
     border-collapse: collapse;
@@ -83,7 +89,7 @@ body {
 
   th, td {
     border: 1px solid #e5e5e5;
-    padding: 8px;
+    padding: 6px;
   }
 
   /* Page break controls */
@@ -125,49 +131,54 @@ body {
     color: #98823a !important;
   }
 
-  /* Print-specific header for documents */
-  .print-header {
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #4e283a;
-  }
-
-  /* Totals section styling */
-  .print-totals {
-    margin-top: 20px;
-    padding-top: 10px;
-    border-top: 2px solid #4e283a;
-  }
-
-  /* Footer */
-  .print-footer {
-    margin-top: 30px;
-    padding-top: 10px;
-    border-top: 1px solid #ddd;
-    text-align: center;
-    font-size: 10pt;
-    color: #666;
-  }
-
   /* Hide the gray background wrapper */
   .bg-gray-100 {
     background-color: white !important;
   }
 
-  /* Compact spacing for print */
+  /* Tighter spacing for print */
   .mb-6 {
-    margin-bottom: 12px !important;
-  }
-
-  .mb-4 {
     margin-bottom: 8px !important;
   }
 
+  .mb-4 {
+    margin-bottom: 6px !important;
+  }
+
+  .mb-3 {
+    margin-bottom: 4px !important;
+  }
+
   .p-6 {
-    padding: 12px !important;
+    padding: 8px !important;
   }
 
   .p-4 {
-    padding: 8px !important;
+    padding: 6px !important;
+  }
+
+  .p-3 {
+    padding: 4px !important;
+  }
+
+  .py-6 {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .gap-6 {
+    gap: 8px !important;
+  }
+
+  .gap-4 {
+    gap: 6px !important;
+  }
+
+  .space-y-3 > * + * {
+    margin-top: 4px !important;
+  }
+
+  .space-y-2 > * + * {
+    margin-top: 3px !important;
   }
 }
