@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../components/Header";
+import EmptyState from "../components/EmptyState";
 import { storage } from "../lib/storage";
 import { supabase } from "../lib/supabase";
 import { STAGES } from "../types";
@@ -348,7 +349,10 @@ export default function BoardContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted">Loading board...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-plum mx-auto mb-4"></div>
+          <div className="text-muted">Loading board...</div>
+        </div>
       </div>
     );
   }
@@ -525,13 +529,13 @@ export default function BoardContent() {
           /* Due This Week View */
           <div className="bg-white border border-line rounded-xl p-4">
             {dueThisWeekProjects.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="text-4xl mb-4">🎉</div>
-                <h2 className="text-xl font-bold text-plum mb-2">
-                  All caught up!
-                </h2>
-                <p className="text-muted">No projects due this week</p>
-              </div>
+              <EmptyState
+                icon="🎉"
+                title="All caught up!"
+                message="No projects due this week. Time to enjoy a cup of tea — or maybe start a new quilt?"
+                actionLabel="View All Projects"
+                onAction={clearFilters}
+              />
             ) : (
               <div className="space-y-3">
                 {dueThisWeekProjects.map((project) => (
@@ -547,13 +551,25 @@ export default function BoardContent() {
           </div>
         ) : viewMode === "list" ? (
           /* List View */
-          <ListView
-            projects={getSortedProjects()}
-            onProjectClick={handleCardClick}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-          />
+          activeProjects.length === 0 ? (
+            <div className="bg-white border border-line rounded-xl">
+              <EmptyState
+                icon="📝"
+                title="No projects yet"
+                message="Your project list is as empty as a brand new bolt of fabric. Let's change that!"
+                actionLabel="+ New Estimate"
+                actionHref="/calculator"
+              />
+            </div>
+          ) : (
+            <ListView
+              projects={getSortedProjects()}
+              onProjectClick={handleCardClick}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+            />
+          )
         ) : viewMode === "calendar" ? (
           /* Calendar View */
           <CalendarView
@@ -564,55 +580,46 @@ export default function BoardContent() {
           />
         ) : (
           /* Kanban Board View */
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onDragCancel={handleDragCancel}
-          >
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              {stagesToShow.map((stage) => {
-                const stageProjects = getProjectsForStage(stage as Stage);
-                return (
-                  <DroppableColumn
-                    key={stage}
-                    stage={stage as Stage}
-                    projects={stageProjects}
-                    onCardClick={handleCardClick}
-                  />
-                );
-              })}
+          activeProjects.length === 0 ? (
+            <div className="bg-white border border-line rounded-xl">
+              <EmptyState
+                icon="📋"
+                title="No projects yet"
+                message="Your board is waiting for its first quilt! Create an estimate to get started."
+                actionLabel="+ New Estimate"
+                actionHref="/calculator"
+              />
             </div>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
+            >
+              <div className="flex gap-4 overflow-x-auto pb-4">
+                {stagesToShow.map((stage) => {
+                  const stageProjects = getProjectsForStage(stage as Stage);
+                  return (
+                    <DroppableColumn
+                      key={stage}
+                      stage={stage as Stage}
+                      projects={stageProjects}
+                      onCardClick={handleCardClick}
+                    />
+                  );
+                })}
+              </div>
 
-            <DragOverlay>
-              {activeProject ? (
-                <ProjectCardOverlay project={activeProject} />
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+              <DragOverlay>
+                {activeProject ? (
+                  <ProjectCardOverlay project={activeProject} />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          )
         )}
-
-        {/* Empty State */}
-        {viewMode === "board" &&
-          !showDueThisWeek &&
-          activeProjects.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-4xl mb-4">📋</div>
-              <h2 className="text-xl font-bold text-plum mb-2">
-                No projects yet
-              </h2>
-              <p className="text-muted mb-4">
-                Create your first estimate to get started
-              </p>
-              <button
-                onClick={() => router.push("/calculator")}
-                className="px-6 py-3 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors"
-              >
-                + New Estimate
-              </button>
-            </div>
-          )}
       </main>
     </div>
   );

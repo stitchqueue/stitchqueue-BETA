@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
+import EmptyState from "../components/EmptyState";
 import { storage } from "../lib/storage";
 import type { Project } from "../types";
 
@@ -154,28 +155,40 @@ export default function ArchivePage() {
           </button>
         </div>
 
-        <div className="bg-white border border-line rounded-card p-4 mb-6">
-          <input
-            type="text"
-            placeholder="Search by client name, email, or description..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-3 border border-line rounded-xl"
-          />
-        </div>
+        {/* Only show search if there are archived projects */}
+        {archivedProjects.length > 0 && (
+          <div className="bg-white border border-line rounded-card p-4 mb-6">
+            <input
+              type="text"
+              placeholder="Search by client name, email, or description..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-3 border border-line rounded-xl"
+            />
+          </div>
+        )}
 
-        {filteredProjects.length === 0 ? (
-          <div className="bg-white border border-line rounded-card p-12 text-center">
-            {archivedProjects.length === 0 ? (
-              <>
-                <p className="text-muted mb-4">No archived projects yet.</p>
-                <p className="text-sm text-muted">
-                  Projects move to the archive when they reach the final stage.
-                </p>
-              </>
-            ) : (
-              <p className="text-muted">No projects match "{searchQuery}"</p>
-            )}
+        {archivedProjects.length === 0 ? (
+          /* Empty archive - no projects at all */
+          <div className="bg-white border border-line rounded-card">
+            <EmptyState
+              icon="📦"
+              title="Archive is empty"
+              message="No finished quilts here yet — they're all still on the frame! Completed projects will appear here once you archive them from Paid/Shipped."
+              actionLabel="View Board"
+              actionHref="/board"
+            />
+          </div>
+        ) : filteredProjects.length === 0 ? (
+          /* Has archived projects but search found nothing */
+          <div className="bg-white border border-line rounded-card">
+            <EmptyState
+              icon="🔍"
+              title="No matches found"
+              message={`We searched every quilt in the archive, but couldn't find anything matching "${searchQuery}".`}
+              actionLabel="Clear Search"
+              onAction={() => setSearchQuery("")}
+            />
           </div>
         ) : (
           <div className="space-y-4">

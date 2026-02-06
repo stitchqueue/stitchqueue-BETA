@@ -93,8 +93,10 @@ export default function ListView({
           <tbody>
             {projects.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-muted">
-                  No projects found
+                <td colSpan={7} className="px-4 py-12 text-center">
+                  <div className="text-4xl mb-3">🔍</div>
+                  <div className="text-muted font-medium">No projects match this filter</div>
+                  <div className="text-sm text-muted mt-1">Try selecting a different stage or clearing filters</div>
                 </td>
               </tr>
             ) : (
