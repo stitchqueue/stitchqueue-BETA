@@ -3,10 +3,10 @@
  * 
  * Site-wide footer with legal links and copyright.
  * Appears on all pages except auth and legal pages.
+ * Hidden when printing.
  * 
  * @module components/Footer
  */
-
 "use client";
 
 import Link from "next/link";
@@ -34,7 +34,7 @@ export default function Footer() {
   }
 
   return (
-    <footer className="bg-plum/5 border-t border-line mt-auto">
+    <footer className="bg-plum/5 border-t border-line mt-auto print:hidden">
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Copyright */}

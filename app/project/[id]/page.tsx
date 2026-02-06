@@ -335,10 +335,10 @@ export default function ProjectDetailPage() {
 
       <main className="max-w-4xl mx-auto px-4 py-6 print:px-0 print:py-0 print:max-w-none">
         {/* Print Header - only visible when printing */}
-        <div className="hidden print:block mb-6 pb-4 border-b-2 border-plum">
+        <div className="hidden print:block mb-4 pb-2 border-b-2 border-plum">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-xl font-bold text-plum">
+              <h1 className="text-lg font-bold text-plum">
                 {settings?.businessName || "StitchQueue"}
               </h1>
               <p className="text-xs text-gray-600">
@@ -346,15 +346,12 @@ export default function ProjectDetailPage() {
               </p>
             </div>
             <div className="text-right">
-              <h2 className="text-lg font-bold text-plum">PROJECT DETAILS</h2>
+              <h2 className="text-base font-bold text-plum">PROJECT DETAILS</h2>
               {project.estimateNumber && (
                 <p className="text-sm text-gold font-bold">
                   Estimate #{project.estimateNumber}
                 </p>
               )}
-              <p className="text-xs text-gray-500">
-                Printed: {new Date().toLocaleDateString()}
-              </p>
             </div>
           </div>
         </div>
@@ -399,28 +396,25 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* Print-only client name header */}
-        <div className="hidden print:block mb-4">
-          <h2 className="text-xl font-bold text-plum">{fullName || "Unnamed Client"}</h2>
+        <div className="hidden print:block mb-2">
+          <h2 className="text-lg font-bold text-plum">{fullName || "Unnamed Client"}</h2>
           {project.paidInFull && (
-            <span className="text-green-700 font-bold">✓ PAID IN FULL</span>
+            <span className="text-green-700 font-bold text-sm">✓ PAID IN FULL</span>
           )}
         </div>
 
         {/* ASAP / HIGH PRIORITY Banner */}
         {projectIsAsap && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3 print:bg-transparent print:border-red-300">
-            <span className="text-2xl">🔥</span>
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3 print:bg-transparent print:border-red-300 print:p-2 print:mb-3">
+            <span className="text-2xl print:text-xl">🔥</span>
             <div>
-              <div className="font-bold text-red-700">HIGH PRIORITY</div>
-              <div className="text-sm text-red-600">
-                This project was marked as ASAP by the client
-              </div>
+              <div className="font-bold text-red-700 print:text-sm">HIGH PRIORITY - ASAP</div>
             </div>
           </div>
         )}
 
         {/* Project Info Card */}
-        <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-4">
+        <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-3 print:mb-3">
           {/* Stage - hidden when printing */}
           <div className="flex items-center justify-between mb-6 print:hidden">
             <div className="flex items-center gap-3">
@@ -447,7 +441,7 @@ export default function ProjectDetailPage() {
             <span className="font-bold">{project.stage}</span>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 print:gap-4">
+          <div className="grid md:grid-cols-2 gap-6 print:gap-3">
             {/* Client Information */}
             <div>
               <h2 className="font-bold text-plum mb-3">Client Information</h2>
@@ -527,9 +521,9 @@ export default function ProjectDetailPage() {
 
           {/* Description */}
           {(project.description || project.cardLabel) && (
-            <div className="mt-6 pt-6 border-t border-line print:mt-4 print:pt-4">
-              <h2 className="font-bold text-plum mb-2">Description</h2>
-              <p className="text-sm">
+            <div className="mt-6 pt-6 border-t border-line print:mt-3 print:pt-3">
+              <h2 className="font-bold text-plum mb-2 print:mb-1 print:text-sm">Description</h2>
+              <p className="text-sm print:text-xs">
                 {project.description || project.cardLabel}
               </p>
             </div>
@@ -538,8 +532,8 @@ export default function ProjectDetailPage() {
 
         {/* Estimate Summary (if estimate exists) */}
         {hasEstimate && estimate && (
-          <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-4">
-            <div className="flex items-center justify-between mb-4 print:mb-3">
+          <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-3 print:mb-3">
+            <div className="flex items-center justify-between mb-4 print:mb-2">
               <h2 className="font-bold text-plum flex items-center gap-2">
                 Estimate{" "}
                 {project.estimateNumber && (
@@ -569,9 +563,9 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-sm print:space-y-0">
               {estimate.quiltingTotal && estimate.quiltingTotal > 0 && (
-                <div className="flex justify-between py-2 border-b border-line">
+                <div className="flex justify-between py-2 border-b border-line print:py-1">
                   <span>
                     Quilting ({estimate.quiltArea?.toLocaleString() || 0} sq in
                     × ${estimate.quiltingRate || 0})
@@ -580,13 +574,13 @@ export default function ProjectDetailPage() {
                 </div>
               )}
               {estimate.threadCost && estimate.threadCost > 0 && (
-                <div className="flex justify-between py-2 border-b border-line">
+                <div className="flex justify-between py-2 border-b border-line print:py-1">
                   <span>Thread</span>
                   <span>{formatCurrency(estimate.threadCost)}</span>
                 </div>
               )}
               {estimate.battingTotal && estimate.battingTotal > 0 && (
-                <div className="flex justify-between py-2 border-b border-line">
+                <div className="flex justify-between py-2 border-b border-line print:py-1">
                   <span>
                     Batting ({estimate.battingLengthNeeded?.toFixed(0) || 0}"
                     length)
@@ -595,13 +589,13 @@ export default function ProjectDetailPage() {
                 </div>
               )}
               {estimate.clientSuppliesBatting && (
-                <div className="flex justify-between py-2 border-b border-line">
+                <div className="flex justify-between py-2 border-b border-line print:py-1">
                   <span>Batting (Client Supplied)</span>
                   <span>$0.00</span>
                 </div>
               )}
               {estimate.bindingTotal && estimate.bindingTotal > 0 && (
-                <div className="flex justify-between py-2 border-b border-line">
+                <div className="flex justify-between py-2 border-b border-line print:py-1">
                   <span>
                     Binding ({estimate.bindingPerimeter?.toFixed(0) || 0}" × $
                     {estimate.bindingRatePerInch || 0}/in)
@@ -610,7 +604,7 @@ export default function ProjectDetailPage() {
                 </div>
               )}
               {estimate.bobbinTotal && estimate.bobbinTotal > 0 && (
-                <div className="flex justify-between py-2 border-b border-line">
+                <div className="flex justify-between py-2 border-b border-line print:py-1">
                   <span>
                     Bobbins ({estimate.bobbinCount || 0} × $
                     {estimate.bobbinPrice || 0})
@@ -620,7 +614,7 @@ export default function ProjectDetailPage() {
               )}
             </div>
 
-            <div className="border-t border-line pt-3 mt-3 space-y-2">
+            <div className="border-t border-line pt-3 mt-3 space-y-2 print:pt-2 print:mt-2 print:space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-muted">Subtotal</span>
                 <span className="font-medium">
@@ -649,8 +643,8 @@ export default function ProjectDetailPage() {
 
         {/* Payment Summary Card */}
         {hasEstimate && estimate && (
-          <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-4">
-            <h2 className="font-bold text-plum mb-4">Payment Summary</h2>
+          <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-3 print:mb-3">
+            <h2 className="font-bold text-plum mb-4 print:mb-2">Payment Summary</h2>
 
             <div className="space-y-3">
               {/* Invoice Total */}
@@ -874,10 +868,6 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Print footer */}
-        <div className="hidden print:block mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
-          <p>Printed from StitchQueue • {settings?.businessName || ""}</p>
-        </div>
       </main>
     </div>
   );
