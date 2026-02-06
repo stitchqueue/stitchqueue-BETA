@@ -32,7 +32,6 @@ body {
   }
 
   /* Hide non-printable elements */
-  .print\\:hidden,
   .no-print,
   header,
   nav,
@@ -40,14 +39,8 @@ body {
   input,
   select,
   textarea,
-  [role="button"],
   .sticky {
     display: none !important;
-  }
-
-  /* But allow buttons inside print areas if explicitly marked */
-  .print-visible {
-    display: block !important;
   }
 
   /* Main content should fill the page */
@@ -57,7 +50,7 @@ body {
     margin: 0 !important;
   }
 
-  /* Remove shadows and borders that don't print well */
+  /* Remove shadows */
   .shadow-lg,
   .shadow-md,
   .shadow-sm,
@@ -67,12 +60,11 @@ body {
 
   /* Clean up rounded corners for print */
   .rounded-xl,
-  .rounded-lg,
-  .rounded-card {
+  .rounded-lg {
     border-radius: 4px !important;
   }
 
-  /* Ensure invoice/estimate document fills width */
+  /* Ensure document fills width */
   .print-document {
     width: 100% !important;
     max-width: 100% !important;
@@ -94,11 +86,6 @@ body {
     padding: 8px;
   }
 
-  thead {
-    background-color: #4e283a !important;
-    color: white !important;
-  }
-
   /* Page break controls */
   .page-break-before {
     page-break-before: always;
@@ -118,20 +105,13 @@ body {
     page-break-inside: avoid;
   }
 
-  /* Links should show URL in print (optional - commented out) */
-  /* a[href]:after {
-    content: " (" attr(href) ")";
-    font-size: 0.8em;
-    color: #666;
-  } */
-
   /* Remove link styling */
   a {
     color: inherit !important;
     text-decoration: none !important;
   }
 
-  /* Ensure text is black for readability */
+  /* Ensure text is readable */
   .text-muted {
     color: #666 !important;
   }
@@ -169,43 +149,6 @@ body {
     color: #666;
   }
 
-  /* Status badges should print */
-  .bg-green-100,
-  .bg-green-50,
-  .bg-red-100,
-  .bg-red-50,
-  .bg-orange-100,
-  .bg-purple-100,
-  .bg-purple-50,
-  .bg-gold\\/10 {
-    background-color: inherit !important;
-    border: 1px solid currentColor !important;
-  }
-
-  /* Make sure paid badges are visible */
-  .bg-green-600,
-  .bg-plum,
-  .bg-purple-600 {
-    background-color: inherit !important;
-    color: white !important;
-  }
-
-  /* Grid layouts should stack on print if needed */
-  @media (max-width: 100%) {
-    .grid {
-      display: block;
-    }
-    
-    .grid > * {
-      margin-bottom: 10px;
-    }
-  }
-
-  /* Estimate/Invoice specific */
-  .invoice-line-item {
-    page-break-inside: avoid;
-  }
-
   /* Hide the gray background wrapper */
   .bg-gray-100 {
     background-color: white !important;
@@ -226,15 +169,5 @@ body {
 
   .p-4 {
     padding: 8px !important;
-  }
-
-  /* Project detail print styles */
-  .project-detail-print {
-    padding: 0 !important;
-  }
-
-  .project-detail-print .bg-white {
-    border: 1px solid #ddd !important;
-    margin-bottom: 15px !important;
   }
 }
