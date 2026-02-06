@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "./lib/auth-context";
 import BetaSplash from "./components/BetaSplash";
 import Footer from "./components/Footer";
+import FeedbackButton from "./components/FeedbackButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,12 +48,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
-        <BetaSplash>
-          <div className="flex-1">
-            {children}
-          </div>
-          <Footer />
-        </BetaSplash>
+        <AuthProvider>
+          <BetaSplash>
+            <div className="flex-1">{children}</div>
+            <Footer />
+            <FeedbackButton />
+          </BetaSplash>
+        </AuthProvider>
       </body>
     </html>
   );
