@@ -27,7 +27,7 @@ import {
   PricingRatesSection,
   BobbinOptionsSection,
   BattingOptionsSection,
-  DataSection,
+  ReportsSection,
 } from "./components";
 import type { RateStrings } from "./components";
 
@@ -654,12 +654,11 @@ export default function SettingsForm() {
             onSetDefault={handleSetDefaultBatting}
           />
 
-          {/* Data Section */}
-          <DataSection
+          {/* Reports & Data Section */}
+          <ReportsSection
+            settings={settings}
             isOpen={openSections.has("data")}
             onToggle={toggleSection}
-            onExportCSV={handleExportCSV}
-            onClearAllData={handleClearAllData}
           />
         </div>
       </main>
