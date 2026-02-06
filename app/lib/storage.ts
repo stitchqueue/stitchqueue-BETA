@@ -375,6 +375,7 @@ export const storage = {
 
   /**
    * Get revenue analytics for completed projects
+   * Includes detail arrays for drill-down views
    */
   getRevenueAnalytics: async (
     startDate: string,
@@ -388,6 +389,35 @@ export const storage = {
     donationValue: number;
     projectCount: number;
     averageProjectValue: number;
+    // Detail arrays for drill-down
+    revenueDetails: Array<{
+      projectId: string;
+      clientName: string;
+      amount: number;
+      quiltingAmount: number;
+      materialsAmount: number;
+      date: string;
+    }>;
+    quiltingDetails: Array<{
+      projectId: string;
+      clientName: string;
+      amount: number;
+      quiltSize: string;
+      quiltingType: string;
+    }>;
+    materialsDetails: Array<{
+      projectId: string;
+      clientName: string;
+      battingAmount: number;
+      bobbinAmount: number;
+      totalAmount: number;
+    }>;
+    donationDetails: Array<{
+      projectId: string;
+      clientName: string;
+      amount: number;
+      date: string;
+    }>;
   }> => {
     const orgId = await getOrganizationId();
     if (!orgId) {
@@ -400,6 +430,10 @@ export const storage = {
         donationValue: 0,
         projectCount: 0,
         averageProjectValue: 0,
+        revenueDetails: [],
+        quiltingDetails: [],
+        materialsDetails: [],
+        donationDetails: [],
       };
     }
 
@@ -418,16 +452,88 @@ export const storage = {
     let donationValue = 0;
     let projectCount = 0;
 
+    // Detail arrays
+    const revenueDetails: Array<{
+      projectId: string;
+      clientName: string;
+      amount: number;
+      quiltingAmount: number;
+      materialsAmount: number;
+      date: string;
+    }> = [];
+    const quiltingDetails: Array<{
+      projectId: string;
+      clientName: string;
+      amount: number;
+      quiltSize: string;
+      quiltingType: string;
+    }> = [];
+    const materialsDetails: Array<{
+      projectId: string;
+      clientName: string;
+      battingAmount: number;
+      bobbinAmount: number;
+      totalAmount: number;
+    }> = [];
+    const donationDetails: Array<{
+      projectId: string;
+      clientName: string;
+      amount: number;
+      date: string;
+    }> = [];
+
     completedProjects.forEach((project) => {
       const estimate = project.estimateData;
       if (!estimate?.total) return;
 
       projectCount++;
+      const clientName = `${project.clientFirstName} ${project.clientLastName}`.trim();
+      const quiltSize = project.quiltWidth && project.quiltLength 
+        ? `${project.quiltWidth}" × ${project.quiltLength}"` 
+        : "N/A";
 
       if (project.isDonation) {
         donationValue += estimate.total;
+        donationDetails.push({
+          projectId: project.id,
+          clientName,
+          amount: estimate.total,
+          date: project.createdAt,
+        });
       } else {
         totalRevenue += estimate.total;
+        revenueDetails.push({
+          projectId: project.id,
+          clientName,
+          amount: estimate.total,
+          quiltingAmount: estimate.quiltingTotal || 0,
+          materialsAmount: (estimate.battingTotal || 0) + (estimate.bobbinTotal || 0),
+          date: project.createdAt,
+        });
+      }
+
+      // Quilting details (both paid and donation)
+      if (estimate.quiltingTotal && estimate.quiltingTotal > 0) {
+        quiltingDetails.push({
+          projectId: project.id,
+          clientName,
+          amount: estimate.quiltingTotal,
+          quiltSize,
+          quiltingType: project.quiltingType || "N/A",
+        });
+      }
+
+      // Materials details (both paid and donation)
+      const battingAmt = estimate.battingTotal || 0;
+      const bobbinAmt = estimate.bobbinTotal || 0;
+      if (battingAmt > 0 || bobbinAmt > 0) {
+        materialsDetails.push({
+          projectId: project.id,
+          clientName,
+          battingAmount: battingAmt,
+          bobbinAmount: bobbinAmt,
+          totalAmount: battingAmt + bobbinAmt,
+        });
       }
 
       quiltingRevenue += estimate.quiltingTotal || 0;
@@ -445,6 +551,10 @@ export const storage = {
       donationValue,
       projectCount,
       averageProjectValue: projectCount > 0 ? totalRevenue / projectCount : 0,
+      revenueDetails,
+      quiltingDetails,
+      materialsDetails,
+      donationDetails,
     };
   },
 
@@ -645,6 +755,7 @@ export const storage = {
   /**
    * Get payment/cash flow analytics
    * Shows deposits received, final payments, outstanding balances
+   * Includes detail arrays for drill-down views
    */
   getPaymentAnalytics: async (
     startDate: string,
@@ -666,6 +777,36 @@ export const storage = {
       method?: string;
       projectId: string;
     }>;
+    // Detail arrays for drill-down
+    depositDetails: Array<{
+      projectId: string;
+      clientName: string;
+      amount: number;
+      date: string;
+      method?: string;
+    }>;
+    finalPaymentDetails: Array<{
+      projectId: string;
+      clientName: string;
+      amount: number;
+      date: string;
+      method?: string;
+    }>;
+    outstandingDetails: Array<{
+      projectId: string;
+      clientName: string;
+      totalAmount: number;
+      paidAmount: number;
+      balanceAmount: number;
+      stage: string;
+    }>;
+    pendingDepositDetails: Array<{
+      projectId: string;
+      clientName: string;
+      expectedDeposit: number;
+      totalAmount: number;
+      stage: string;
+    }>;
   }> => {
     const orgId = await getOrganizationId();
     if (!orgId) {
@@ -679,14 +820,15 @@ export const storage = {
         pendingDeposits: 0,
         pendingDepositCount: 0,
         recentPayments: [],
+        depositDetails: [],
+        finalPaymentDetails: [],
+        outstandingDetails: [],
+        pendingDepositDetails: [],
       };
     }
 
     // Get all non-archived, non-donation projects
     const allProjects = await storage.getProjects();
-    const activeProjects = allProjects.filter(
-      (p) => p.stage !== "Archived" && !p.isDonation
-    );
 
     let depositsReceived = 0;
     let depositCount = 0;
@@ -695,6 +837,7 @@ export const storage = {
     let outstandingBalances = 0;
     let pendingDeposits = 0;
     let pendingDepositCount = 0;
+    
     const recentPayments: Array<{
       clientName: string;
       amount: number;
@@ -702,6 +845,37 @@ export const storage = {
       date: string;
       method?: string;
       projectId: string;
+    }> = [];
+
+    // Detail arrays
+    const depositDetails: Array<{
+      projectId: string;
+      clientName: string;
+      amount: number;
+      date: string;
+      method?: string;
+    }> = [];
+    const finalPaymentDetails: Array<{
+      projectId: string;
+      clientName: string;
+      amount: number;
+      date: string;
+      method?: string;
+    }> = [];
+    const outstandingDetails: Array<{
+      projectId: string;
+      clientName: string;
+      totalAmount: number;
+      paidAmount: number;
+      balanceAmount: number;
+      stage: string;
+    }> = [];
+    const pendingDepositDetails: Array<{
+      projectId: string;
+      clientName: string;
+      expectedDeposit: number;
+      totalAmount: number;
+      stage: string;
     }> = [];
 
     // Parse date range for filtering recent payments
@@ -728,7 +902,16 @@ export const storage = {
         depositsReceived += project.depositPaidAmount;
         depositCount++;
 
-        // Check if deposit was paid within date range
+        // Add to deposit details
+        depositDetails.push({
+          projectId: project.id,
+          clientName,
+          amount: project.depositPaidAmount,
+          date: project.depositPaidDate || project.createdAt,
+          method: project.depositPaidMethod,
+        });
+
+        // Check if deposit was paid within date range for recent payments
         if (project.depositPaidDate) {
           const paidDate = new Date(project.depositPaidDate);
           if (paidDate >= rangeStart && paidDate <= rangeEnd) {
@@ -746,6 +929,13 @@ export const storage = {
         // Deposit expected but not yet paid
         pendingDeposits += expectedDeposit;
         pendingDepositCount++;
+        pendingDepositDetails.push({
+          projectId: project.id,
+          clientName,
+          expectedDeposit,
+          totalAmount: total,
+          stage: project.stage,
+        });
       }
 
       // Track final payments received
@@ -753,7 +943,16 @@ export const storage = {
         finalPaymentsReceived += project.finalPaymentAmount;
         finalPaymentCount++;
 
-        // Check if final payment was within date range
+        // Add to final payment details
+        finalPaymentDetails.push({
+          projectId: project.id,
+          clientName,
+          amount: project.finalPaymentAmount,
+          date: project.finalPaymentDate || project.createdAt,
+          method: project.finalPaymentMethod,
+        });
+
+        // Check if final payment was within date range for recent payments
         if (project.finalPaymentDate) {
           const paidDate = new Date(project.finalPaymentDate);
           if (paidDate >= rangeStart && paidDate <= rangeEnd) {
@@ -776,12 +975,26 @@ export const storage = {
         const balance = total - depositPaid - finalPaid;
         if (balance > 0) {
           outstandingBalances += balance;
+          outstandingDetails.push({
+            projectId: project.id,
+            clientName,
+            totalAmount: total,
+            paidAmount: depositPaid + finalPaid,
+            balanceAmount: balance,
+            stage: project.stage,
+          });
         }
       }
     });
 
     // Sort recent payments by date (newest first)
     recentPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    // Sort detail arrays
+    depositDetails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    finalPaymentDetails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    outstandingDetails.sort((a, b) => b.balanceAmount - a.balanceAmount);
+    pendingDepositDetails.sort((a, b) => b.expectedDeposit - a.expectedDeposit);
 
     return {
       depositsReceived,
@@ -792,7 +1005,11 @@ export const storage = {
       outstandingBalances,
       pendingDeposits,
       pendingDepositCount,
-      recentPayments: recentPayments.slice(0, 10), // Return top 10 recent
+      recentPayments: recentPayments.slice(0, 10),
+      depositDetails,
+      finalPaymentDetails,
+      outstandingDetails,
+      pendingDepositDetails,
     };
   },
 };

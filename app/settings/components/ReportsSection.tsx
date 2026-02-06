@@ -11,6 +11,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { storage } from "../../lib/storage";
 import type { Settings } from "../../types";
 import { AccordionHeader, AccordionBody, SectionKey } from "./Accordion";
@@ -23,6 +24,25 @@ interface ReportsSectionProps {
 
 type ReportType = "revenue" | "payments" | "materials" | "clients" | "tax";
 type DateRangeType = "month" | "quarter" | "year" | "custom";
+
+// Modal types for drill-down
+type ModalType = 
+  | "revenue" 
+  | "quilting" 
+  | "materials" 
+  | "donations"
+  | "deposits" 
+  | "finalPayments" 
+  | "outstanding" 
+  | "pendingDeposits"
+  | "totalCash";
+
+interface ModalState {
+  isOpen: boolean;
+  title: string;
+  type: ModalType | null;
+  data: any[];
+}
 
 /**
  * Full reports and data management section.
@@ -40,12 +60,29 @@ export default function ReportsSection({
   isOpen,
   onToggle,
 }: ReportsSectionProps) {
+  const router = useRouter();
   const [selectedReport, setSelectedReport] = useState<ReportType>("revenue");
   const [dateRange, setDateRange] = useState<DateRangeType>("month");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
+  
+  // Modal state for drill-down
+  const [modal, setModal] = useState<ModalState>({
+    isOpen: false,
+    title: "",
+    type: null,
+    data: [],
+  });
+
+  const openModal = (title: string, type: ModalType, data: any[]) => {
+    setModal({ isOpen: true, title, type, data });
+  };
+
+  const closeModal = () => {
+    setModal({ isOpen: false, title: "", type: null, data: [] });
+  };
 
   // ─────────────────────────────────────────────────────────────────────
   // DATE RANGE HELPERS
@@ -518,7 +555,14 @@ export default function ReportsSection({
                 {selectedReport === "revenue" && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+                      <button
+                        onClick={() => openModal(
+                          "Total Revenue",
+                          "revenue",
+                          reportData.revenueDetails || []
+                        )}
+                        className="p-4 bg-green-50 border border-green-200 rounded-xl text-left hover:bg-green-100 transition-colors cursor-pointer"
+                      >
                         <div className="text-green-600 text-xs font-bold uppercase tracking-wide mb-1">
                           Total Revenue
                         </div>
@@ -526,11 +570,18 @@ export default function ReportsSection({
                           {formatCurrency(reportData.totalRevenue)}
                         </div>
                         <div className="text-xs text-green-600 mt-1">
-                          {reportData.projectCount} projects completed
+                          {reportData.projectCount} projects completed • Click for details
                         </div>
-                      </div>
+                      </button>
 
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                      <button
+                        onClick={() => openModal(
+                          "Quilting Services",
+                          "quilting",
+                          reportData.quiltingDetails || []
+                        )}
+                        className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-left hover:bg-blue-100 transition-colors cursor-pointer"
+                      >
                         <div className="text-blue-600 text-xs font-bold uppercase tracking-wide mb-1">
                           Quilting Services
                         </div>
@@ -545,11 +596,18 @@ export default function ReportsSection({
                                 100
                               ).toFixed(0)
                             : 0}
-                          % of total
+                          % of total • Click for details
                         </div>
-                      </div>
+                      </button>
 
-                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                      <button
+                        onClick={() => openModal(
+                          "Materials Income",
+                          "materials",
+                          reportData.materialsDetails || []
+                        )}
+                        className="p-4 bg-purple-50 border border-purple-200 rounded-xl text-left hover:bg-purple-100 transition-colors cursor-pointer"
+                      >
                         <div className="text-purple-600 text-xs font-bold uppercase tracking-wide mb-1">
                           Materials Income
                         </div>
@@ -559,9 +617,9 @@ export default function ReportsSection({
                           )}
                         </div>
                         <div className="text-xs text-purple-600 mt-1">
-                          Batting + Bobbins
+                          Batting + Bobbins • Click for details
                         </div>
-                      </div>
+                      </button>
 
                       <div className="p-4 bg-gold/10 border border-gold/20 rounded-xl">
                         <div className="text-gold text-xs font-bold uppercase tracking-wide mb-1">
@@ -580,7 +638,14 @@ export default function ReportsSection({
                     </div>
 
                     {reportData.donationValue > 0 && (
-                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                      <button
+                        onClick={() => openModal(
+                          "Charitable Donations",
+                          "donations",
+                          reportData.donationDetails || []
+                        )}
+                        className="w-full p-4 bg-purple-50 border border-purple-200 rounded-xl text-left hover:bg-purple-100 transition-colors cursor-pointer"
+                      >
                         <h4 className="font-bold text-purple-700 mb-2">
                           🎁 Charitable Donations
                         </h4>
@@ -588,9 +653,9 @@ export default function ReportsSection({
                           {formatCurrency(reportData.donationValue)}
                         </div>
                         <div className="text-xs text-purple-600 mt-1">
-                          Total value of donated services and materials
+                          Total value of donated services and materials • Click for details
                         </div>
-                      </div>
+                      </button>
                     )}
                   </div>
                 )}
@@ -600,7 +665,17 @@ export default function ReportsSection({
                   <div className="space-y-6">
                     {/* Cash Summary Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+                      <button
+                        onClick={() => {
+                          // Combine deposits and final payments for total cash view
+                          const allPayments = [
+                            ...(reportData.depositDetails || []).map((d: any) => ({ ...d, type: "deposit" })),
+                            ...(reportData.finalPaymentDetails || []).map((d: any) => ({ ...d, type: "final" })),
+                          ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                          openModal("Total Cash Received", "totalCash", allPayments);
+                        }}
+                        className="p-4 bg-green-50 border border-green-200 rounded-xl text-left hover:bg-green-100 transition-colors cursor-pointer"
+                      >
                         <div className="text-green-600 text-xs font-bold uppercase tracking-wide mb-1">
                           Total Cash Received
                         </div>
@@ -608,11 +683,18 @@ export default function ReportsSection({
                           {formatCurrency(reportData.totalCashReceived || 0)}
                         </div>
                         <div className="text-xs text-green-600 mt-1">
-                          Deposits + Final Payments
+                          Deposits + Final Payments • Click for details
                         </div>
-                      </div>
+                      </button>
 
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                      <button
+                        onClick={() => openModal(
+                          "Deposits Received",
+                          "deposits",
+                          reportData.depositDetails || []
+                        )}
+                        className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-left hover:bg-blue-100 transition-colors cursor-pointer"
+                      >
                         <div className="text-blue-600 text-xs font-bold uppercase tracking-wide mb-1">
                           Deposits Received
                         </div>
@@ -620,11 +702,18 @@ export default function ReportsSection({
                           {formatCurrency(reportData.depositsReceived || 0)}
                         </div>
                         <div className="text-xs text-blue-600 mt-1">
-                          {reportData.depositCount || 0} deposits
+                          {reportData.depositCount || 0} deposits • Click for details
                         </div>
-                      </div>
+                      </button>
 
-                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                      <button
+                        onClick={() => openModal(
+                          "Final Payments",
+                          "finalPayments",
+                          reportData.finalPaymentDetails || []
+                        )}
+                        className="p-4 bg-purple-50 border border-purple-200 rounded-xl text-left hover:bg-purple-100 transition-colors cursor-pointer"
+                      >
                         <div className="text-purple-600 text-xs font-bold uppercase tracking-wide mb-1">
                           Final Payments
                         </div>
@@ -632,11 +721,18 @@ export default function ReportsSection({
                           {formatCurrency(reportData.finalPaymentsReceived || 0)}
                         </div>
                         <div className="text-xs text-purple-600 mt-1">
-                          {reportData.finalPaymentCount || 0} payments
+                          {reportData.finalPaymentCount || 0} payments • Click for details
                         </div>
-                      </div>
+                      </button>
 
-                      <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                      <button
+                        onClick={() => openModal(
+                          "Outstanding Balances",
+                          "outstanding",
+                          reportData.outstandingDetails || []
+                        )}
+                        className="p-4 bg-orange-50 border border-orange-200 rounded-xl text-left hover:bg-orange-100 transition-colors cursor-pointer"
+                      >
                         <div className="text-orange-600 text-xs font-bold uppercase tracking-wide mb-1">
                           Outstanding Balances
                         </div>
@@ -644,14 +740,21 @@ export default function ReportsSection({
                           {formatCurrency(reportData.outstandingBalances || 0)}
                         </div>
                         <div className="text-xs text-orange-600 mt-1">
-                          Active projects
+                          Active projects • Click for details
                         </div>
-                      </div>
+                      </button>
                     </div>
 
                     {/* Pending Deposits Alert */}
                     {(reportData.pendingDepositCount || 0) > 0 && (
-                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                      <button
+                        onClick={() => openModal(
+                          "Pending Deposits",
+                          "pendingDeposits",
+                          reportData.pendingDepositDetails || []
+                        )}
+                        className="w-full p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-left hover:bg-yellow-100 transition-colors cursor-pointer"
+                      >
                         <h4 className="font-bold text-yellow-700 mb-2">
                           ⏳ Pending Deposits
                         </h4>
@@ -661,11 +764,11 @@ export default function ReportsSection({
                               {formatCurrency(reportData.pendingDeposits || 0)}
                             </div>
                             <div className="text-xs text-yellow-600">
-                              {reportData.pendingDepositCount} project{(reportData.pendingDepositCount || 0) !== 1 ? "s" : ""} awaiting deposit
+                              {reportData.pendingDepositCount} project{(reportData.pendingDepositCount || 0) !== 1 ? "s" : ""} awaiting deposit • Click for details
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     )}
 
                     {/* Recent Payments */}
@@ -677,9 +780,10 @@ export default function ReportsSection({
                         <div className="space-y-2">
                           {(reportData.recentPayments || []).map(
                             (payment: any, index: number) => (
-                              <div
+                              <button
                                 key={index}
-                                className="flex items-center justify-between p-3 border border-line rounded-lg"
+                                onClick={() => router.push(`/project/${payment.projectId}`)}
+                                className="w-full flex items-center justify-between p-3 border border-line rounded-lg hover:bg-gray-50 text-left"
                               >
                                 <div className="flex-1">
                                   <div className="font-bold text-sm">
@@ -698,7 +802,7 @@ export default function ReportsSection({
                                     {formatDate(payment.date)}
                                   </div>
                                 </div>
-                              </div>
+                              </button>
                             )
                           )}
                         </div>
@@ -1074,6 +1178,233 @@ export default function ReportsSection({
             </div>
           </div>
         </div>
+
+        {/* Drill-Down Modal */}
+        {modal.isOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-xl">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-line">
+                <h3 className="text-lg font-bold text-plum">{modal.title}</h3>
+                <button
+                  onClick={closeModal}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-4 overflow-y-auto max-h-[60vh]">
+                {modal.data.length === 0 ? (
+                  <div className="text-center text-muted py-8">
+                    No items to display.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {/* Revenue Details */}
+                    {modal.type === "revenue" && modal.data.map((item: any, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          closeModal();
+                          router.push(`/project/${item.projectId}`);
+                        }}
+                        className="w-full flex items-center justify-between p-3 border border-line rounded-lg hover:bg-gray-50 text-left"
+                      >
+                        <div>
+                          <div className="font-bold text-sm">{item.clientName}</div>
+                          <div className="text-xs text-muted">
+                            Quilting: {formatCurrency(item.quiltingAmount)} • Materials: {formatCurrency(item.materialsAmount)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-green-600">{formatCurrency(item.amount)}</div>
+                          <div className="text-xs text-muted">{formatDate(item.date)}</div>
+                        </div>
+                      </button>
+                    ))}
+
+                    {/* Quilting Details */}
+                    {modal.type === "quilting" && modal.data.map((item: any, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          closeModal();
+                          router.push(`/project/${item.projectId}`);
+                        }}
+                        className="w-full flex items-center justify-between p-3 border border-line rounded-lg hover:bg-gray-50 text-left"
+                      >
+                        <div>
+                          <div className="font-bold text-sm">{item.clientName}</div>
+                          <div className="text-xs text-muted">
+                            {item.quiltSize} • {item.quiltingType}
+                          </div>
+                        </div>
+                        <div className="font-bold text-blue-600">{formatCurrency(item.amount)}</div>
+                      </button>
+                    ))}
+
+                    {/* Materials Details */}
+                    {modal.type === "materials" && modal.data.map((item: any, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          closeModal();
+                          router.push(`/project/${item.projectId}`);
+                        }}
+                        className="w-full flex items-center justify-between p-3 border border-line rounded-lg hover:bg-gray-50 text-left"
+                      >
+                        <div>
+                          <div className="font-bold text-sm">{item.clientName}</div>
+                          <div className="text-xs text-muted">
+                            Batting: {formatCurrency(item.battingAmount)} • Bobbins: {formatCurrency(item.bobbinAmount)}
+                          </div>
+                        </div>
+                        <div className="font-bold text-purple-600">{formatCurrency(item.totalAmount)}</div>
+                      </button>
+                    ))}
+
+                    {/* Donation Details */}
+                    {modal.type === "donations" && modal.data.map((item: any, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          closeModal();
+                          router.push(`/project/${item.projectId}`);
+                        }}
+                        className="w-full flex items-center justify-between p-3 border border-line rounded-lg hover:bg-gray-50 text-left"
+                      >
+                        <div>
+                          <div className="font-bold text-sm">{item.clientName}</div>
+                          <div className="text-xs text-muted">{formatDate(item.date)}</div>
+                        </div>
+                        <div className="font-bold text-purple-600">{formatCurrency(item.amount)}</div>
+                      </button>
+                    ))}
+
+                    {/* Deposit Details */}
+                    {modal.type === "deposits" && modal.data.map((item: any, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          closeModal();
+                          router.push(`/project/${item.projectId}`);
+                        }}
+                        className="w-full flex items-center justify-between p-3 border border-line rounded-lg hover:bg-gray-50 text-left"
+                      >
+                        <div>
+                          <div className="font-bold text-sm">{item.clientName}</div>
+                          <div className="text-xs text-muted">
+                            {formatDate(item.date)}{item.method && ` • ${item.method}`}
+                          </div>
+                        </div>
+                        <div className="font-bold text-blue-600">{formatCurrency(item.amount)}</div>
+                      </button>
+                    ))}
+
+                    {/* Final Payment Details */}
+                    {modal.type === "finalPayments" && modal.data.map((item: any, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          closeModal();
+                          router.push(`/project/${item.projectId}`);
+                        }}
+                        className="w-full flex items-center justify-between p-3 border border-line rounded-lg hover:bg-gray-50 text-left"
+                      >
+                        <div>
+                          <div className="font-bold text-sm">{item.clientName}</div>
+                          <div className="text-xs text-muted">
+                            {formatDate(item.date)}{item.method && ` • ${item.method}`}
+                          </div>
+                        </div>
+                        <div className="font-bold text-green-600">{formatCurrency(item.amount)}</div>
+                      </button>
+                    ))}
+
+                    {/* Total Cash Details (combines deposits + final) */}
+                    {modal.type === "totalCash" && modal.data.map((item: any, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          closeModal();
+                          router.push(`/project/${item.projectId}`);
+                        }}
+                        className="w-full flex items-center justify-between p-3 border border-line rounded-lg hover:bg-gray-50 text-left"
+                      >
+                        <div>
+                          <div className="font-bold text-sm">{item.clientName}</div>
+                          <div className="text-xs text-muted">
+                            {item.type === "deposit" ? "💵 Deposit" : "✅ Final"} • {formatDate(item.date)}
+                          </div>
+                        </div>
+                        <div className={`font-bold ${item.type === "deposit" ? "text-blue-600" : "text-green-600"}`}>
+                          {formatCurrency(item.amount)}
+                        </div>
+                      </button>
+                    ))}
+
+                    {/* Outstanding Balance Details */}
+                    {modal.type === "outstanding" && modal.data.map((item: any, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          closeModal();
+                          router.push(`/project/${item.projectId}`);
+                        }}
+                        className="w-full flex items-center justify-between p-3 border border-line rounded-lg hover:bg-gray-50 text-left"
+                      >
+                        <div>
+                          <div className="font-bold text-sm">{item.clientName}</div>
+                          <div className="text-xs text-muted">
+                            Total: {formatCurrency(item.totalAmount)} • Paid: {formatCurrency(item.paidAmount)} • Stage: {item.stage}
+                          </div>
+                        </div>
+                        <div className="font-bold text-orange-600">{formatCurrency(item.balanceAmount)}</div>
+                      </button>
+                    ))}
+
+                    {/* Pending Deposit Details */}
+                    {modal.type === "pendingDeposits" && modal.data.map((item: any, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          closeModal();
+                          router.push(`/project/${item.projectId}`);
+                        }}
+                        className="w-full flex items-center justify-between p-3 border border-line rounded-lg hover:bg-gray-50 text-left"
+                      >
+                        <div>
+                          <div className="font-bold text-sm">{item.clientName}</div>
+                          <div className="text-xs text-muted">
+                            Total: {formatCurrency(item.totalAmount)} • Stage: {item.stage}
+                          </div>
+                        </div>
+                        <div className="font-bold text-yellow-600">{formatCurrency(item.expectedDeposit)}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-line bg-gray-50">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted">
+                    {modal.data.length} item{modal.data.length !== 1 ? "s" : ""}
+                  </span>
+                  <button
+                    onClick={closeModal}
+                    className="px-4 py-2 bg-plum text-white rounded-xl font-bold text-sm"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </AccordionBody>
     </div>
   );
