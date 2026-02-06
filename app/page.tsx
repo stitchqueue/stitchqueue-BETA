@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Header from "./components/Header";
+import Toast from "./components/Toast";
 import { storage } from "./lib/storage";
 import { supabase } from "./lib/supabase";
 import { STAGES } from "./types";
@@ -105,13 +106,27 @@ function isAsap(project: Project): boolean {
 
 export default function HomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
-  const [quote] = useState(
-    () => QUOTES[Math.floor(Math.random() * QUOTES.length)]
-  );
+  const [quote, setQuote] = useState("");
+  const [showWelcomeBackToast, setShowWelcomeBackToast] = useState(false);
+
+  // Handle random quote client-side to avoid hydration mismatch (Bug #9 fix)
+  useEffect(() => {
+    setQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
+  }, []);
+
+  // Check if user came from 404 page
+  useEffect(() => {
+    if (searchParams.get('from') === '404') {
+      setShowWelcomeBackToast(true);
+      // Clear the query parameter from URL without triggering navigation
+      window.history.replaceState({}, '', '/');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     async function checkAuthAndLoadData() {
@@ -176,12 +191,23 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <Header />
 
+      {/* Welcome back toast from 404 */}
+      {showWelcomeBackToast && (
+        <Toast
+          message="Whew, glad we made it back safe & sound!"
+          type="success"
+          duration={4000}
+          onClose={() => setShowWelcomeBackToast(false)}
+          icon={<span className="text-lg">🧵</span>}
+        />
+      )}
+
       <main className="max-w-4xl mx-auto px-4 py-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-plum">
             {getGreeting()}, {businessName}
           </h1>
-          <p className="text-muted italic mt-1">"{quote}"</p>
+          {quote && <p className="text-muted italic mt-1">"{quote}"</p>}
           <p className="text-sm text-muted mt-2">
             You have {activeProjects.length} active project
             {activeProjects.length !== 1 ? "s" : ""}
