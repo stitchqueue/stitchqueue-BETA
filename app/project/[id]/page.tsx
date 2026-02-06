@@ -563,79 +563,67 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
-            <div className="space-y-2 text-sm print:space-y-0">
+            <div className="space-y-0 text-sm">
               {estimate.quiltingTotal && estimate.quiltingTotal > 0 && (
-                <div className="flex justify-between py-2 border-b border-line print:py-1">
+                <div className="flex justify-between py-1 border-b border-line">
                   <span>
-                    Quilting ({estimate.quiltArea?.toLocaleString() || 0} sq in
-                    × ${estimate.quiltingRate || 0})
+                    Quilting ({(estimate.quiltArea || 0).toLocaleString()} sq in × ${estimate.quiltingRate}/sq in)
                   </span>
                   <span>{formatCurrency(estimate.quiltingTotal)}</span>
                 </div>
               )}
               {estimate.threadCost && estimate.threadCost > 0 && (
-                <div className="flex justify-between py-2 border-b border-line print:py-1">
+                <div className="flex justify-between py-1 border-b border-line">
                   <span>Thread</span>
                   <span>{formatCurrency(estimate.threadCost)}</span>
                 </div>
               )}
               {estimate.battingTotal && estimate.battingTotal > 0 && (
-                <div className="flex justify-between py-2 border-b border-line print:py-1">
+                <div className="flex justify-between py-1 border-b border-line">
                   <span>
-                    Batting ({estimate.battingLengthNeeded?.toFixed(0) || 0}"
-                    length)
+                    Batting ({Math.round(estimate.battingLengthNeeded || 0)}" length)
                   </span>
                   <span>{formatCurrency(estimate.battingTotal)}</span>
                 </div>
               )}
               {estimate.clientSuppliesBatting && (
-                <div className="flex justify-between py-2 border-b border-line print:py-1">
+                <div className="flex justify-between py-1 border-b border-line">
                   <span>Batting (Client Supplied)</span>
                   <span>$0.00</span>
                 </div>
               )}
               {estimate.bindingTotal && estimate.bindingTotal > 0 && (
-                <div className="flex justify-between py-2 border-b border-line print:py-1">
+                <div className="flex justify-between py-1 border-b border-line">
                   <span>
-                    Binding ({estimate.bindingPerimeter?.toFixed(0) || 0}" × $
-                    {estimate.bindingRatePerInch || 0}/in)
+                    Binding ({Math.round(estimate.bindingPerimeter || 0)}" × ${estimate.bindingRatePerInch}/in)
                   </span>
                   <span>{formatCurrency(estimate.bindingTotal)}</span>
                 </div>
               )}
               {estimate.bobbinTotal && estimate.bobbinTotal > 0 && (
-                <div className="flex justify-between py-2 border-b border-line print:py-1">
+                <div className="flex justify-between py-1 border-b border-line">
                   <span>
-                    Bobbins ({estimate.bobbinCount || 0} × $
-                    {estimate.bobbinPrice || 0})
+                    Bobbins ({estimate.bobbinCount} × ${estimate.bobbinPrice})
                   </span>
                   <span>{formatCurrency(estimate.bobbinTotal)}</span>
                 </div>
               )}
             </div>
 
-            <div className="border-t border-line pt-3 mt-3 space-y-2 print:pt-2 print:mt-2 print:space-y-1">
+            <div className="border-t border-line pt-2 mt-2 space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-muted">Subtotal</span>
-                <span className="font-medium">
-                  {formatCurrency(estimate.subtotal)}
-                </span>
+                <span className="font-medium">{formatCurrency(estimate.subtotal)}</span>
               </div>
               {estimate.taxAmount && estimate.taxAmount > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted">
-                    Tax ({estimate.taxRate || 0}%)
-                  </span>
-                  <span className="font-medium">
-                    {formatCurrency(estimate.taxAmount)}
-                  </span>
+                  <span className="text-muted">Tax ({estimate.taxRate}%)</span>
+                  <span className="font-medium">{formatCurrency(estimate.taxAmount)}</span>
                 </div>
               )}
-              <div className="flex justify-between py-2 font-bold text-lg border-t border-line">
+              <div className="flex justify-between py-1 font-bold text-base border-t border-line">
                 <span>Total</span>
-                <span className="text-plum">
-                  {formatCurrency(estimate.total)}
-                </span>
+                <span className="text-plum">{formatCurrency(estimate.total)}</span>
               </div>
             </div>
           </div>
@@ -643,32 +631,26 @@ export default function ProjectDetailPage() {
 
         {/* Payment Summary Card */}
         {hasEstimate && estimate && (
-          <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-3 print:mb-3">
-            <h2 className="font-bold text-plum mb-4 print:mb-2">Payment Summary</h2>
+          <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-3 print:mb-2">
+            <h2 className="font-bold text-plum mb-3 print:mb-2 print:text-sm">Payment Summary</h2>
 
-            <div className="space-y-3">
+            <div className="space-y-2 print:space-y-1">
               {/* Invoice Total */}
-              <div className="flex justify-between text-sm py-2 border-b border-line">
+              <div className="flex justify-between text-sm py-1 border-b border-line">
                 <span className="text-muted">Invoice Total</span>
-                <span className="font-bold">
-                  {formatCurrency(estimate.total)}
-                </span>
+                <span className="font-bold">{formatCurrency(estimate.total)}</span>
               </div>
 
               {/* Deposit Section */}
               {project.depositAmount && project.depositAmount > 0 && (
-                <div className="p-3 bg-gold/10 rounded-xl space-y-2 print:bg-transparent print:border print:border-gold/30">
+                <div className="p-2 bg-gold/10 rounded-lg space-y-1 print:bg-transparent print:border print:border-gold/30 print:p-1">
                   <div className="flex justify-between text-sm">
                     <span className="font-bold text-gold">Deposit</span>
-                    <span className="font-bold text-gold">
-                      {formatCurrency(project.depositAmount)}
-                    </span>
+                    <span className="font-bold text-gold">{formatCurrency(project.depositAmount)}</span>
                   </div>
                   {project.depositPaid ? (
-                    <div className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded print:bg-transparent">
-                      ✓ Paid on {formatDate(project.depositPaidDate)}
-                      {project.depositPaidMethod &&
-                        ` via ${project.depositPaidMethod}`}
+                    <div className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded print:bg-transparent print:p-0">
+                      ✓ Paid on {formatDate(project.depositPaidDate)}{project.depositPaidMethod && ` via ${project.depositPaidMethod}`}
                     </div>
                   ) : (
                     <div className="flex items-center justify-between print:hidden">
@@ -689,21 +671,14 @@ export default function ProjectDetailPage() {
 
               {/* Final Payment Section */}
               {project.finalPaymentAmount && project.finalPaymentAmount > 0 ? (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-xl space-y-2 print:bg-transparent">
+                <div className="p-2 bg-green-50 border border-green-200 rounded-lg space-y-1 print:bg-transparent print:p-1">
                   <div className="flex justify-between text-sm">
-                    <span className="font-bold text-green-700">
-                      Final Payment
-                    </span>
-                    <span className="font-bold text-green-700">
-                      {formatCurrency(project.finalPaymentAmount)}
-                    </span>
+                    <span className="font-bold text-green-700">Final Payment</span>
+                    <span className="font-bold text-green-700">{formatCurrency(project.finalPaymentAmount)}</span>
                   </div>
                   <div className="text-xs text-green-700">
-                    ✓ Paid on {formatDate(project.finalPaymentDate)}
-                    {project.finalPaymentMethod &&
-                      ` via ${project.finalPaymentMethod}`}
+                    ✓ Paid on {formatDate(project.finalPaymentDate)}{project.finalPaymentMethod && ` via ${project.finalPaymentMethod}`}
                   </div>
-                  {/* Clear button hidden when printing */}
                   <button
                     onClick={handleClearFinalPayment}
                     disabled={updating}
@@ -800,23 +775,19 @@ export default function ProjectDetailPage() {
 
               {/* Balance Due */}
               <div
-                className={`flex justify-between py-3 font-bold text-lg border-t border-line ${
+                className={`flex justify-between py-2 font-bold text-base border-t border-line print:py-1 ${
                   balanceDue <= 0 ? "text-green-700" : "text-plum"
                 }`}
               >
                 <span>Balance Due</span>
-                <span>
-                  {balanceDue <= 0
-                    ? "✓ PAID IN FULL"
-                    : formatCurrency(balanceDue)}
-                </span>
+                <span>{balanceDue <= 0 ? "✓ PAID IN FULL" : formatCurrency(balanceDue)}</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* Stage Actions - hidden when printing */}
-        <div className="bg-white border border-line rounded-xl p-6 print:hidden">
+        {/* Stage Actions - completely hidden when printing */}
+        <div className="bg-white border border-line rounded-xl p-6 no-print print:hidden print:!hidden">
           <h2 className="font-bold text-plum mb-4">Stage Actions</h2>
 
           <div className="flex flex-wrap gap-3">
