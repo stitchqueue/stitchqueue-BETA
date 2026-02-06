@@ -3,15 +3,16 @@
  * 
  * Full-featured reports and data management section.
  * Includes revenue reports, materials usage, client analysis,
- * tax summary, CSV export, and danger zone.
+ * tax summary, CSV/PDF export, and danger zone.
  * 
  * @module settings/components/ReportsSection
  */
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { jsPDF } from "jspdf";
 import { storage } from "../../lib/storage";
 import type { Settings } from "../../types";
 import { AccordionHeader, AccordionBody, SectionKey } from "./Accordion";
@@ -75,6 +76,21 @@ export default function ReportsSection({
     type: null,
     data: [],
   });
+
+  // Export dropdown state
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const openModal = (title: string, type: ModalType, data: any[]) => {
     setModal({ isOpen: true, title, type, data });
@@ -349,6 +365,425 @@ export default function ReportsSection({
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  };
+
+  // ─────────────────────────────────────────────────────────────────────
+  // PDF EXPORT
+  // ─────────────────────────────────────────────────────────────────────
+  const exportReportPDF = () => {
+    if (!reportData) return;
+
+    const { startDate, endDate } = getDateRange();
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    let yPos = 20;
+
+    // Helper function to add text and track position
+    const addText = (text: string, x: number, y: number, options?: { fontSize?: number; fontStyle?: string; color?: [number, number, number] }) => {
+      if (options?.fontSize) doc.setFontSize(options.fontSize);
+      if (options?.fontStyle) doc.setFont("helvetica", options.fontStyle);
+      if (options?.color) doc.setTextColor(...options.color);
+      else doc.setTextColor(0, 0, 0);
+      doc.text(text, x, y);
+      return y;
+    };
+
+    // Helper to format currency
+    const pdfFormatCurrency = (amount: number) => {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: settings?.currencyCode || "USD",
+      }).format(amount);
+    };
+
+    // Helper to check if we need a new page
+    const checkPageBreak = (neededSpace: number) => {
+      if (yPos + neededSpace > doc.internal.pageSize.getHeight() - 20) {
+        doc.addPage();
+        yPos = 20;
+        return true;
+      }
+      return false;
+    };
+
+    // ─── HEADER ───
+    // Business name
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(78, 40, 58); // Plum color
+    doc.text(settings?.businessName || "StitchQueue", margin, yPos);
+    yPos += 10;
+
+    // Report title
+    let reportTitle = "";
+    switch (selectedReport) {
+      case "revenue": reportTitle = "Revenue Report"; break;
+      case "payments": reportTitle = "Payments Report"; break;
+      case "materials": reportTitle = "Materials Usage Report"; break;
+      case "clients": reportTitle = "Client Analysis"; break;
+      case "tax": reportTitle = `Tax Summary ${new Date().getFullYear()}`; break;
+    }
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(reportTitle, margin, yPos);
+    yPos += 8;
+
+    // Date range (if applicable)
+    if (selectedReport !== "clients" && selectedReport !== "tax") {
+      doc.setFontSize(10);
+      doc.text(`Period: ${startDate} to ${endDate}`, margin, yPos);
+    } else if (selectedReport === "tax") {
+      doc.setFontSize(10);
+      doc.text(`Year: ${new Date().getFullYear()}`, margin, yPos);
+    }
+    yPos += 5;
+
+    // Horizontal line
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 15;
+
+    // ─── REPORT CONTENT ───
+    doc.setTextColor(0, 0, 0);
+
+    if (selectedReport === "revenue") {
+      // Summary section
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Summary", margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      
+      const summaryItems = [
+        ["Total Revenue:", pdfFormatCurrency(reportData.totalRevenue || 0)],
+        ["Quilting Services:", pdfFormatCurrency(reportData.quiltingRevenue || 0)],
+        ["Batting Revenue:", pdfFormatCurrency(reportData.battingRevenue || 0)],
+        ["Bobbin Revenue:", pdfFormatCurrency(reportData.bobbinRevenue || 0)],
+        ["Extra Charges:", pdfFormatCurrency(reportData.extraChargesRevenue || 0)],
+        ["Donation Value:", pdfFormatCurrency(reportData.donationValue || 0)],
+        ["Projects Completed:", String(reportData.projectCount || 0)],
+        ["Average Project Value:", pdfFormatCurrency(reportData.averageProjectValue || 0)],
+      ];
+
+      summaryItems.forEach(([label, value]) => {
+        doc.text(label, margin, yPos);
+        doc.text(value, margin + 60, yPos);
+        yPos += 6;
+      });
+
+      // Project details table
+      if (reportData.revenueDetails && reportData.revenueDetails.length > 0) {
+        yPos += 10;
+        checkPageBreak(30);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Project Details", margin, yPos);
+        yPos += 8;
+
+        // Table header
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, yPos - 4, pageWidth - 2 * margin, 7, "F");
+        doc.text("Client", margin + 2, yPos);
+        doc.text("Quilting", margin + 70, yPos);
+        doc.text("Materials", margin + 100, yPos);
+        doc.text("Total", margin + 135, yPos);
+        yPos += 8;
+
+        doc.setFont("helvetica", "normal");
+        reportData.revenueDetails.slice(0, 25).forEach((item: any) => {
+          checkPageBreak(8);
+          doc.text(item.clientName.substring(0, 30), margin + 2, yPos);
+          doc.text(pdfFormatCurrency(item.quiltingAmount), margin + 70, yPos);
+          doc.text(pdfFormatCurrency(item.materialsAmount), margin + 100, yPos);
+          doc.text(pdfFormatCurrency(item.amount), margin + 135, yPos);
+          yPos += 6;
+        });
+        
+        if (reportData.revenueDetails.length > 25) {
+          yPos += 4;
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100);
+          doc.text(`... and ${reportData.revenueDetails.length - 25} more projects`, margin, yPos);
+        }
+      }
+    }
+
+    if (selectedReport === "payments") {
+      // Summary section
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Cash Flow Summary", margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      
+      const summaryItems = [
+        ["Total Cash Received:", pdfFormatCurrency(reportData.totalCashReceived || 0)],
+        ["Deposits Received:", pdfFormatCurrency(reportData.depositsReceived || 0) + ` (${reportData.depositCount || 0} deposits)`],
+        ["Final Payments:", pdfFormatCurrency(reportData.finalPaymentsReceived || 0) + ` (${reportData.finalPaymentCount || 0} payments)`],
+        ["Outstanding Balances:", pdfFormatCurrency(reportData.outstandingBalances || 0)],
+        ["Pending Deposits:", pdfFormatCurrency(reportData.pendingDeposits || 0) + ` (${reportData.pendingDepositCount || 0} projects)`],
+      ];
+
+      summaryItems.forEach(([label, value]) => {
+        doc.text(label, margin, yPos);
+        doc.text(value, margin + 55, yPos);
+        yPos += 6;
+      });
+
+      // Outstanding balances details
+      if (reportData.outstandingDetails && reportData.outstandingDetails.length > 0) {
+        yPos += 10;
+        checkPageBreak(30);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Outstanding Balances", margin, yPos);
+        yPos += 8;
+
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setFillColor(255, 237, 213); // Orange tint
+        doc.rect(margin, yPos - 4, pageWidth - 2 * margin, 7, "F");
+        doc.text("Client", margin + 2, yPos);
+        doc.text("Total", margin + 70, yPos);
+        doc.text("Paid", margin + 100, yPos);
+        doc.text("Balance Due", margin + 130, yPos);
+        yPos += 8;
+
+        doc.setFont("helvetica", "normal");
+        reportData.outstandingDetails.forEach((item: any) => {
+          checkPageBreak(8);
+          doc.text(item.clientName.substring(0, 30), margin + 2, yPos);
+          doc.text(pdfFormatCurrency(item.totalAmount), margin + 70, yPos);
+          doc.text(pdfFormatCurrency(item.paidAmount), margin + 100, yPos);
+          doc.setTextColor(200, 100, 0);
+          doc.text(pdfFormatCurrency(item.balanceAmount), margin + 130, yPos);
+          doc.setTextColor(0, 0, 0);
+          yPos += 6;
+        });
+      }
+
+      // Pending deposits details
+      if (reportData.pendingDepositDetails && reportData.pendingDepositDetails.length > 0) {
+        yPos += 10;
+        checkPageBreak(30);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Pending Deposits", margin, yPos);
+        yPos += 8;
+
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setFillColor(254, 249, 195); // Yellow tint
+        doc.rect(margin, yPos - 4, pageWidth - 2 * margin, 7, "F");
+        doc.text("Client", margin + 2, yPos);
+        doc.text("Project Total", margin + 70, yPos);
+        doc.text("Expected Deposit", margin + 115, yPos);
+        yPos += 8;
+
+        doc.setFont("helvetica", "normal");
+        reportData.pendingDepositDetails.forEach((item: any) => {
+          checkPageBreak(8);
+          doc.text(item.clientName.substring(0, 30), margin + 2, yPos);
+          doc.text(pdfFormatCurrency(item.totalAmount), margin + 70, yPos);
+          doc.setTextColor(180, 130, 0);
+          doc.text(pdfFormatCurrency(item.expectedDeposit), margin + 115, yPos);
+          doc.setTextColor(0, 0, 0);
+          yPos += 6;
+        });
+      }
+    }
+
+    if (selectedReport === "materials") {
+      // Bobbin section
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Bobbin Sales", margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Bobbins Sold: ${reportData.bobbinsSold || 0}`, margin, yPos);
+      yPos += 6;
+      doc.text(`Bobbin Revenue: ${pdfFormatCurrency(reportData.bobbinRevenue || 0)}`, margin, yPos);
+      yPos += 6;
+      if ((reportData.bobbinsSold || 0) > 0) {
+        doc.text(`Avg Price/Bobbin: ${pdfFormatCurrency((reportData.bobbinRevenue || 0) / reportData.bobbinsSold)}`, margin, yPos);
+      }
+      yPos += 12;
+
+      // Batting section
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Batting Usage", margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Yards Used: ${(reportData.battingYardsUsed || 0).toFixed(1)} yds`, margin, yPos);
+      yPos += 6;
+      doc.text(`Batting Revenue: ${pdfFormatCurrency(reportData.battingRevenue || 0)}`, margin, yPos);
+      yPos += 6;
+      if ((reportData.battingYardsUsed || 0) > 0) {
+        doc.text(`Avg Price/Yard: ${pdfFormatCurrency((reportData.battingRevenue || 0) / reportData.battingYardsUsed)}`, margin, yPos);
+      }
+      yPos += 12;
+
+      // Popular types
+      if (reportData.popularBattingTypes && reportData.popularBattingTypes.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Popular Batting Types", margin, yPos);
+        yPos += 8;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        reportData.popularBattingTypes.forEach((item: any) => {
+          doc.text(`${item.name}: ${item.count} projects`, margin, yPos);
+          yPos += 6;
+        });
+      }
+    }
+
+    if (selectedReport === "clients") {
+      // Summary
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Client Summary", margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Total Unique Clients: ${reportData.totalUniqueClients || 0}`, margin, yPos);
+      yPos += 6;
+      doc.text(`Repeat Client Rate: ${(reportData.repeatClientPercentage || 0).toFixed(0)}%`, margin, yPos);
+      yPos += 12;
+
+      // Top clients table
+      if (reportData.topClientsByRevenue && reportData.topClientsByRevenue.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Top Clients by Revenue", margin, yPos);
+        yPos += 8;
+
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, yPos - 4, pageWidth - 2 * margin, 7, "F");
+        doc.text("Client", margin + 2, yPos);
+        doc.text("Projects", margin + 80, yPos);
+        doc.text("Total Revenue", margin + 110, yPos);
+        yPos += 8;
+
+        doc.setFont("helvetica", "normal");
+        reportData.topClientsByRevenue.forEach((client: any) => {
+          checkPageBreak(8);
+          doc.text(client.name.substring(0, 35), margin + 2, yPos);
+          doc.text(String(client.projectCount), margin + 80, yPos);
+          doc.text(pdfFormatCurrency(client.totalRevenue), margin + 110, yPos);
+          yPos += 6;
+        });
+      }
+    }
+
+    if (selectedReport === "tax") {
+      const year = new Date().getFullYear();
+      
+      if ((reportData.donationCount || 0) > 0) {
+        // Donation summary
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Donation Summary", margin, yPos);
+        yPos += 8;
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Total Donations: ${reportData.donationCount}`, margin, yPos);
+        yPos += 6;
+        doc.text(`Total Value: ${pdfFormatCurrency(reportData.totalDonationValue || 0)}`, margin, yPos);
+        yPos += 12;
+
+        // Tax deductions
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Tax Deduction Breakdown", margin, yPos);
+        yPos += 8;
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 128, 0);
+        doc.text(`Materials (Deductible): ${pdfFormatCurrency(reportData.materialsDonatedValue || 0)}`, margin, yPos);
+        yPos += 6;
+        doc.setTextColor(128, 128, 128);
+        doc.text(`Services (Non-Deductible): ${pdfFormatCurrency(reportData.servicesDonatedValue || 0)}`, margin, yPos);
+        yPos += 12;
+        doc.setTextColor(0, 0, 0);
+
+        // Mileage
+        if ((reportData.charitableMileage || 0) > 0) {
+          doc.setFontSize(12);
+          doc.setFont("helvetica", "bold");
+          doc.text("Charitable Mileage", margin, yPos);
+          yPos += 8;
+
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.text(`Miles Driven: ${reportData.charitableMileage}`, margin, yPos);
+          yPos += 6;
+          doc.text(`Deductible Value: ${pdfFormatCurrency(reportData.charitableMileageValue || 0)} @ $0.14/mile`, margin, yPos);
+          yPos += 12;
+        }
+
+        // Total deductible
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(152, 130, 58); // Gold color
+        const totalDeductible = (reportData.materialsDonatedValue || 0) + (reportData.charitableMileageValue || 0);
+        doc.text(`Total Tax-Deductible: ${pdfFormatCurrency(totalDeductible)}`, margin, yPos);
+        yPos += 8;
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100, 100, 100);
+        doc.text("Note: Consult your tax advisor for guidance.", margin, yPos);
+      } else {
+        doc.setFontSize(10);
+        doc.text("No donations recorded for this year.", margin, yPos);
+      }
+    }
+
+    // ─── FOOTER ───
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(
+        `Generated ${new Date().toLocaleDateString()} | Page ${i} of ${pageCount}`,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: "center" }
+      );
+    }
+
+    // Save the PDF
+    let filename = "";
+    switch (selectedReport) {
+      case "revenue": filename = `revenue-report-${startDate}-${endDate}.pdf`; break;
+      case "payments": filename = `payments-report-${startDate}-${endDate}.pdf`; break;
+      case "materials": filename = `materials-report-${startDate}-${endDate}.pdf`; break;
+      case "clients": filename = `client-analysis-${new Date().toISOString().split("T")[0]}.pdf`; break;
+      case "tax": filename = `tax-summary-${new Date().getFullYear()}.pdf`; break;
+    }
+    
+    doc.save(filename);
+    setShowExportMenu(false);
   };
 
   const handleExportAllCSV = async () => {
@@ -543,12 +978,33 @@ export default function ReportsSection({
                     {selectedReport === "tax" &&
                       `Tax Summary ${new Date().getFullYear()}`}
                   </h3>
-                  <button
-                    onClick={exportReportData}
-                    className="px-4 py-2 border border-plum text-plum rounded-xl text-sm font-bold hover:bg-plum hover:text-white transition-colors"
-                  >
-                    Export CSV
-                  </button>
+                  <div className="relative" ref={exportMenuRef}>
+                    <button
+                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      className="px-4 py-2 border border-plum text-plum rounded-xl text-sm font-bold hover:bg-plum hover:text-white transition-colors flex items-center gap-2"
+                    >
+                      Export
+                      <svg className={`w-4 h-4 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {showExportMenu && (
+                      <div className="absolute right-0 mt-2 w-40 bg-white border border-line rounded-xl shadow-lg z-10 overflow-hidden">
+                        <button
+                          onClick={exportReportData}
+                          className="w-full px-4 py-3 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <span>📄</span> Export CSV
+                        </button>
+                        <button
+                          onClick={exportReportPDF}
+                          className="w-full px-4 py-3 text-left text-sm hover:bg-gray-50 flex items-center gap-2 border-t border-line"
+                        >
+                          <span>📑</span> Export PDF
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Revenue Report */}
