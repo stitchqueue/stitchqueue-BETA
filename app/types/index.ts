@@ -64,6 +64,7 @@ export interface Project {
   backingLength?: number;
   serviceType?: string;
   quiltingType?: string;
+  customQuiltingRate?: number; // For "Custom Rate" quilting type
   battingChoice?: string;
   battingLengthAddition?: string;
   clientSuppliesBatting?: boolean;

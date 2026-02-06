@@ -20,6 +20,7 @@ export interface CalculationInputs {
   // Quilting
   quiltingType: string;
   quiltingRateManual: string;
+  customQuiltingRate: string;
   
   // Batting
   battingChoice: string;
@@ -71,6 +72,8 @@ export interface CalculationResults {
  * 
  * Pricing logic:
  * - Quilting: quilt area (width × length) × rate per square inch
+ *   - If quiltingType is "Custom Rate", use customQuiltingRate value
+ *   - Otherwise use saved rate from settings or manual entry
  * - Batting: (quilt length + addition inches) × price per inch
  * - Binding: perimeter (2 × (width + length)) × rate per inch
  * - Bobbin: count × price each
@@ -116,15 +119,23 @@ export function calculateTotals(
   // ─────────────────────────────────────────────────────────────────
   // QUILTING CALCULATION
   // Formula: area × rate per square inch
+  // Priority: Custom Rate > Saved Rates > Manual Entry
   // ─────────────────────────────────────────────────────────────────
   if (area > 0) {
-    if (isPaidTier && hasQuiltingRates && inputs.quiltingType) {
+    // Check if using "Custom Rate" option (PRO tier only)
+    if (inputs.quiltingType === "Custom Rate" && inputs.customQuiltingRate) {
+      quilting = area * (parseFloat(inputs.customQuiltingRate) || 0);
+    }
+    // Check if using saved rates from settings (PRO tier)
+    else if (isPaidTier && hasQuiltingRates && inputs.quiltingType) {
       const rate =
         settings.pricingRates?.[
           inputs.quiltingType as keyof typeof settings.pricingRates
         ] || 0;
       quilting = area * (rate as number);
-    } else if (inputs.quiltingRateManual) {
+    }
+    // Fallback to manual entry (FREE tier or PRO without selection)
+    else if (inputs.quiltingRateManual) {
       quilting = area * (parseFloat(inputs.quiltingRateManual) || 0);
     }
   }

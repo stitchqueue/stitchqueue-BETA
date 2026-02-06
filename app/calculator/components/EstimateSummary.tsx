@@ -14,6 +14,9 @@ import type { Settings, ExtraCharge } from "../../types";
 interface EstimateSummaryProps {
   settings: Settings;
   
+  // Quilting type (for custom rate indicator)
+  quiltingType: string;
+  
   // Calculated totals
   quiltingTotal: number;
   battingTotal: number;
@@ -62,6 +65,7 @@ interface EstimateSummaryProps {
  */
 export default function EstimateSummary({
   settings,
+  quiltingType,
   quiltingTotal,
   battingTotal,
   bindingTotal,
@@ -95,7 +99,12 @@ export default function EstimateSummary({
           ───────────────────────────────────────────────────────────────── */}
       <div className="space-y-2 mb-4">
         <div className="flex justify-between text-sm">
-          <span className="text-muted">Quilting</span>
+          <span className="text-muted">
+            Quilting
+            {quiltingType === "Custom Rate" && (
+              <span className="text-xs ml-1 text-amber-600">(Custom Rate)</span>
+            )}
+          </span>
           <span className="font-bold">{formatCurrency(quiltingTotal)}</span>
         </div>
         <div className="flex justify-between text-sm">

@@ -85,6 +85,7 @@ export default function CalculatorForm() {
   // ─────────────────────────────────────────────────────────────────────
   const [quiltingType, setQuiltingType] = useState("");
   const [quiltingRateManual, setQuiltingRateManual] = useState("");
+  const [customQuiltingRate, setCustomQuiltingRate] = useState("");
   const [battingChoice, setBattingChoice] = useState("");
   const [battingPriceManual, setBattingPriceManual] = useState("");
   const [battingLengthAddition, setBattingLengthAddition] = useState("4");
@@ -256,6 +257,9 @@ export default function CalculatorForm() {
           setRequestedDateType(project.requestedDateType || "no_date");
           setRequestedCompletionDate(project.requestedCompletionDate || "");
           setQuiltingType(project.quiltingType || "");
+          if (project.customQuiltingRate) {
+            setCustomQuiltingRate(project.customQuiltingRate.toString());
+          }
           setBattingChoice(project.battingChoice || "");
           setBattingLengthAddition(project.battingLengthAddition || "4");
           setClientSuppliesBatting(project.clientSuppliesBatting || false);
@@ -299,6 +303,7 @@ export default function CalculatorForm() {
         quiltLength,
         quiltingType,
         quiltingRateManual,
+        customQuiltingRate,
         battingChoice,
         battingPriceManual,
         battingLengthAddition,
@@ -334,6 +339,7 @@ export default function CalculatorForm() {
     quiltLength,
     quiltingType,
     quiltingRateManual,
+    customQuiltingRate,
     battingChoice,
     battingPriceManual,
     battingLengthAddition,
@@ -404,7 +410,9 @@ export default function CalculatorForm() {
         quiltArea:
           (parseFloat(quiltWidth) || 0) * (parseFloat(quiltLength) || 0),
         quiltingRate:
-          isPaidTier && hasQuiltingRates && quiltingType
+          quiltingType === "Custom Rate"
+            ? parseFloat(customQuiltingRate) || 0
+            : isPaidTier && hasQuiltingRates && quiltingType
             ? settings.pricingRates?.[
                 quiltingType as keyof typeof settings.pricingRates
               ] || 0
@@ -477,6 +485,10 @@ export default function CalculatorForm() {
           isPaidTier && hasQuiltingRates
             ? quiltingType
             : quiltingType || "Manual Entry",
+        customQuiltingRate:
+          quiltingType === "Custom Rate"
+            ? parseFloat(customQuiltingRate) || undefined
+            : undefined,
         battingChoice:
           isPaidTier && hasBattingOptions
             ? battingChoice
@@ -671,6 +683,8 @@ export default function CalculatorForm() {
               setQuiltingType={setQuiltingType}
               quiltingRateManual={quiltingRateManual}
               setQuiltingRateManual={setQuiltingRateManual}
+              customQuiltingRate={customQuiltingRate}
+              setCustomQuiltingRate={setCustomQuiltingRate}
               clientSuppliesBatting={clientSuppliesBatting}
               setClientSuppliesBatting={setClientSuppliesBatting}
               battingChoice={battingChoice}
@@ -710,6 +724,7 @@ export default function CalculatorForm() {
           {settings && (
             <EstimateSummary
               settings={settings}
+              quiltingType={quiltingType}
               quiltingTotal={quiltingTotal}
               battingTotal={battingTotal}
               bindingTotal={bindingTotal}

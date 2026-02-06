@@ -25,6 +25,8 @@ interface PricingSectionProps {
   setQuiltingType: (value: string) => void;
   quiltingRateManual: string;
   setQuiltingRateManual: (value: string) => void;
+  customQuiltingRate: string;
+  setCustomQuiltingRate: (value: string) => void;
   
   // Batting
   clientSuppliesBatting: boolean;
@@ -55,7 +57,7 @@ interface PricingSectionProps {
  * Form section for all pricing-related inputs.
  * 
  * Display modes:
- * - PRO tier with rates: Shows dropdown with saved rates
+ * - PRO tier with rates: Shows dropdown with saved rates + "Custom Rate" option
  * - PRO tier without rates: Shows text input for type + rate input
  * - FREE tier: Always shows text input for type + rate input
  */
@@ -69,6 +71,8 @@ export default function PricingSection({
   setQuiltingType,
   quiltingRateManual,
   setQuiltingRateManual,
+  customQuiltingRate,
+  setCustomQuiltingRate,
   clientSuppliesBatting,
   setClientSuppliesBatting,
   battingChoice,
@@ -98,39 +102,54 @@ export default function PricingSection({
           Quilting Type
         </label>
         {isPaidTier && hasQuiltingRates ? (
-          // PRO tier with rates: show dropdown
-          <select
-            value={quiltingType}
-            onChange={(e) => setQuiltingType(e.target.value)}
-            className="w-full px-4 py-2 border border-line rounded-xl"
-          >
-            <option value="">Select quilting type...</option>
-            {(settings.pricingRates?.lightE2E ?? 0) > 0 && (
-              <option value="lightE2E">
-                Light Edge-to-Edge (${settings.pricingRates?.lightE2E}/sq in)
-              </option>
+          // PRO tier with rates: show dropdown with "Custom Rate" option
+          <div className="space-y-2">
+            <select
+              value={quiltingType}
+              onChange={(e) => setQuiltingType(e.target.value)}
+              className="w-full px-4 py-2 border border-line rounded-xl"
+            >
+              <option value="">Select quilting type...</option>
+              {(settings.pricingRates?.lightE2E ?? 0) > 0 && (
+                <option value="lightE2E">
+                  Light Edge-to-Edge (${settings.pricingRates?.lightE2E}/sq in)
+                </option>
+              )}
+              {(settings.pricingRates?.standardE2E ?? 0) > 0 && (
+                <option value="standardE2E">
+                  Standard Edge-to-Edge (${settings.pricingRates?.standardE2E}/sq in)
+                </option>
+              )}
+              {(settings.pricingRates?.lightCustom ?? 0) > 0 && (
+                <option value="lightCustom">
+                  Light Custom (${settings.pricingRates?.lightCustom}/sq in)
+                </option>
+              )}
+              {(settings.pricingRates?.custom ?? 0) > 0 && (
+                <option value="custom">
+                  Custom (${settings.pricingRates?.custom}/sq in)
+                </option>
+              )}
+              {(settings.pricingRates?.denseCustom ?? 0) > 0 && (
+                <option value="denseCustom">
+                  Dense Custom (${settings.pricingRates?.denseCustom}/sq in)
+                </option>
+              )}
+              <option value="Custom Rate">Custom Rate (set price for this estimate only)</option>
+            </select>
+            
+            {/* Show custom rate input when "Custom Rate" is selected */}
+            {quiltingType === "Custom Rate" && (
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="Price per square inch for this estimate (e.g., 0.025)"
+                value={customQuiltingRate}
+                onChange={(e) => setCustomQuiltingRate(e.target.value)}
+                className="w-full px-4 py-2 border border-line rounded-xl bg-amber-50"
+              />
             )}
-            {(settings.pricingRates?.standardE2E ?? 0) > 0 && (
-              <option value="standardE2E">
-                Standard Edge-to-Edge (${settings.pricingRates?.standardE2E}/sq in)
-              </option>
-            )}
-            {(settings.pricingRates?.lightCustom ?? 0) > 0 && (
-              <option value="lightCustom">
-                Light Custom (${settings.pricingRates?.lightCustom}/sq in)
-              </option>
-            )}
-            {(settings.pricingRates?.custom ?? 0) > 0 && (
-              <option value="custom">
-                Custom (${settings.pricingRates?.custom}/sq in)
-              </option>
-            )}
-            {(settings.pricingRates?.denseCustom ?? 0) > 0 && (
-              <option value="denseCustom">
-                Dense Custom (${settings.pricingRates?.denseCustom}/sq in)
-              </option>
-            )}
-          </select>
+          </div>
         ) : (
           // FREE tier or PRO without rates: manual entry
           <div className="space-y-2">
