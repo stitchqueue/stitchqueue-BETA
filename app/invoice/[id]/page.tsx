@@ -369,9 +369,7 @@ export default function InvoicePage() {
 
   if (estimate.quiltingTotal && estimate.quiltingTotal > 0) {
     lineItems.push({
-      description: `Quilting - ${(estimate.quiltArea || 0).toLocaleString()} sq in × $${
-        estimate.quiltingRate || 0
-      }/sq in`,
+      description: `Quilting - ${(estimate.quiltArea || 0).toLocaleString()} sq in × ${estimate.quiltingRate || 0}/sq in`,
       amount: estimate.quiltingTotal,
       deductible: false, // Quilting services are not deductible
     });
@@ -396,9 +394,7 @@ export default function InvoicePage() {
 
   if (estimate.bindingTotal && estimate.bindingTotal > 0) {
     lineItems.push({
-      description: `Binding - ${
-        estimate.bindingPerimeter?.toFixed(0) || "0"
-      }" × $${estimate.bindingRatePerInch || 0}/in`,
+      description: `Binding - ${estimate.bindingPerimeter?.toFixed(0) || "0"}" × ${estimate.bindingRatePerInch || 0}/in`,
       amount: estimate.bindingTotal,
       deductible: false, // Binding labor is not deductible
     });
@@ -429,7 +425,7 @@ export default function InvoicePage() {
   // Add mileage if donation and mileage entered
   if (isDonation && mileageNumber > 0) {
     lineItems.push({
-      description: `Charitable Mileage (${mileageNumber} miles × $${CHARITABLE_MILEAGE_RATE}/mi)`,
+      description: `Charitable Mileage (${mileageNumber} miles × ${CHARITABLE_MILEAGE_RATE}/mi)`,
       amount: mileageTotal,
       deductible: true,
     });
