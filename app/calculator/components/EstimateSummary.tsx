@@ -1,8 +1,8 @@
 /**
  * EstimateSummary Component
  * 
- * Displays the pricing breakdown, donation toggle, and deposit summary.
- * Shows all calculated totals from the pricing engine.
+ * Displays the pricing breakdown, discount controls, donation toggle, 
+ * and deposit summary. Shows all calculated totals from the pricing engine.
  * 
  * @module calculator/components/EstimateSummary
  */
@@ -28,6 +28,13 @@ interface EstimateSummaryProps {
   // Extra charges for itemized display
   extraCharges: ExtraCharge[];
   clientSuppliesBatting: boolean;
+
+  // Discount controls
+  discountType: "percentage" | "flat";
+  setDiscountType: (value: "percentage" | "flat") => void;
+  discountValue: string;
+  setDiscountValue: (value: string) => void;
+  discountAmount: number;
   
   // Donation toggle
   isDonation: boolean;
@@ -47,7 +54,9 @@ interface EstimateSummaryProps {
  * Sections:
  * - Line items (quilting, batting, binding, bobbin)
  * - Extra charges (itemized)
- * - Subtotal, tax, and total
+ * - Subtotal
+ * - Discount input + display
+ * - Tax and total
  * - Donation toggle with tax-deductible info
  * - Deposit summary (if deposit entered)
  */
@@ -64,6 +73,11 @@ export default function EstimateSummary({
   balanceDue,
   extraCharges,
   clientSuppliesBatting,
+  discountType,
+  setDiscountType,
+  discountValue,
+  setDiscountValue,
+  discountAmount,
   isDonation,
   setIsDonation,
   depositReceivedToday,
@@ -122,19 +136,88 @@ export default function EstimateSummary({
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────
-          SUBTOTAL, TAX, TOTAL
+          SUBTOTAL, DISCOUNT, TAX, TOTAL
           ───────────────────────────────────────────────────────────────── */}
       <div className="border-t border-line pt-3 space-y-2">
+        {/* Subtotal */}
         <div className="flex justify-between text-sm">
           <span className="text-muted">Subtotal</span>
           <span className="font-bold">{formatCurrency(subtotal)}</span>
         </div>
+
+        {/* Discount Input Row */}
+        <div className="flex items-center justify-between gap-2 py-1">
+          <div className="flex items-center gap-2 flex-1">
+            <span className="text-sm text-muted">Discount</span>
+            {/* Type Toggle */}
+            <div className="inline-flex rounded-lg border border-line overflow-hidden text-xs">
+              <button
+                type="button"
+                onClick={() => setDiscountType("percentage")}
+                className={`px-2 py-1 transition-colors ${
+                  discountType === "percentage"
+                    ? "bg-plum text-white"
+                    : "bg-white text-muted hover:bg-gray-50"
+                }`}
+              >
+                %
+              </button>
+              <button
+                type="button"
+                onClick={() => setDiscountType("flat")}
+                className={`px-2 py-1 transition-colors ${
+                  discountType === "flat"
+                    ? "bg-plum text-white"
+                    : "bg-white text-muted hover:bg-gray-50"
+                }`}
+              >
+                $
+              </button>
+            </div>
+            {/* Value Input */}
+            <div className="relative w-24">
+              {discountType === "flat" && (
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted">
+                  $
+                </span>
+              )}
+              <input
+                type="text"
+                inputMode="decimal"
+                value={discountValue}
+                onChange={(e) => setDiscountValue(e.target.value)}
+                placeholder="0"
+                className={`w-full py-1 text-sm border border-line rounded-lg text-right ${
+                  discountType === "flat" ? "pl-5 pr-2" : "px-2"
+                }`}
+              />
+              {discountType === "percentage" && (
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted">
+                  %
+                </span>
+              )}
+            </div>
+          </div>
+          {/* Discount Amount Display */}
+          {discountAmount > 0 && (
+            <span className="font-bold text-sm text-green-600">
+              −{formatCurrency(discountAmount)}
+            </span>
+          )}
+        </div>
+
+        {/* Tax */}
         <div className="flex justify-between text-sm">
           <span className="text-muted">
             {settings.taxLabel || "Tax"} ({settings.taxRate || 0}%)
+            {discountAmount > 0 && (
+              <span className="text-xs ml-1">(on discounted amount)</span>
+            )}
           </span>
           <span className="font-bold">{formatCurrency(taxAmount)}</span>
         </div>
+
+        {/* Total */}
         <div className="flex justify-between text-lg border-t border-line pt-3">
           <span className="font-bold text-plum">Total</span>
           <span className="font-bold text-plum">{formatCurrency(total)}</span>

@@ -72,6 +72,10 @@ export interface Project {
   bobbinChoice?: string;
   // Extra charges (shipping, rush, custom fees)
   extraCharges?: ExtraCharge[];
+  // Discount fields
+  discountType?: "percentage" | "flat";
+  discountValue?: number;
+  discountAmount?: number;
   // Donation/Gift fields
   isDonation?: boolean;
   invoiceType?: InvoiceType;
@@ -118,6 +122,10 @@ export interface Project {
     extraCharges?: ExtraCharge[];
     extraChargesTotal?: number;
     extraChargesTaxable?: number;
+    // Discount fields
+    discountType?: "percentage" | "flat";
+    discountValue?: number;
+    discountAmount?: number;
     // Donation fields
     isDonation?: boolean;
     invoiceType?: InvoiceType;

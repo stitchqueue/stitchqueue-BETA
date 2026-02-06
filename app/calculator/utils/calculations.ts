@@ -2,7 +2,7 @@
  * Pricing Calculations
  * 
  * Core pricing engine for the StitchQueue calculator.
- * Calculates quilting, batting, binding, bobbin, extra charges, tax, and deposit.
+ * Calculates quilting, batting, binding, bobbin, extra charges, discount, tax, and deposit.
  * 
  * @module calculator/utils/calculations
  */
@@ -38,6 +38,10 @@ export interface CalculationInputs {
   
   // Extra charges
   extraCharges: ExtraCharge[];
+
+  // Discount
+  discountType: "percentage" | "flat";
+  discountValue: string;
   
   // Deposit
   depositType: "percentage" | "flat";
@@ -54,6 +58,7 @@ export interface CalculationResults {
   bobbinTotal: number;
   extraChargesTotal: number;
   extraChargesTaxable: number;
+  discountAmount: number;
   subtotal: number;
   taxAmount: number;
   total: number;
@@ -69,7 +74,9 @@ export interface CalculationResults {
  * - Batting: (quilt length + addition inches) × price per inch
  * - Binding: perimeter (2 × (width + length)) × rate per inch
  * - Bobbin: count × price each
- * - Tax: applied to quilting, batting, binding, bobbin, and taxable extra charges
+ * - Subtotal: sum of all line items above + extra charges
+ * - Discount: percentage of subtotal OR flat amount (applied after subtotal)
+ * - Tax: applied to discounted taxable amount (proportionally reduced by discount)
  * - Deposit: percentage of total OR flat amount
  * 
  * @param inputs - Form values for calculations
@@ -192,13 +199,43 @@ export function calculateTotals(
   });
 
   // ─────────────────────────────────────────────────────────────────
-  // SUBTOTAL, TAX, AND TOTAL
-  // Tax applies to: quilting, batting, binding, bobbin, taxable extras
+  // SUBTOTAL (before discount)
   // ─────────────────────────────────────────────────────────────────
   const subtotal = quilting + batting + binding + bobbin + extraTotal;
   const taxableAmount = quilting + batting + binding + bobbin + extraTaxable;
-  const tax = taxableAmount * ((settings.taxRate || 0) / 100);
-  const total = subtotal + tax;
+
+  // ─────────────────────────────────────────────────────────────────
+  // DISCOUNT CALCULATION
+  // Applied after subtotal, before tax
+  // Percentage: % of subtotal | Flat: fixed dollar amount
+  // Discount cannot exceed subtotal
+  // ─────────────────────────────────────────────────────────────────
+  let discount = 0;
+  const discVal = parseFloat(inputs.discountValue) || 0;
+  if (discVal > 0 && subtotal > 0) {
+    if (inputs.discountType === "percentage") {
+      discount = subtotal * (Math.min(discVal, 100) / 100);
+    } else {
+      discount = Math.min(discVal, subtotal);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // TAX CALCULATION
+  // Tax applies to: quilting, batting, binding, bobbin, taxable extras
+  // Discount proportionally reduces the taxable amount
+  // ─────────────────────────────────────────────────────────────────
+  let discountedTaxable = taxableAmount;
+  if (discount > 0 && subtotal > 0) {
+    const discountRatio = discount / subtotal;
+    discountedTaxable = taxableAmount * (1 - discountRatio);
+  }
+  const tax = discountedTaxable * ((settings.taxRate || 0) / 100);
+
+  // ─────────────────────────────────────────────────────────────────
+  // TOTAL (subtotal - discount + tax)
+  // ─────────────────────────────────────────────────────────────────
+  const total = subtotal - discount + tax;
 
   // ─────────────────────────────────────────────────────────────────
   // DEPOSIT CALCULATION
@@ -222,6 +259,7 @@ export function calculateTotals(
     bobbinTotal: bobbin,
     extraChargesTotal: extraTotal,
     extraChargesTaxable: extraTaxable,
+    discountAmount: discount,
     subtotal,
     taxAmount: tax,
     total,

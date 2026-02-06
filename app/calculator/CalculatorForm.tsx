@@ -104,6 +104,12 @@ export default function CalculatorForm() {
   const [newChargeTaxable, setNewChargeTaxable] = useState(true);
 
   // ─────────────────────────────────────────────────────────────────────
+  // DISCOUNT STATE
+  // ─────────────────────────────────────────────────────────────────────
+  const [discountType, setDiscountType] = useState<"percentage" | "flat">("percentage");
+  const [discountValue, setDiscountValue] = useState("");
+
+  // ─────────────────────────────────────────────────────────────────────
   // DONATION & DEPOSIT STATE
   // ─────────────────────────────────────────────────────────────────────
   const [isDonation, setIsDonation] = useState(false);
@@ -121,6 +127,7 @@ export default function CalculatorForm() {
   const [bobbinTotal, setBobbinTotal] = useState(0);
   const [extraChargesTotal, setExtraChargesTotal] = useState(0);
   const [extraChargesTaxable, setExtraChargesTaxable] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState(0);
   const [subtotal, setSubtotal] = useState(0);
   const [taxAmount, setTaxAmount] = useState(0);
   const [total, setTotal] = useState(0);
@@ -257,6 +264,17 @@ export default function CalculatorForm() {
           setExtraCharges(project.extraCharges || []);
           setIsDonation(project.isDonation || false);
 
+          // Restore discount fields from project or estimateData
+          if (project.discountType) {
+            setDiscountType(project.discountType);
+          }
+          if (project.discountValue !== undefined && project.discountValue > 0) {
+            setDiscountValue(project.discountValue.toString());
+          } else if (project.estimateData?.discountValue !== undefined && project.estimateData.discountValue > 0) {
+            setDiscountType(project.estimateData.discountType || "percentage");
+            setDiscountValue(project.estimateData.discountValue.toString());
+          }
+
           // Use existing estimate number if available
           if (project.estimateNumber) {
             setNextEstimateNumber(project.estimateNumber);
@@ -291,6 +309,8 @@ export default function CalculatorForm() {
         bobbinCount,
         bobbinPriceManual,
         extraCharges,
+        discountType,
+        discountValue,
         depositType,
         depositValue,
       },
@@ -303,6 +323,7 @@ export default function CalculatorForm() {
     setBobbinTotal(results.bobbinTotal);
     setExtraChargesTotal(results.extraChargesTotal);
     setExtraChargesTaxable(results.extraChargesTaxable);
+    setDiscountAmount(results.discountAmount);
     setSubtotal(results.subtotal);
     setTaxAmount(results.taxAmount);
     setTotal(results.total);
@@ -323,6 +344,8 @@ export default function CalculatorForm() {
     bobbinCount,
     bobbinPriceManual,
     extraCharges,
+    discountType,
+    discountValue,
     depositType,
     depositValue,
     settings,
@@ -408,6 +431,10 @@ export default function CalculatorForm() {
         extraCharges,
         extraChargesTotal,
         extraChargesTaxable,
+        // Discount snapshot
+        discountType: discountAmount > 0 ? discountType : undefined,
+        discountValue: discountAmount > 0 ? (parseFloat(discountValue) || 0) : undefined,
+        discountAmount: discountAmount > 0 ? discountAmount : undefined,
         isDonation,
         subtotal,
         taxRate: settings.taxRate || 0,
@@ -462,6 +489,10 @@ export default function CalculatorForm() {
             ? bobbinChoice
             : "Manual Entry",
         extraCharges,
+        // Discount fields on project level
+        discountType: discountAmount > 0 ? discountType : undefined,
+        discountValue: discountAmount > 0 ? (parseFloat(discountValue) || 0) : undefined,
+        discountAmount: discountAmount > 0 ? discountAmount : undefined,
         isDonation,
         depositType: depositAmount > 0 ? depositType : undefined,
         depositPercentage:
@@ -501,11 +532,12 @@ export default function CalculatorForm() {
         }
 
         const donationMsg = isDonation ? " (Marked as Donation)" : "";
+        const discountMsg = discountAmount > 0 ? ` Discount: ${formatCurrency(discountAmount)}.` : "";
         const depositMsg =
           depositReceivedToday && depositAmount > 0
             ? ` Deposit of ${formatCurrency(depositAmount)} recorded.`
             : "";
-        alert(`Estimate #${estimateNumber} updated!${donationMsg}${depositMsg}`);
+        alert(`Estimate #${estimateNumber} updated!${donationMsg}${discountMsg}${depositMsg}`);
       } else {
         // CREATE new project
         const newProject: Project = {
@@ -526,11 +558,12 @@ export default function CalculatorForm() {
         }
 
         const donationMsg = isDonation ? " (Marked as Donation)" : "";
+        const discountMsg = discountAmount > 0 ? ` Discount: ${formatCurrency(discountAmount)}.` : "";
         const depositMsg =
           depositReceivedToday && depositAmount > 0
             ? ` Deposit of ${formatCurrency(depositAmount)} recorded.`
             : "";
-        alert(`Estimate #${estimateNumber} saved!${donationMsg}${depositMsg}`);
+        alert(`Estimate #${estimateNumber} saved!${donationMsg}${discountMsg}${depositMsg}`);
       }
 
       router.push("/board");
@@ -673,7 +706,7 @@ export default function CalculatorForm() {
             formatCurrency={formatCurrency}
           />
 
-          {/* Estimate Summary (Totals, Donation Toggle) */}
+          {/* Estimate Summary (Totals, Discount, Donation Toggle) */}
           {settings && (
             <EstimateSummary
               settings={settings}
@@ -688,6 +721,11 @@ export default function CalculatorForm() {
               balanceDue={balanceDue}
               extraCharges={extraCharges}
               clientSuppliesBatting={clientSuppliesBatting}
+              discountType={discountType}
+              setDiscountType={setDiscountType}
+              discountValue={discountValue}
+              setDiscountValue={setDiscountValue}
+              discountAmount={discountAmount}
               isDonation={isDonation}
               setIsDonation={setIsDonation}
               depositReceivedToday={depositReceivedToday}

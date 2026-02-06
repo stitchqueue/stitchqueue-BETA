@@ -374,6 +374,7 @@ export default function InvoicePage() {
 
   // Calculate totals
   const subtotal = estimate.subtotal || 0;
+  const invoiceDiscountAmount = estimate.discountAmount || 0;
   const taxAmount = estimate.taxAmount || 0;
   const total = estimate.total || 0;
   const depositPaid = project.depositPaid
@@ -465,6 +466,13 @@ export default function InvoicePage() {
 
   // Check if there are any non-taxable extra charges for the footnote
   const hasNonTaxableCharges = estimate.extraCharges?.some((c) => !c.taxable);
+
+  // Format discount description for invoice display
+  const discountDescription = invoiceDiscountAmount > 0
+    ? estimate.discountType === "percentage"
+      ? `Discount (${estimate.discountValue}%)`
+      : "Discount"
+    : "";
 
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white print:min-h-0">
@@ -866,6 +874,16 @@ export default function InvoicePage() {
                 <span className="text-gray-600">Subtotal</span>
                 <span className="font-medium">{formatCurrency(subtotal)}</span>
               </div>
+
+              {/* Discount line (only shown when discount was applied) */}
+              {invoiceDiscountAmount > 0 && (
+                <div className="flex justify-between py-1 text-sm border-t border-gray-100">
+                  <span className="text-green-600">{discountDescription}</span>
+                  <span className="font-medium text-green-600">
+                    −{formatCurrency(invoiceDiscountAmount)}
+                  </span>
+                </div>
+              )}
 
               {taxAmount > 0 && (
                 <div className="flex justify-between py-1 text-sm border-t border-gray-100">
