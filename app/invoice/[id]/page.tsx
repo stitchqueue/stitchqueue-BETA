@@ -884,15 +884,39 @@ export default function InvoicePage() {
                   </span>
                 </div>
               )}
-
-              {taxAmount > 0 && (
+              {/* Tax Display - Dual Rate System */}
+              {!estimate.taxExempt && estimate.taxPrimaryAmount && estimate.taxPrimaryAmount > 0 && (
                 <div className="flex justify-between py-1 text-sm border-t border-gray-100">
                   <span className="text-gray-600">
-                    {settings.taxLabel || "Tax"} ({estimate.taxRate}%)
+                    {estimate.taxPrimaryLabel || settings.taxPrimaryLabel || "Sales Tax"} ({estimate.taxPrimaryRate}%)
                   </span>
                   <span className="font-medium">
-                    {formatCurrency(taxAmount)}
+                    {formatCurrency(estimate.taxPrimaryAmount)}
                   </span>
+                </div>
+              )}
+              {!estimate.taxExempt && settings.taxSecondaryEnabled && estimate.taxSecondaryAmount && estimate.taxSecondaryAmount > 0 && (
+                <div className="flex justify-between py-1 text-sm">
+                  <span className="text-gray-600">
+                    {estimate.taxSecondaryLabel || settings.taxSecondaryLabel || "Provincial Tax"} ({estimate.taxSecondaryRate}%)
+                  </span>
+                  <span className="font-medium">
+                    {formatCurrency(estimate.taxSecondaryAmount)}
+                  </span>
+                </div>
+              )}
+              {!estimate.taxExempt && settings.taxSecondaryEnabled && estimate.taxSecondaryAmount && estimate.taxSecondaryAmount > 0 && (
+                <div className="flex justify-between py-1 text-sm font-semibold">
+                  <span className="text-gray-600">Total Tax</span>
+                  <span className="font-medium">
+                    {formatCurrency(estimate.taxTotalAmount || taxAmount)}
+                  </span>
+                </div>
+              )}
+              {/* Tax Exempt Message */}
+              {estimate.taxExempt && (
+                <div className="flex justify-between py-1 text-sm border-t border-gray-100">
+                  <span className="text-gray-600 italic">Tax Exempt</span>
                 </div>
               )}
 

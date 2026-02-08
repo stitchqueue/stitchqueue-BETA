@@ -226,6 +226,12 @@ export function mapSettingsFromDb(row: any): Settings {
     currencyCode: row.currency_code || "USD",
     taxRate: row.tax_rate || 0,
     taxLabel: row.tax_label || "Sales Tax",
+    // Dual tax system fields
+    taxPrimaryRate: row.tax_primary_rate,
+    taxPrimaryLabel: row.tax_primary_label,
+    taxSecondaryEnabled: row.tax_secondary_enabled,
+    taxSecondaryRate: row.tax_secondary_rate,
+    taxSecondaryLabel: row.tax_secondary_label,
     nextEstimateNumber: row.next_estimate_number || 1001,
     pricingRates: row.pricing_rates || {},
     bobbinOptions: row.bobbin_options || [],
@@ -262,6 +268,12 @@ export function mapSettingsToDb(settings: Partial<Settings>): any {
   if (settings.currencyCode !== undefined)
     dbSettings.currency_code = settings.currencyCode;
   if (settings.taxRate !== undefined) dbSettings.tax_rate = settings.taxRate;
+  // Dual tax system fields
+  if (settings.taxPrimaryRate !== undefined) dbSettings.tax_primary_rate = settings.taxPrimaryRate;
+  if (settings.taxPrimaryLabel !== undefined) dbSettings.tax_primary_label = settings.taxPrimaryLabel;
+  if (settings.taxSecondaryEnabled !== undefined) dbSettings.tax_secondary_enabled = settings.taxSecondaryEnabled;
+  if (settings.taxSecondaryRate !== undefined) dbSettings.tax_secondary_rate = settings.taxSecondaryRate;
+  if (settings.taxSecondaryLabel !== undefined) dbSettings.tax_secondary_label = settings.taxSecondaryLabel;
   if (settings.taxLabel !== undefined) dbSettings.tax_label = settings.taxLabel;
   if (settings.nextEstimateNumber !== undefined)
     dbSettings.next_estimate_number = settings.nextEstimateNumber;

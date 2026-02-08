@@ -80,6 +80,13 @@ export interface Project {
   // Donation/Gift fields
   isDonation?: boolean;
   invoiceType?: InvoiceType;
+  // Tax fields (dual rate system)
+  taxExempt?: boolean;              // Tax-exempt sales (out of state, etc.)
+  taxPrimaryRate?: number;          // Primary tax rate (%) - copied from Settings or overridden
+  taxPrimaryAmount?: number;        // Calculated primary tax amount
+  taxSecondaryRate?: number;        // Secondary tax rate (%) - only if enabled
+  taxSecondaryAmount?: number;      // Calculated secondary tax amount
+  taxTotalAmount?: number;          // Sum of primary + secondary
   // Deposit fields
   depositType?: "percentage" | "flat";
   depositPercentage?: number;
@@ -99,43 +106,33 @@ export interface Project {
     quiltingType?: string;
     quiltingRate?: number;
     quiltingTotal?: number;
-    squareInches?: number;
-    quiltingCost?: number;
-    battingName?: string;
-    battingLength?: number;
-    battingCost?: number;
     battingLengthNeeded?: number;
     battingTotal?: number;
     clientSuppliesBatting?: boolean;
-    bindingType?: string;
     bindingPerimeter?: number;
-    bindingRate?: number;
-    bindingCost?: number;
     bindingRatePerInch?: number;
     bindingTotal?: number;
-    // Bobbin fields
     bobbinName?: string;
     bobbinCount?: number;
     bobbinPrice?: number;
-    bobbinCost?: number;
     bobbinTotal?: number;
-    // Extra charges
     extraCharges?: ExtraCharge[];
     extraChargesTotal?: number;
     extraChargesTaxable?: number;
-    // Discount fields
-    discountType?: "percentage" | "flat";
+    discountType?: "percentage" | "flat" | null;
     discountValue?: number;
     discountAmount?: number;
-    // Donation fields
     isDonation?: boolean;
-    invoiceType?: InvoiceType;
-    mileage?: number;
-    mileageTotal?: number;
-    // Totals
     subtotal?: number;
-    taxRate?: number;
-    taxAmount?: number;
+    // Tax snapshot at estimate time
+    taxExempt?: boolean;
+    taxPrimaryRate?: number;
+    taxPrimaryLabel?: string;
+    taxPrimaryAmount?: number;
+    taxSecondaryRate?: number;
+    taxSecondaryLabel?: string;
+    taxSecondaryAmount?: number;
+    taxTotalAmount?: number;
     total?: number;
     depositType?: "percentage" | "flat" | null;
     depositPercentage?: number;
@@ -211,6 +208,15 @@ export interface Settings {
   // Measurement & Currency
   measurementSystem: MeasurementSystem;
   currencyCode?: string;
+  
+  // Tax Configuration (Dual Rate System)
+  taxPrimaryRate?: number;          // Primary tax rate (e.g., 5.0 for GST or 7.5 for Sales Tax)
+  taxPrimaryLabel?: string;         // Label for primary tax (e.g., "GST", "Sales Tax")
+  taxSecondaryEnabled?: boolean;    // Enable secondary tax (for dual-rate systems)
+  taxSecondaryRate?: number;        // Secondary tax rate (e.g., 7.0 for PST)
+  taxSecondaryLabel?: string;       // Label for secondary tax (e.g., "PST", "Provincial Tax")
+  
+  // Legacy single tax field (backwards compatibility)
   taxRate?: number;
   taxLabel?: string;
 
@@ -231,13 +237,22 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   measurementSystem: "imperial",
   currencyCode: "USD",
+  
+  // Default tax configuration (single-rate US style)
+  taxPrimaryRate: 0,
+  taxPrimaryLabel: "Sales Tax",
+  taxSecondaryEnabled: false,
+  taxSecondaryRate: 0,
+  taxSecondaryLabel: "Provincial Tax",
+  
+  // Legacy fields for backwards compatibility
   taxRate: 0,
   taxLabel: "Sales Tax",
+  
   nextEstimateNumber: 1001,
   bobbinOptions: [],
   battingOptions: [],
   isPaidTier: false,
   brandPrimaryColor: "#4e283a",
   brandSecondaryColor: "#98823a",
-  country: "United States",
 };

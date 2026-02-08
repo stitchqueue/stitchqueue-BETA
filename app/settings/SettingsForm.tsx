@@ -24,6 +24,7 @@ import {
   SectionKey,
   TierCard,
   BusinessInfoSection,
+  TaxConfigSection,
   PricingRatesSection,
   BobbinOptionsSection,
   BattingOptionsSection,
@@ -39,6 +40,7 @@ import { formatPhoneNumber } from "./utils";
  */
 const SECTIONS: { key: SectionKey; label: string; icon: string }[] = [
   { key: "business", label: "Business Info", icon: "🏢" },
+  { key: "tax", label: "Tax Configuration", icon: "💰" },
   { key: "pricing", label: "Pricing Rates", icon: "💲" },
   { key: "bobbin", label: "Bobbin Options", icon: "🧵" },
   { key: "batting", label: "Batting Options", icon: "🛏️" },
@@ -591,6 +593,14 @@ export default function SettingsForm() {
             onPhoneChange={handlePhoneChange}
             onLogoUpload={handleLogoUpload}
             onRemoveLogo={handleRemoveLogo}
+          />
+
+          {/* Tax Configuration */}
+          <TaxConfigSection
+            settings={settings}
+            isOpen={openSections.has("tax")}
+            onToggle={toggleSection}
+            handleInputChange={handleFieldChange}
           />
 
           {/* Pricing Rates */}

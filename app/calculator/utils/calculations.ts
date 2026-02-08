@@ -2,7 +2,10 @@
  * Pricing Calculations
  * 
  * Core pricing engine for the StitchQueue calculator.
- * Calculates quilting, batting, binding, bobbin, extra charges, discount, tax, and deposit.
+ * Calculates quilting, batting, binding, bobbin, extra charges, discount, 
+ * dual tax rates (primary + secondary), and deposit.
+ * 
+ * Supports tax-exempt sales and per-project tax rate overrides.
  * 
  * @module calculator/utils/calculations
  */
@@ -44,6 +47,11 @@ export interface CalculationInputs {
   discountType: "percentage" | "flat";
   discountValue: string;
   
+  // Tax (dual rate system with exempt option)
+  taxExempt: boolean;
+  taxPrimaryRate: string;      // Editable per-project
+  taxSecondaryRate: string;    // Editable per-project (only if secondary enabled)
+  
   // Deposit
   depositType: "percentage" | "flat";
   depositValue: string;
@@ -61,7 +69,9 @@ export interface CalculationResults {
   extraChargesTaxable: number;
   discountAmount: number;
   subtotal: number;
-  taxAmount: number;
+  taxPrimaryAmount: number;     // Primary tax (GST/Sales Tax)
+  taxSecondaryAmount: number;   // Secondary tax (PST/Provincial Tax)
+  taxTotalAmount: number;       // Sum of primary + secondary
   total: number;
   depositAmount: number;
   balanceDue: number;
@@ -79,7 +89,8 @@ export interface CalculationResults {
  * - Bobbin: count × price each
  * - Subtotal: sum of all line items above + extra charges
  * - Discount: percentage of subtotal OR flat amount (applied after subtotal)
- * - Tax: applied to discounted taxable amount (proportionally reduced by discount)
+ * - Tax: If not exempt, calculate primary and secondary tax on (subtotal - discount)
+ * - Total: subtotal - discount + tax
  * - Deposit: percentage of total OR flat amount
  * 
  * @param inputs - Form values for calculations
@@ -232,21 +243,41 @@ export function calculateTotals(
   }
 
   // ─────────────────────────────────────────────────────────────────
-  // TAX CALCULATION
-  // Tax applies to: quilting, batting, binding, bobbin, taxable extras
+  // DUAL TAX CALCULATION
+  // Both primary and secondary tax apply to the same discounted taxable base
   // Discount proportionally reduces the taxable amount
+  // Tax exempt checkbox sets all tax to 0
   // ─────────────────────────────────────────────────────────────────
-  let discountedTaxable = taxableAmount;
-  if (discount > 0 && subtotal > 0) {
-    const discountRatio = discount / subtotal;
-    discountedTaxable = taxableAmount * (1 - discountRatio);
+  let taxPrimaryAmount = 0;
+  let taxSecondaryAmount = 0;
+  let taxTotalAmount = 0;
+
+  if (!inputs.taxExempt) {
+    // Calculate discounted taxable base
+    let discountedTaxable = taxableAmount;
+    if (discount > 0 && subtotal > 0) {
+      const discountRatio = discount / subtotal;
+      discountedTaxable = taxableAmount * (1 - discountRatio);
+    }
+
+    // Primary Tax (always applicable if not exempt)
+    const primaryRate = parseFloat(inputs.taxPrimaryRate) || 0;
+    taxPrimaryAmount = discountedTaxable * (primaryRate / 100);
+
+    // Secondary Tax (only if enabled in settings and not exempt)
+    if (settings.taxSecondaryEnabled) {
+      const secondaryRate = parseFloat(inputs.taxSecondaryRate) || 0;
+      taxSecondaryAmount = discountedTaxable * (secondaryRate / 100);
+    }
+
+    // Combined tax
+    taxTotalAmount = taxPrimaryAmount + taxSecondaryAmount;
   }
-  const tax = discountedTaxable * ((settings.taxRate || 0) / 100);
 
   // ─────────────────────────────────────────────────────────────────
   // TOTAL (subtotal - discount + tax)
   // ─────────────────────────────────────────────────────────────────
-  const total = subtotal - discount + tax;
+  const total = subtotal - discount + taxTotalAmount;
 
   // ─────────────────────────────────────────────────────────────────
   // DEPOSIT CALCULATION
@@ -272,7 +303,9 @@ export function calculateTotals(
     extraChargesTaxable: extraTaxable,
     discountAmount: discount,
     subtotal,
-    taxAmount: tax,
+    taxPrimaryAmount,
+    taxSecondaryAmount,
+    taxTotalAmount,
     total,
     depositAmount: deposit,
     balanceDue: balance,

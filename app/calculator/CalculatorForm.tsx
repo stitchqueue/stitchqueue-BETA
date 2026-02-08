@@ -135,6 +135,12 @@ export default function CalculatorForm() {
   const [depositAmount, setDepositAmount] = useState(0);
   const [balanceDue, setBalanceDue] = useState(0);
 
+  // Tax state (dual rate system)
+  const [taxExempt, setTaxExempt] = useState(false);
+  const [taxPrimaryRate, setTaxPrimaryRate] = useState("");
+  const [taxSecondaryRate, setTaxSecondaryRate] = useState("");
+  const [taxPrimaryAmount, setTaxPrimaryAmount] = useState(0);
+  const [taxSecondaryAmount, setTaxSecondaryAmount] = useState(0);
   // ─────────────────────────────────────────────────────────────────────
   // DERIVED FLAGS (computed from settings)
   // ─────────────────────────────────────────────────────────────────────
@@ -232,6 +238,12 @@ export default function CalculatorForm() {
       setSettings(savedSettings);
       setNextEstimateNumber(savedSettings.nextEstimateNumber || 1001);
 
+      // Initialize tax rates from settings
+      setTaxPrimaryRate((savedSettings.taxPrimaryRate || 0).toString());
+      if (savedSettings.taxSecondaryEnabled) {
+        setTaxSecondaryRate((savedSettings.taxSecondaryRate || 0).toString());
+      }
+
       // Load existing project if projectId provided (edit mode)
       if (projectId) {
         const project = await storage.getProjectById(
@@ -279,6 +291,17 @@ export default function CalculatorForm() {
             setDiscountValue(project.estimateData.discountValue.toString());
           }
 
+          // Restore tax data
+          if (project.taxExempt !== undefined) {
+            setTaxExempt(project.taxExempt);
+          }
+          if (project.taxPrimaryRate !== undefined) {
+            setTaxPrimaryRate(project.taxPrimaryRate.toString());
+          }
+          if (project.taxSecondaryRate !== undefined) {
+            setTaxSecondaryRate(project.taxSecondaryRate.toString());
+          }
+
           // Use existing estimate number if available
           if (project.estimateNumber) {
             setNextEstimateNumber(project.estimateNumber);
@@ -316,6 +339,9 @@ export default function CalculatorForm() {
         extraCharges,
         discountType,
         discountValue,
+        taxExempt,
+        taxPrimaryRate,
+        taxSecondaryRate,
         depositType,
         depositValue,
       },
@@ -330,7 +356,9 @@ export default function CalculatorForm() {
     setExtraChargesTaxable(results.extraChargesTaxable);
     setDiscountAmount(results.discountAmount);
     setSubtotal(results.subtotal);
-    setTaxAmount(results.taxAmount);
+    setTaxPrimaryAmount(results.taxPrimaryAmount);
+    setTaxSecondaryAmount(results.taxSecondaryAmount);
+    setTaxAmount(results.taxTotalAmount);
     setTotal(results.total);
     setDepositAmount(results.depositAmount);
     setBalanceDue(results.balanceDue);
@@ -352,6 +380,9 @@ export default function CalculatorForm() {
     extraCharges,
     discountType,
     discountValue,
+    taxExempt,
+    taxPrimaryRate,
+    taxSecondaryRate,
     depositType,
     depositValue,
     settings,
@@ -445,8 +476,15 @@ export default function CalculatorForm() {
         discountAmount: discountAmount > 0 ? discountAmount : undefined,
         isDonation,
         subtotal,
-        taxRate: settings.taxRate || 0,
-        taxAmount,
+        // Tax snapshot
+        taxExempt,
+        taxPrimaryRate: parseFloat(taxPrimaryRate) || 0,
+        taxPrimaryLabel: settings.taxPrimaryLabel || "Sales Tax",
+        taxPrimaryAmount,
+        taxSecondaryRate: settings.taxSecondaryEnabled ? (parseFloat(taxSecondaryRate) || 0) : undefined,
+        taxSecondaryLabel: settings.taxSecondaryEnabled ? settings.taxSecondaryLabel : undefined,
+        taxSecondaryAmount: settings.taxSecondaryEnabled ? taxSecondaryAmount : undefined,
+        taxTotalAmount: taxAmount,
         total,
         depositType: depositAmount > 0 ? depositType : undefined,
         depositPercentage:
@@ -506,6 +544,13 @@ export default function CalculatorForm() {
         discountValue: discountAmount > 0 ? (parseFloat(discountValue) || 0) : undefined,
         discountAmount: discountAmount > 0 ? discountAmount : undefined,
         isDonation,
+        // Tax fields
+        taxExempt,
+        taxPrimaryRate: parseFloat(taxPrimaryRate) || 0,
+        taxPrimaryAmount,
+        taxSecondaryRate: settings.taxSecondaryEnabled ? (parseFloat(taxSecondaryRate) || 0) : undefined,
+        taxSecondaryAmount: settings.taxSecondaryEnabled ? taxSecondaryAmount : undefined,
+        taxTotalAmount: taxAmount,
         depositType: depositAmount > 0 ? depositType : undefined,
         depositPercentage:
           depositType === "percentage" ? parseFloat(depositValue) || 0 : undefined,
@@ -730,6 +775,14 @@ export default function CalculatorForm() {
               bindingTotal={bindingTotal}
               bobbinTotal={bobbinTotal}
               subtotal={subtotal}
+              taxExempt={taxExempt}
+              setTaxExempt={setTaxExempt}
+              taxPrimaryRate={taxPrimaryRate}
+              setTaxPrimaryRate={setTaxPrimaryRate}
+              taxSecondaryRate={taxSecondaryRate}
+              setTaxSecondaryRate={setTaxSecondaryRate}
+              taxPrimaryAmount={taxPrimaryAmount}
+              taxSecondaryAmount={taxSecondaryAmount}
               taxAmount={taxAmount}
               total={total}
               depositAmount={depositAmount}

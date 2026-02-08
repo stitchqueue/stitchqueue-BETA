@@ -317,39 +317,6 @@ export default function BusinessInfoSection({
             </select>
           </div>
 
-          {/* Tax Settings */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-bold text-muted mb-2">
-                Tax Rate (%)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={settings.taxRate || 0}
-                onChange={(e) =>
-                  onFieldChange("taxRate", parseFloat(e.target.value) || 0)
-                }
-                placeholder="8.5"
-                className="w-full px-4 py-2 border border-line rounded-xl"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-muted mb-2">
-                Tax Label
-              </label>
-              <input
-                type="text"
-                value={settings.taxLabel || "Sales Tax"}
-                onChange={(e) => onFieldChange("taxLabel", e.target.value)}
-                placeholder="Sales Tax"
-                className="w-full px-4 py-2 border border-line rounded-xl"
-              />
-            </div>
-          </div>
-
           {/* Estimate Numbering */}
           <div className="border-t border-line pt-6 mt-6">
             <h3 className="text-md font-bold text-plum mb-4">

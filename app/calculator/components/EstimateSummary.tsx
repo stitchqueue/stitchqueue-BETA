@@ -23,6 +23,15 @@ interface EstimateSummaryProps {
   bindingTotal: number;
   bobbinTotal: number;
   subtotal: number;
+  // Tax controls (dual rate with exempt option)
+  taxExempt: boolean;
+  setTaxExempt: (value: boolean) => void;
+  taxPrimaryRate: string;
+  setTaxPrimaryRate: (value: string) => void;
+  taxSecondaryRate: string;
+  setTaxSecondaryRate: (value: string) => void;
+  taxPrimaryAmount: number;
+  taxSecondaryAmount: number;
   taxAmount: number;
   total: number;
   depositAmount: number;
@@ -71,6 +80,14 @@ export default function EstimateSummary({
   bindingTotal,
   bobbinTotal,
   subtotal,
+  taxExempt,
+  setTaxExempt,
+  taxPrimaryRate,
+  setTaxPrimaryRate,
+  taxSecondaryRate,
+  setTaxSecondaryRate,
+  taxPrimaryAmount,
+  taxSecondaryAmount,
   taxAmount,
   total,
   depositAmount,
@@ -215,16 +232,99 @@ export default function EstimateSummary({
           )}
         </div>
 
-        {/* Tax */}
-        <div className="flex justify-between text-sm">
-          <span className="text-muted">
-            {settings.taxLabel || "Tax"} ({settings.taxRate || 0}%)
-            {discountAmount > 0 && (
-              <span className="text-xs ml-1">(on discounted amount)</span>
-            )}
-          </span>
-          <span className="font-bold">{formatCurrency(taxAmount)}</span>
+        {/* Tax Exempt Checkbox */}
+        <div className="pt-2 border-t border-line">
+          <label className="flex items-center gap-2 cursor-pointer py-2">
+            <input
+              type="checkbox"
+              checked={taxExempt}
+              onChange={(e) => setTaxExempt(e.target.checked)}
+              className="w-4 h-4 rounded border-line accent-plum"
+            />
+            <span className="text-sm font-bold text-muted">Tax Exempt</span>
+            <span className="text-xs text-muted">(out-of-state, tax-free sales)</span>
+          </label>
         </div>
+
+        {/* Tax Configuration */}
+        {!taxExempt && (
+          <div className="space-y-2 mt-2">
+            {/* Primary Tax */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm text-muted">
+                {settings.taxPrimaryLabel || "Sales Tax"}
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="relative w-20">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={taxPrimaryRate}
+                    onChange={(e) => setTaxPrimaryRate(e.target.value)}
+                    className="w-full py-1 px-2 text-sm border border-line rounded-lg text-right pr-6"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted">
+                    %
+                  </span>
+                </div>
+                <span className="font-bold text-sm w-20 text-right">
+                  {formatCurrency(taxPrimaryAmount)}
+                </span>
+              </div>
+            </div>
+
+            {/* Secondary Tax (if enabled) */}
+            {settings.taxSecondaryEnabled && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-muted">
+                  {settings.taxSecondaryLabel || "Provincial Tax"}
+                </span>
+                <div className="flex items-center gap-2">
+                  <div className="relative w-20">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={taxSecondaryRate}
+                      onChange={(e) => setTaxSecondaryRate(e.target.value)}
+                      className="w-full py-1 px-2 text-sm border border-line rounded-lg text-right pr-6"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted">
+                      %
+                    </span>
+                  </div>
+                  <span className="font-bold text-sm w-20 text-right">
+                    {formatCurrency(taxSecondaryAmount)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Total Tax (if dual rate) */}
+            {settings.taxSecondaryEnabled && (
+              <div className="flex justify-between text-sm pl-4 pt-1 border-t border-line/50">
+                <span className="text-muted font-bold">Total Tax</span>
+                <span className="font-bold w-20 text-right">{formatCurrency(taxAmount)}</span>
+              </div>
+            )}
+
+            {/* Helper Text */}
+            <p className="text-xs text-muted italic">
+              ℹ️ Verify tax rate for client's location. Rates can be adjusted per-project.
+              {discountAmount > 0 && " Tax applied to discounted amount."}
+            </p>
+          </div>
+        )}
+
+        {/* Tax Exempt Message */}
+        {taxExempt && (
+          <div className="text-sm text-muted italic bg-gray-50 p-2 rounded mt-2">
+            ✓ This estimate is tax-exempt. No tax will be charged.
+          </div>
+        )}
 
         {/* Total */}
         <div className="flex justify-between text-lg border-t border-line pt-3">
