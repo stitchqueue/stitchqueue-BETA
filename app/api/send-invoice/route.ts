@@ -1,174 +1,66 @@
-// app/api/send-invoice/route.ts
-// API route to send invoice emails via Resend
-
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
-import { supabase } from '@/app/lib/supabase';
-import { generateInvoiceEmail } from '@/app/lib/email/invoice-template';
-import { generateInvoicePDF } from '@/app/lib/email/pdf-generator';
+import { generateInvoiceEmail, generateInvoicePDF } from '@/app/lib/email';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { projectId } = body;
+    const { projectId } = await request.json();
 
     if (!projectId) {
-      return NextResponse.json(
-        { error: 'Project ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
     }
 
-    // Initialize Supabase client
-    // Use existing supabase client
-
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const { data: project, error: projectError } = await supabase.from('projects').select('*').eq('id', projectId).single();
+    if (projectError || !project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    // Get user's organization
-    const { data: orgData, error: orgError } = await supabase
-      .from('organizations')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (orgError || !orgData) {
-      return NextResponse.json(
-        { error: 'Organization not found' },
-        { status: 404 }
-      );
+    const { data: org, error: orgError } = await supabase.from('organizations').select('*').eq('id', project.organization_id).single();
+    if (orgError || !org) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
-    // Check if user is PRO tier
-    const isPro = orgData.tier === 'pro';
-    if (!isPro) {
-      return NextResponse.json(
-        { error: 'Email sending is a PRO feature. Please upgrade to send emails.' },
-        { status: 403 }
-      );
+    if (!org.isPaidTier) {
+      return NextResponse.json({ error: 'Email sending requires PRO tier' }, { status: 403 });
     }
 
-    // Get project
-    const { data: projectData, error: projectError } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', projectId)
-      .eq('organization_id', user.id)
-      .single();
+    const projectData = project.data as any;
+    const clientEmail = projectData.clientEmail;
 
-    if (projectError || !projectData) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      );
+    if (!clientEmail) {
+      return NextResponse.json({ error: 'Client email address is required' }, { status: 400 });
     }
 
-    const project = projectData.data;
-    const settings = {
-      businessName: orgData.business_name || 'StitchQueue User',
-      email: orgData.email || user.email || '',
-      phone: orgData.phone,
-      address: orgData.address,
-      city: orgData.city,
-      state: orgData.state,
-      postalCode: orgData.postal_code,
-      country: orgData.country,
-    };
+    const emailHtml = generateInvoiceEmail(projectData, org);
+    const pdfBuffer = generateInvoicePDF(projectData, org);
 
-    // Validate client email
-    if (!project.client?.email) {
-      return NextResponse.json(
-        { error: 'Client email address is required' },
-        { status: 400 }
-      );
-    }
-
-    // Generate invoice number
-    const invoiceNumber = project.estimateNumber || 'DRAFT';
-
-    // Generate email HTML
-    const emailHtml = generateInvoiceEmail({
-      project,
-      settings,
-      invoiceNumber,
-    });
-
-    // Generate PDF attachment
-    const pdfBase64 = await generateInvoicePDF(project, settings, invoiceNumber);
-
-    // Determine subject line based on invoice type
-    const isGift = project.invoiceType === 'gift';
-    const isCharitable = project.invoiceType === 'charitable';
-    
-    let subject = `Invoice #${invoiceNumber} from ${settings.businessName}`;
-    if (isGift) {
-      subject = `Gift Invoice #${invoiceNumber} from ${settings.businessName}`;
-    } else if (isCharitable) {
-      subject = `Charitable Invoice #${invoiceNumber} from ${settings.businessName}`;
-    }
-
-    // Send email via Resend
-    const emailResult = await resend.emails.send({
-      from: 'no-reply@stitchqueue.com',
-      to: project.client.email,
-      replyTo: settings.email, // Replies go to quilter's email
-      subject,
+    const { data: emailData, error: emailError } = await resend.emails.send({
+      from: 'noreply@stitchqueue.com',
+      to: clientEmail,
+      replyTo: org.email || 'noreply@stitchqueue.com',
+      subject: `Invoice #${projectData.estimateNumber || 'TBD'} from ${org.businessName || 'StitchQueue'}`,
       html: emailHtml,
-      attachments: [
-        {
-          filename: `StitchQueue_Invoice_${invoiceNumber}.txt`,
-          content: pdfBase64,
-        },
-      ],
+      attachments: [{ filename: `Invoice-${projectData.estimateNumber || 'TBD'}.pdf`, content: pdfBuffer }],
     });
 
-    if (emailResult.error) {
-      console.error('Resend error:', emailResult.error);
-      return NextResponse.json(
-        { error: 'Failed to send email' },
-        { status: 500 }
-      );
+    if (emailError) {
+      console.error('Resend error:', emailError);
+      return NextResponse.json({ error: 'Failed to send email' }, { status: 500 });
     }
 
-    // Update project with email sent timestamp
-    const updatedProject = {
-      ...project,
-      invoiceEmailSent: {
-        timestamp: new Date().toISOString(),
-        recipientEmail: project.client.email,
-        resendId: emailResult.data?.id,
-      },
-    };
+    const updatedData = { ...projectData, invoiceEmailSent: { timestamp: new Date().toISOString(), recipientEmail: clientEmail, resendId: emailData?.id || null } };
+    await supabase.from('projects').update({ data: updatedData }).eq('id', projectId);
 
-    const { error: updateError } = await supabase
-      .from('projects')
-      .update({ data: updatedProject })
-      .eq('id', projectId);
-
-    if (updateError) {
-      console.error('Failed to update project:', updateError);
-      // Don't fail the request - email was sent successfully
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `Invoice sent to ${project.client.email}`,
-      emailId: emailResult.data?.id,
-    });
-
+    return NextResponse.json({ success: true, message: 'Invoice sent successfully' });
   } catch (error) {
     console.error('Send invoice error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
