@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Header from "../../components/Header";
-import Toast from "../../components/Toast";
 import { storage } from "../../lib/storage";
 import { STAGES } from "../../types";
 import type { Project, Stage, Settings } from "../../types";
@@ -26,16 +25,6 @@ function formatCurrency(amount: number | undefined): string {
   }).format(amount);
 }
 
-function formatDateTime(isoString: string): string {
-  const date = new Date(isoString);
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 function isAsap(project: Project): boolean {
   return project.requestedDateType === "asap";
 }
@@ -51,9 +40,6 @@ export default function ProjectDetailPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  // Toast notification state
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-
   // Payment recording state
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -61,11 +47,6 @@ export default function ProjectDetailPage() {
   const [paymentDate, setPaymentDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-
-  // Email sending state
-  const [showEstimateConfirm, setShowEstimateConfirm] = useState(false);
-  const [showInvoiceConfirm, setShowInvoiceConfirm] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Set document title for PDF naming
   useEffect(() => {
@@ -117,94 +98,6 @@ export default function ProjectDetailPage() {
 
     loadProject();
   }, [projectId, router]);
-
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ message, type });
-  };
-
-  const handleSendEstimate = async () => {
-    if (!project?.clientEmail) {
-      showToast("Client email address is required to send estimate", "error");
-      return;
-    }
-
-    setSendingEmail(true);
-    setShowEstimateConfirm(false);
-
-    try {
-      const response = await fetch('/api/send-estimate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projectId: project.id,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send estimate');
-      }
-
-      // Reload project to get updated email tracking data
-      const updatedProject = await storage.getProjectById(projectId);
-      setProject(updatedProject || null);
-
-      showToast(`Estimate sent to ${project.clientEmail}!`, "success");
-    } catch (error) {
-      console.error('Error sending estimate:', error);
-      showToast(
-        error instanceof Error ? error.message : 'Failed to send estimate',
-        "error"
-      );
-    } finally {
-      setSendingEmail(false);
-    }
-  };
-
-  const handleSendInvoice = async () => {
-    if (!project?.clientEmail) {
-      showToast("Client email address is required to send invoice", "error");
-      return;
-    }
-
-    setSendingEmail(true);
-    setShowInvoiceConfirm(false);
-
-    try {
-      const response = await fetch('/api/send-invoice', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projectId: project.id,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send invoice');
-      }
-
-      // Reload project to get updated email tracking data
-      const updatedProject = await storage.getProjectById(projectId);
-      setProject(updatedProject || null);
-
-      showToast(`Invoice sent to ${project.clientEmail}!`, "success");
-    } catch (error) {
-      console.error('Error sending invoice:', error);
-      showToast(
-        error instanceof Error ? error.message : 'Failed to send invoice',
-        "error"
-      );
-    } finally {
-      setSendingEmail(false);
-    }
-  };
 
   const handlePrint = () => {
     window.print();
@@ -266,13 +159,6 @@ export default function ProjectDetailPage() {
   const hasEstimate = project.estimateData && project.estimateData.total > 0;
   const estimate = project.estimateData;
 
-  // Check if user is PRO tier
-  const isPro = settings?.isPaidTier || false;
-
-  // Determine if send buttons should be shown
-  const canSendEstimate = hasEstimate && project.stage === "Estimate";
-  const canSendInvoice = hasEstimate && (project.stage === "Invoiced" || project.stage === "Paid/Shipped");
-
   // Calculate balance due
   const getBalanceDue = (): number => {
     if (!estimate?.total) return 0;
@@ -293,7 +179,7 @@ export default function ProjectDetailPage() {
       setProject({ ...project, stage: newStage });
     } catch (error) {
       console.error("Error updating stage:", error);
-      showToast("Failed to update stage. Please try again.", "error");
+      alert("Failed to update stage. Please try again.");
     } finally {
       setUpdating(false);
     }
@@ -314,7 +200,7 @@ export default function ProjectDetailPage() {
         router.push("/board");
       } catch (error) {
         console.error("Error archiving project:", error);
-        showToast("Failed to archive project. Please try again.", "error");
+        alert("Failed to archive project. Please try again.");
         setUpdating(false);
       }
     }
@@ -322,7 +208,7 @@ export default function ProjectDetailPage() {
 
   const handleRecordDeposit = async () => {
     if (!project.depositAmount || project.depositAmount <= 0) {
-      showToast("No deposit amount set for this project.", "error");
+      alert("No deposit amount set for this project.");
       return;
     }
 
@@ -342,10 +228,10 @@ export default function ProjectDetailPage() {
         depositPaidMethod: paymentMethod,
         depositPaidAmount: project.depositAmount,
       });
-      showToast("Deposit recorded successfully!", "success");
+      alert("Deposit recorded successfully!");
     } catch (error) {
       console.error("Error recording deposit:", error);
-      showToast("Failed to record deposit. Please try again.", "error");
+      alert("Failed to record deposit. Please try again.");
     } finally {
       setUpdating(false);
     }
@@ -354,7 +240,7 @@ export default function ProjectDetailPage() {
   const handleRecordFinalPayment = async () => {
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
-      showToast("Please enter a valid payment amount.", "error");
+      alert("Please enter a valid payment amount.");
       return;
     }
 
@@ -382,15 +268,14 @@ export default function ProjectDetailPage() {
           : {}),
       });
       setShowPaymentForm(false);
-      showToast(
+      alert(
         isPaidInFull
           ? "Payment recorded! Project marked as Paid/Shipped."
-          : "Partial payment recorded.",
-        "success"
+          : "Partial payment recorded."
       );
     } catch (error) {
       console.error("Error recording payment:", error);
-      showToast("Failed to record payment. Please try again.", "error");
+      alert("Failed to record payment. Please try again.");
     } finally {
       setUpdating(false);
     }
@@ -423,7 +308,7 @@ export default function ProjectDetailPage() {
       }
     } catch (error) {
       console.error("Error clearing payment:", error);
-      showToast("Failed to clear payment. Please try again.", "error");
+      alert("Failed to clear payment. Please try again.");
     } finally {
       setUpdating(false);
     }
@@ -443,78 +328,6 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="min-h-screen bg-background print:bg-white print:min-h-0">
-      {/* Toast Notifications */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
-
-      {/* Confirmation Modal - Send Estimate */}
-      {showEstimateConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-plum mb-3">Send Estimate Email</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Send estimate #{project.estimateNumber} to <strong>{project.clientEmail}</strong>?
-            </p>
-            <p className="text-xs text-gray-500 mb-6">
-              The client will receive a professional email with full pricing details and a PDF attachment. 
-              They can approve, request changes, or decline.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleSendEstimate}
-                disabled={sendingEmail}
-                className="flex-1 px-4 py-3 bg-gold text-white rounded-xl font-bold hover:bg-gold/90 transition-colors disabled:opacity-50"
-              >
-                {sendingEmail ? "Sending..." : "Send Estimate"}
-              </button>
-              <button
-                onClick={() => setShowEstimateConfirm(false)}
-                disabled={sendingEmail}
-                className="px-4 py-3 border border-line rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmation Modal - Send Invoice */}
-      {showInvoiceConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-plum mb-3">Send Invoice Email</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Send invoice #{project.estimateNumber} to <strong>{project.clientEmail}</strong>?
-            </p>
-            <p className="text-xs text-gray-500 mb-6">
-              The client will receive a professional email with payment details and a PDF attachment.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleSendInvoice}
-                disabled={sendingEmail}
-                className="flex-1 px-4 py-3 bg-gold text-white rounded-xl font-bold hover:bg-gold/90 transition-colors disabled:opacity-50"
-              >
-                {sendingEmail ? "Sending..." : "Send Invoice"}
-              </button>
-              <button
-                onClick={() => setShowInvoiceConfirm(false)}
-                disabled={sendingEmail}
-                className="px-4 py-3 border border-line rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header - hidden when printing */}
       <div className="print:hidden">
         <Header />
@@ -590,47 +403,6 @@ export default function ProjectDetailPage() {
           )}
         </div>
 
-        {/* Client Approval Status Banner */}
-        {project.estimateApproval && (
-          <div className={`border rounded-xl p-4 mb-6 print:p-2 print:mb-3 ${
-            project.estimateApproval.status === 'approve' 
-              ? 'bg-green-50 border-green-200' 
-              : project.estimateApproval.status === 'approve_with_changes'
-              ? 'bg-amber-50 border-amber-200'
-              : 'bg-red-50 border-red-200'
-          }`}>
-            <div className="flex items-start gap-3">
-              <span className="text-2xl print:text-xl">
-                {project.estimateApproval.status === 'approve' && '✓'}
-                {project.estimateApproval.status === 'approve_with_changes' && '⚠'}
-                {project.estimateApproval.status === 'decline' && '✗'}
-              </span>
-              <div className="flex-1">
-                <div className={`font-bold mb-1 ${
-                  project.estimateApproval.status === 'approve' 
-                    ? 'text-green-700' 
-                    : project.estimateApproval.status === 'approve_with_changes'
-                    ? 'text-amber-700'
-                    : 'text-red-700'
-                }`}>
-                  {project.estimateApproval.status === 'approve' && 'Client Approved Estimate'}
-                  {project.estimateApproval.status === 'approve_with_changes' && 'Client Approved with Changes'}
-                  {project.estimateApproval.status === 'decline' && 'Client Declined Estimate'}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {formatDateTime(project.estimateApproval.timestamp)}
-                </div>
-                {project.estimateApproval.comment && (
-                  <div className="mt-2 p-3 bg-white rounded-lg text-sm border border-gray-200">
-                    <div className="font-medium text-gray-700 mb-1">Client Comments:</div>
-                    <div className="text-gray-600">{project.estimateApproval.comment}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* ASAP / HIGH PRIORITY Banner */}
         {projectIsAsap && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3 print:bg-transparent print:border-red-300 print:p-2 print:mb-3">
@@ -638,28 +410,6 @@ export default function ProjectDetailPage() {
             <div>
               <div className="font-bold text-red-700 print:text-sm">HIGH PRIORITY - ASAP</div>
             </div>
-          </div>
-        )}
-
-        {/* Email Status Indicators */}
-        {(project.estimateEmailSent || project.invoiceEmailSent) && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 space-y-2 print:hidden">
-            {project.estimateEmailSent && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-blue-600">📧</span>
-                <span className="text-gray-700">
-                  Estimate sent to <strong>{project.estimateEmailSent.recipientEmail}</strong> on {formatDateTime(project.estimateEmailSent.timestamp)}
-                </span>
-              </div>
-            )}
-            {project.invoiceEmailSent && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-blue-600">📧</span>
-                <span className="text-gray-700">
-                  Invoice sent to <strong>{project.invoiceEmailSent.recipientEmail}</strong> on {formatDateTime(project.invoiceEmailSent.timestamp)}
-                </span>
-              </div>
-            )}
           </div>
         )}
 
@@ -792,36 +542,6 @@ export default function ProjectDetailPage() {
               </h2>
               {/* Buttons hidden when printing */}
               <div className="flex gap-2 print:hidden">
-                {/* Send Estimate Button */}
-                {canSendEstimate && (
-                  <div className="relative group">
-                    <button
-                      onClick={() => {
-                        if (!isPro) return;
-                        if (!project.clientEmail) {
-                          showToast("Please add client email address first", "error");
-                          return;
-                        }
-                        setShowEstimateConfirm(true);
-                      }}
-                      disabled={sendingEmail || !project.clientEmail}
-                      className={`px-4 py-2 rounded-xl font-bold transition-colors ${
-                        isPro && project.clientEmail
-                          ? 'bg-gold text-white hover:bg-gold/90'
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      }`}
-                      title={!isPro ? "Upgrade to PRO to send emails" : !project.clientEmail ? "Add client email first" : "Send estimate email"}
-                    >
-                      📧 Send Estimate
-                    </button>
-                    {!isPro && (
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                        Upgrade to PRO to send emails
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <button
                   onClick={() =>
                     router.push(`/invoice/${encodeURIComponent(project.id)}`)
@@ -912,38 +632,7 @@ export default function ProjectDetailPage() {
         {/* Payment Summary Card */}
         {hasEstimate && estimate && (
           <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-3 print:mb-2">
-            <div className="flex items-center justify-between mb-3 print:mb-2">
-              <h2 className="font-bold text-plum print:text-sm">Payment Summary</h2>
-              {/* Send Invoice Button */}
-              {canSendInvoice && (
-                <div className="relative group print:hidden">
-                  <button
-                    onClick={() => {
-                      if (!isPro) return;
-                      if (!project.clientEmail) {
-                        showToast("Please add client email address first", "error");
-                        return;
-                      }
-                      setShowInvoiceConfirm(true);
-                    }}
-                    disabled={sendingEmail || !project.clientEmail}
-                    className={`px-4 py-2 rounded-xl font-bold transition-colors ${
-                      isPro && project.clientEmail
-                        ? 'bg-gold text-white hover:bg-gold/90'
-                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    }`}
-                    title={!isPro ? "Upgrade to PRO to send emails" : !project.clientEmail ? "Add client email first" : "Send invoice email"}
-                  >
-                    📧 Send Invoice
-                  </button>
-                  {!isPro && (
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                      Upgrade to PRO to send emails
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <h2 className="font-bold text-plum mb-3 print:mb-2 print:text-sm">Payment Summary</h2>
 
             <div className="space-y-2 print:space-y-1">
               {/* Invoice Total */}
