@@ -164,6 +164,13 @@ export default function ProjectDetailPage() {
   const hasEstimate = project.estimateData && project.estimateData.total > 0;
   const estimate = project.estimateData;
 
+
+  // Check if user is PRO tier
+  const isPro = settings?.isPaidTier || false;
+
+  // Determine if send buttons should be shown
+  const canSendEstimate = hasEstimate;
+  const canSendInvoice = hasEstimate;
   // Calculate balance due
   const getBalanceDue = (): number => {
     if (!estimate?.total) return 0;
