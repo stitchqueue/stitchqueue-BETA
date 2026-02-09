@@ -16,7 +16,8 @@
     "jspdf": "^4.1.0",
     "next": "15.5.7",
     "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react-dom": "19.0.0",
+    "resend": "^6.9.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
