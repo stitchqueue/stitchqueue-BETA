@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
-    if (!org.isPaidTier) {
+    console.log("Organization check:", { id: org.id, isPaidTier: org.is_paid_tier, businessName: org.businessName });
+    if (!org.is_paid_tier) {
       return NextResponse.json({ error: 'Email sending requires PRO tier' }, { status: 403 });
     }
 
