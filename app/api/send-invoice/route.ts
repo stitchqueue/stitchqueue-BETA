@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
-import { createClient } from '@/app/lib/supabase';
+import { supabase } from '@/app/lib/supabase';
 import { generateInvoiceEmail } from '@/app/lib/email/invoice-template';
 import { generateInvoicePDF } from '@/app/lib/email/pdf-generator';
 
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Initialize Supabase client
-    const supabase = createClient();
+    // Use existing supabase client
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();

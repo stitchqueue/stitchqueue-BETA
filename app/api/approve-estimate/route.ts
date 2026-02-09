@@ -2,7 +2,7 @@
 // API route to handle client estimate approval responses
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/app/lib/supabase';
+import { supabase } from '@/app/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Initialize Supabase client (no auth required - public endpoint)
-    const supabase = createClient();
+    // Use existing supabase client
 
     // Get project (using service role to bypass RLS for public access)
     const { data: projectData, error: projectError } = await supabase
