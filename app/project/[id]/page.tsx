@@ -48,6 +48,11 @@ export default function ProjectDetailPage() {
     new Date().toISOString().split("T")[0]
   );
 
+  // Email sending state
+  const [showEstimateConfirm, setShowEstimateConfirm] = useState(false);
+  const [showInvoiceConfirm, setShowInvoiceConfirm] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+
   // Set document title for PDF naming
   useEffect(() => {
     if (project?.estimateNumber) {
