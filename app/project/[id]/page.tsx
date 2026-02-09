@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Toast from "../../components/Toast";
 import Header from "../../components/Header";
 import { storage } from "../../lib/storage";
 import { STAGES } from "../../types";
@@ -51,6 +52,9 @@ export default function ProjectDetailPage() {
   // Email sending state
   const [showEstimateConfirm, setShowEstimateConfirm] = useState(false);
   const [showInvoiceConfirm, setShowInvoiceConfirm] = useState(false);
+
+  // Toast notification state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
 
   // Set document title for PDF naming
@@ -427,6 +431,78 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="min-h-screen bg-background print:bg-white print:min-h-0">
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Confirmation Modal - Send Estimate */}
+      {showEstimateConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-plum mb-3">Send Estimate Email</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Send estimate #{project.estimateNumber} to <strong>{project.clientEmail}</strong>?
+            </p>
+            <p className="text-xs text-gray-500 mb-6">
+              The client will receive a professional email with full pricing details and a PDF attachment. 
+              They can approve, request changes, or decline.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleSendEstimate}
+                disabled={sendingEmail}
+                className="flex-1 px-4 py-3 bg-gold text-white rounded-xl font-bold hover:bg-gold/90 transition-colors disabled:opacity-50"
+              >
+                {sendingEmail ? "Sending..." : "Send Estimate"}
+              </button>
+              <button
+                onClick={() => setShowEstimateConfirm(false)}
+                disabled={sendingEmail}
+                className="px-4 py-3 border border-line rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal - Send Invoice */}
+      {showInvoiceConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-plum mb-3">Send Invoice Email</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Send invoice #{project.estimateNumber} to <strong>{project.clientEmail}</strong>?
+            </p>
+            <p className="text-xs text-gray-500 mb-6">
+              The client will receive a professional email with payment details and a PDF attachment.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleSendInvoice}
+                disabled={sendingEmail}
+                className="flex-1 px-4 py-3 bg-gold text-white rounded-xl font-bold hover:bg-gold/90 transition-colors disabled:opacity-50"
+              >
+                {sendingEmail ? "Sending..." : "Send Invoice"}
+              </button>
+              <button
+                onClick={() => setShowInvoiceConfirm(false)}
+                disabled={sendingEmail}
+                className="px-4 py-3 border border-line rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header - hidden when printing */}
       <div className="print:hidden">
         <Header />
