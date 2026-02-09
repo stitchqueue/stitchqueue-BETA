@@ -104,6 +104,93 @@ export default function ProjectDetailPage() {
     loadProject();
   }, [projectId, router]);
 
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+  };
+
+  const handleSendEstimate = async () => {
+    if (!project?.clientEmail) {
+      showToast("Client email address is required to send estimate", "error");
+      return;
+    }
+
+    setSendingEmail(true);
+    setShowEstimateConfirm(false);
+
+    try {
+      const response = await fetch('/api/send-estimate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectId: project.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send estimate');
+      }
+
+      const updatedProject = await storage.getProjectById(projectId);
+      setProject(updatedProject || null);
+
+      showToast(`Estimate sent to ${project.clientEmail}!`, "success");
+    } catch (error) {
+      console.error('Error sending estimate:', error);
+      showToast(
+        error instanceof Error ? error.message : 'Failed to send estimate',
+        "error"
+      );
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handleSendInvoice = async () => {
+    if (!project?.clientEmail) {
+      showToast("Client email address is required to send invoice", "error");
+      return;
+    }
+
+    setSendingEmail(true);
+    setShowInvoiceConfirm(false);
+
+    try {
+      const response = await fetch('/api/send-invoice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectId: project.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send invoice');
+      }
+
+      const updatedProject = await storage.getProjectById(projectId);
+      setProject(updatedProject || null);
+
+      showToast(`Invoice sent to ${project.clientEmail}!`, "success");
+    } catch (error) {
+      console.error('Error sending invoice:', error);
+      showToast(
+        error instanceof Error ? error.message : 'Failed to send invoice',
+        "error"
+      );
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+
   const handlePrint = () => {
     window.print();
   };
