@@ -411,7 +411,7 @@ export default function ProjectDetailPage() {
                     setShowEstimateConfirm(true);
                   }}
                   disabled={sendingEmail || !project.clientEmail}
-                  className={`px-4 py-2 border rounded-xl font-bold transition-colors $\{
+                  className={`px-4 py-2 border rounded-xl font-bold transition-colors ${
                     isPro && project.clientEmail
                       ? 'border-gold bg-gold text-white hover:bg-gold/90'
                       : 'border-line bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -440,7 +440,7 @@ export default function ProjectDetailPage() {
                     setShowInvoiceConfirm(true);
                   }}
                   disabled={sendingEmail || !project.clientEmail}
-                  className={`px-4 py-2 border rounded-xl font-bold transition-colors $\{
+                  className={`px-4 py-2 border rounded-xl font-bold transition-colors ${
                     isPro && project.clientEmail
                       ? 'border-gold bg-gold text-white hover:bg-gold/90'
                       : 'border-line bg-gray-200 text-gray-400 cursor-not-allowed'
