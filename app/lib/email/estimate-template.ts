@@ -13,19 +13,34 @@ interface EstimateEmailData {
 
 export function generateEstimateEmail(data: EstimateEmailData): string {
   const { project, settings, estimateNumber, approvalUrl } = data;
-  const client = project.client;
-  const pricing = project.pricing;
-
-  // Calculate totals
-  const subtotal = pricing.subtotal || 0;
-  const discount = pricing.discount || 0;
-  const taxAmount = pricing.taxAmount || 0;
-  const total = pricing.total || 0;
+  
+  // Extract data from project (actual structure)
+  const clientName = `${project.clientFirstName} ${project.clientLastName}`;
+  const estimate = project.estimateData || {};
+  
+  // Calculate totals (subtotal only - no tax/payment per new workflow positioning)
+  const subtotal = estimate.subtotal || 0;
+  const discountAmount = estimate.discountAmount || 0;
+  const total = subtotal - discountAmount; // Show net amount (no tax)
 
   // Build service description
-  const serviceType = pricing.quiltingType === 'custom' 
-    ? `Custom Rate ($${pricing.customRate?.toFixed(2)}/sq in)`
-    : pricing.quiltingType;
+  let serviceType = estimate.quiltingType || project.quiltingType || 'Custom Quilting';
+  if (project.customQuiltingRate) {
+    serviceType = `Custom Rate ($${project.customQuiltingRate.toFixed(2)}/sq in)`;
+  }
+
+  // Format address
+  const clientAddress = [
+    project.clientStreet,
+    project.clientCity && project.clientState ? `${project.clientCity}, ${project.clientState}` : null,
+    project.clientPostalCode,
+  ].filter(Boolean).join('<br>');
+
+  const businessAddress = [
+    settings.street,
+    settings.city && settings.state ? `${settings.city}, ${settings.state}` : null,
+    settings.postalCode,
+  ].filter(Boolean).join('<br>');
 
   return `
 <!DOCTYPE html>
@@ -41,17 +56,17 @@ export function generateEstimateEmail(data: EstimateEmailData): string {
     <!-- Header -->
     <div style="${emailStyles.header}">
       <h1 style="${emailStyles.headerTitle}">StitchQueue</h1>
-      <p style="${emailStyles.headerSubtitle}">${settings.businessName}</p>
+      <p style="${emailStyles.headerSubtitle}">${settings.businessName || 'Professional Quilting Services'}</p>
     </div>
 
     <!-- Main Content -->
     <div style="${emailStyles.content}">
       
       <!-- Greeting -->
-      <p style="${emailStyles.greeting}">Hi ${client.firstName},</p>
+      <p style="${emailStyles.greeting}">Hi ${project.clientFirstName},</p>
       
       <p style="${emailStyles.paragraph}">
-        Thank you for considering ${settings.businessName} for your quilting project! 
+        Thank you for considering ${settings.businessName || 'us'} for your quilting project! 
         I'm excited to work with you on this beautiful quilt.
       </p>
 
@@ -63,16 +78,17 @@ export function generateEstimateEmail(data: EstimateEmailData): string {
       <div style="${emailStyles.detailBox}">
         <p style="${emailStyles.detailLabel}">Client</p>
         <p style="${emailStyles.detailValue}">
-          ${client.firstName} ${client.lastName}<br>
-          ${client.email}${client.phone ? `<br>${client.phone}` : ''}
+          ${clientName}<br>
+          ${project.clientEmail || ''}${project.clientPhone ? `<br>${project.clientPhone}` : ''}
+          ${clientAddress ? `<br>${clientAddress}` : ''}
         </p>
 
         <p style="${emailStyles.detailLabel}">Quilt Details</p>
         <p style="${emailStyles.detailValue}">
-          ${project.width}" × ${project.length}" (${(project.width * project.length / 144).toFixed(1)} sq ft)<br>
+          ${project.quiltWidth}" × ${project.quiltLength}" (${((project.quiltWidth || 0) * (project.quiltLength || 0) / 144).toFixed(1)} sq ft)<br>
           Service: ${serviceType}
-          ${pricing.batting ? `<br>Batting: ${pricing.batting}` : ''}
-          ${pricing.binding ? `<br>Binding: ${pricing.binding}` : ''}
+          ${estimate.battingTotal ? `<br>Batting: ${project.battingChoice || 'Custom'}` : ''}
+          ${estimate.bindingTotal ? `<br>Binding: ${project.bindingType || 'Binding'}` : ''}
         </p>
 
         ${project.dueDate ? `
@@ -83,36 +99,38 @@ export function generateEstimateEmail(data: EstimateEmailData): string {
 
       <!-- Pricing Breakdown -->
       <div style="${emailStyles.priceBox}">
+        ${estimate.quiltingTotal ? `
         <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Quilting (${(project.width * project.length).toFixed(0)} sq in)</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(pricing.quiltingCharge || 0)}</span>
-        </div>
-
-        ${pricing.battingCharge ? `
-        <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Batting</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(pricing.battingCharge)}</span>
+          <span style="${emailStyles.priceLabel}">Quilting (${estimate.quiltArea || 0} sq in @ $${estimate.quiltingRate?.toFixed(2) || '0.00'}/sq in)</span>
+          <span style="${emailStyles.priceValue}">${formatCurrency(estimate.quiltingTotal)}</span>
         </div>
         ` : ''}
 
-        ${pricing.bindingCharge ? `
+        ${estimate.battingTotal ? `
         <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Binding</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(pricing.bindingCharge)}</span>
+          <span style="${emailStyles.priceLabel}">Batting (${estimate.battingLengthNeeded || 0}" @ ${project.battingChoice || 'Custom'})</span>
+          <span style="${emailStyles.priceValue}">${formatCurrency(estimate.battingTotal)}</span>
         </div>
         ` : ''}
 
-        ${pricing.bobbinCharge ? `
+        ${estimate.bindingTotal ? `
         <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Thread/Bobbin</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(pricing.bobbinCharge)}</span>
+          <span style="${emailStyles.priceLabel}">Binding (${estimate.bindingPerimeter || 0}" @ $${estimate.bindingRatePerInch?.toFixed(2) || '0.00'}/in)</span>
+          <span style="${emailStyles.priceValue}">${formatCurrency(estimate.bindingTotal)}</span>
         </div>
         ` : ''}
 
-        ${pricing.extraCharges && pricing.extraCharges.length > 0 ? 
-          pricing.extraCharges.map(charge => `
+        ${estimate.bobbinTotal ? `
+        <div style="${emailStyles.priceRow}">
+          <span style="${emailStyles.priceLabel}">Thread/Bobbin ${estimate.bobbinName ? `(${estimate.bobbinName})` : ''}</span>
+          <span style="${emailStyles.priceValue}">${formatCurrency(estimate.bobbinTotal)}</span>
+        </div>
+        ` : ''}
+
+        ${estimate.extraCharges && estimate.extraCharges.length > 0 ? 
+          estimate.extraCharges.map((charge: any) => `
             <div style="${emailStyles.priceRow}">
-              <span style="${emailStyles.priceLabel}">${charge.description}</span>
+              <span style="${emailStyles.priceLabel}">${charge.name}</span>
               <span style="${emailStyles.priceValue}">${formatCurrency(charge.amount)}</span>
             </div>
           `).join('') 
@@ -123,17 +141,10 @@ export function generateEstimateEmail(data: EstimateEmailData): string {
           <span style="${emailStyles.priceValue}">${formatCurrency(subtotal)}</span>
         </div>
 
-        ${discount > 0 ? `
+        ${discountAmount > 0 ? `
         <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Discount</span>
-          <span style="${emailStyles.priceValue}; color: #10b981;">-${formatCurrency(discount)}</span>
-        </div>
-        ` : ''}
-
-        ${taxAmount > 0 ? `
-        <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Tax</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(taxAmount)}</span>
+          <span style="${emailStyles.priceLabel}">Discount ${estimate.discountType === 'percentage' ? `(${estimate.discountValue}%)` : ''}</span>
+          <span style="${emailStyles.priceValue}; color: #10b981;">-${formatCurrency(discountAmount)}</span>
         </div>
         ` : ''}
 
@@ -141,13 +152,6 @@ export function generateEstimateEmail(data: EstimateEmailData): string {
           <span style="${emailStyles.totalLabel}">Total</span>
           <span style="${emailStyles.totalValue}">${formatCurrency(total)}</span>
         </div>
-
-        ${pricing.deposit ? `
-        <div style="${emailStyles.priceRow}; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e5e5;">
-          <span style="${emailStyles.priceLabel}">Deposit ${pricing.depositType === 'percentage' ? `(${pricing.depositPercentage}%)` : ''}</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(pricing.deposit)}</span>
-        </div>
-        ` : ''}
       </div>
 
       <!-- PDF Attachment Note -->
@@ -186,10 +190,9 @@ export function generateEstimateEmail(data: EstimateEmailData): string {
       </p>
 
       <p style="${emailStyles.paragraph}">
-        ${settings.businessName}<br>
-        ${settings.email}${settings.phone ? `<br>${settings.phone}` : ''}<br>
-        ${settings.address ? `${settings.address}<br>` : ''}
-        ${settings.city && settings.state ? `${settings.city}, ${settings.state} ${settings.postalCode || ''}` : ''}
+        ${settings.businessName || 'StitchQueue'}<br>
+        ${settings.email || ''}${settings.phone ? `<br>${settings.phone}` : ''}<br>
+        ${businessAddress ? `${businessAddress}` : ''}
       </p>
 
       <p style="${emailStyles.paragraph}">
@@ -198,7 +201,7 @@ export function generateEstimateEmail(data: EstimateEmailData): string {
 
       <p style="${emailStyles.paragraph}">
         Best regards,<br>
-        ${settings.businessName}
+        ${settings.businessName || 'StitchQueue'}
       </p>
 
     </div>

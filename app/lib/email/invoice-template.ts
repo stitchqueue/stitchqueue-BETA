@@ -12,25 +12,38 @@ interface InvoiceEmailData {
 
 export function generateInvoiceEmail(data: InvoiceEmailData): string {
   const { project, settings, invoiceNumber } = data;
-  const client = project.client;
-  const pricing = project.pricing;
-  const payments = project.payments || {};
-
-  // Calculate amounts
-  const total = pricing.total || 0;
-  const depositPaid = payments.depositAmount || 0;
-  const finalPaymentAmount = payments.finalPaymentAmount || 0;
-  const totalPaid = depositPaid + finalPaymentAmount;
-  const balanceDue = total - totalPaid;
+  
+  // Extract data from project (actual structure)
+  const clientName = `${project.clientFirstName} ${project.clientLastName}`;
+  const estimate = project.estimateData || {};
+  
+  // Calculate amounts (no tax/payment tracking per new workflow positioning)
+  const subtotal = estimate.subtotal || 0;
+  const discountAmount = estimate.discountAmount || 0;
+  const total = subtotal - discountAmount; // Show net amount (no tax)
 
   // Determine invoice type
   const isGift = project.invoiceType === 'gift';
   const isCharitable = project.invoiceType === 'charitable';
 
   // Build service description
-  const serviceType = pricing.quiltingType === 'custom' 
-    ? `Custom Rate ($${pricing.customRate?.toFixed(2)}/sq in)`
-    : pricing.quiltingType;
+  let serviceType = estimate.quiltingType || project.quiltingType || 'Custom Quilting';
+  if (project.customQuiltingRate) {
+    serviceType = `Custom Rate ($${project.customQuiltingRate.toFixed(2)}/sq in)`;
+  }
+
+  // Format addresses
+  const clientAddress = [
+    project.clientStreet,
+    project.clientCity && project.clientState ? `${project.clientCity}, ${project.clientState}` : null,
+    project.clientPostalCode,
+  ].filter(Boolean).join('<br>');
+
+  const businessAddress = [
+    settings.street,
+    settings.city && settings.state ? `${settings.city}, ${settings.state}` : null,
+    settings.postalCode,
+  ].filter(Boolean).join('<br>');
 
   return `
 <!DOCTYPE html>
@@ -46,14 +59,14 @@ export function generateInvoiceEmail(data: InvoiceEmailData): string {
     <!-- Header -->
     <div style="${emailStyles.header}">
       <h1 style="${emailStyles.headerTitle}">StitchQueue</h1>
-      <p style="${emailStyles.headerSubtitle}">${settings.businessName}</p>
+      <p style="${emailStyles.headerSubtitle}">${settings.businessName || 'Professional Quilting Services'}</p>
     </div>
 
     <!-- Main Content -->
     <div style="${emailStyles.content}">
       
       <!-- Greeting -->
-      <p style="${emailStyles.greeting}">Hi ${client.firstName},</p>
+      <p style="${emailStyles.greeting}">Hi ${project.clientFirstName},</p>
       
       ${isGift ? `
         <p style="${emailStyles.paragraph}">
@@ -61,7 +74,7 @@ export function generateInvoiceEmail(data: InvoiceEmailData): string {
         </p>
       ` : isCharitable ? `
         <p style="${emailStyles.paragraph}">
-          Your quilt is ready for pickup! This invoice includes tax-deductible information for your charitable donation.
+          Your quilt is ready for pickup! This invoice includes information for your charitable donation records.
         </p>
       ` : `
         <p style="${emailStyles.paragraph}">
@@ -73,134 +86,96 @@ export function generateInvoiceEmail(data: InvoiceEmailData): string {
       <div style="${emailStyles.detailBox}">
         <p style="${emailStyles.detailLabel}">Client</p>
         <p style="${emailStyles.detailValue}">
-          ${client.firstName} ${client.lastName}<br>
-          ${client.email}${client.phone ? `<br>${client.phone}` : ''}
+          ${clientName}<br>
+          ${project.clientEmail || ''}${project.clientPhone ? `<br>${project.clientPhone}` : ''}
+          ${clientAddress ? `<br>${clientAddress}` : ''}
         </p>
 
         <p style="${emailStyles.detailLabel}">Quilt Details</p>
         <p style="${emailStyles.detailValue}">
-          ${project.width}" × ${project.length}" (${(project.width * project.length / 144).toFixed(1)} sq ft)<br>
+          ${project.quiltWidth}" × ${project.quiltLength}" (${((project.quiltWidth || 0) * (project.quiltLength || 0) / 144).toFixed(1)} sq ft)<br>
           Service: ${serviceType}
-          ${pricing.batting ? `<br>Batting: ${pricing.batting}` : ''}
-          ${pricing.binding ? `<br>Binding: ${pricing.binding}` : ''}
+          ${estimate.battingTotal ? `<br>Batting: ${project.battingChoice || 'Custom'}` : ''}
+          ${estimate.bindingTotal ? `<br>Binding: ${project.bindingType || 'Binding'}` : ''}
         </p>
 
-        ${project.completedDate ? `
+        ${project.updatedAt ? `
         <p style="${emailStyles.detailLabel}">Completion Date</p>
-        <p style="${emailStyles.detailValueLast}">${formatDate(project.completedDate)}</p>
+        <p style="${emailStyles.detailValueLast}">${formatDate(project.updatedAt)}</p>
         ` : ''}
       </div>
 
       <!-- Pricing Breakdown -->
       <div style="${emailStyles.priceBox}">
+        ${estimate.quiltingTotal ? `
         <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Quilting (${(project.width * project.length).toFixed(0)} sq in)</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(pricing.quiltingCharge || 0)}</span>
-        </div>
-
-        ${pricing.battingCharge ? `
-        <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Batting</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(pricing.battingCharge)}</span>
+          <span style="${emailStyles.priceLabel}">Quilting (${estimate.quiltArea || 0} sq in @ $${estimate.quiltingRate?.toFixed(2) || '0.00'}/sq in)</span>
+          <span style="${emailStyles.priceValue}">${formatCurrency(estimate.quiltingTotal)}</span>
         </div>
         ` : ''}
 
-        ${pricing.bindingCharge ? `
+        ${estimate.battingTotal ? `
         <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Binding</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(pricing.bindingCharge)}</span>
+          <span style="${emailStyles.priceLabel}">Batting (${estimate.battingLengthNeeded || 0}" @ ${project.battingChoice || 'Custom'})</span>
+          <span style="${emailStyles.priceValue}">${formatCurrency(estimate.battingTotal)}</span>
         </div>
         ` : ''}
 
-        ${pricing.bobbinCharge ? `
+        ${estimate.bindingTotal ? `
         <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Thread/Bobbin</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(pricing.bobbinCharge)}</span>
+          <span style="${emailStyles.priceLabel}">Binding (${estimate.bindingPerimeter || 0}" @ $${estimate.bindingRatePerInch?.toFixed(2) || '0.00'}/in)</span>
+          <span style="${emailStyles.priceValue}">${formatCurrency(estimate.bindingTotal)}</span>
         </div>
         ` : ''}
 
-        ${pricing.extraCharges && pricing.extraCharges.length > 0 ? 
-          pricing.extraCharges.map(charge => `
+        ${estimate.bobbinTotal ? `
+        <div style="${emailStyles.priceRow}">
+          <span style="${emailStyles.priceLabel}">Thread/Bobbin ${estimate.bobbinName ? `(${estimate.bobbinName})` : ''}</span>
+          <span style="${emailStyles.priceValue}">${formatCurrency(estimate.bobbinTotal)}</span>
+        </div>
+        ` : ''}
+
+        ${estimate.extraCharges && estimate.extraCharges.length > 0 ? 
+          estimate.extraCharges.map((charge: any) => `
             <div style="${emailStyles.priceRow}">
-              <span style="${emailStyles.priceLabel}">${charge.description}</span>
+              <span style="${emailStyles.priceLabel}">${charge.name}</span>
               <span style="${emailStyles.priceValue}">${formatCurrency(charge.amount)}</span>
             </div>
           `).join('') 
         : ''}
 
-        ${isCharitable && project.mileage ? `
-        <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Mileage (${project.mileage} miles @ $0.67/mi)</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(project.mileage * 0.67)}</span>
-        </div>
-        ` : ''}
-
         <div style="${emailStyles.priceRow}">
           <span style="${emailStyles.priceLabel}">Subtotal</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(pricing.subtotal || 0)}</span>
+          <span style="${emailStyles.priceValue}">${formatCurrency(subtotal)}</span>
         </div>
 
-        ${pricing.discount && pricing.discount > 0 ? `
+        ${discountAmount > 0 ? `
         <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Discount</span>
-          <span style="${emailStyles.priceValue}; color: #10b981;">-${formatCurrency(pricing.discount)}</span>
-        </div>
-        ` : ''}
-
-        ${pricing.taxAmount && pricing.taxAmount > 0 ? `
-        <div style="${emailStyles.priceRow}">
-          <span style="${emailStyles.priceLabel}">Tax</span>
-          <span style="${emailStyles.priceValue}">${formatCurrency(pricing.taxAmount)}</span>
+          <span style="${emailStyles.priceLabel}">Discount ${estimate.discountType === 'percentage' ? `(${estimate.discountValue}%)` : ''}</span>
+          <span style="${emailStyles.priceValue}; color: #10b981;">-${formatCurrency(discountAmount)}</span>
         </div>
         ` : ''}
 
         <div style="${emailStyles.totalRow}">
-          <span style="${emailStyles.totalLabel}">Total</span>
+          <span style="${emailStyles.totalLabel}">${isGift ? 'Gift Value' : 'Total'}</span>
           <span style="${emailStyles.totalValue}">${formatCurrency(total)}</span>
         </div>
 
-        ${!isGift ? `
-        <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #e5e5e5;">
-          ${depositPaid > 0 ? `
-          <div style="${emailStyles.priceRow}">
-            <span style="${emailStyles.priceLabel}">Deposit Paid</span>
-            <span style="${emailStyles.priceValue}; color: #10b981;">${formatCurrency(depositPaid)}</span>
-          </div>
-          ` : ''}
-          
-          ${finalPaymentAmount > 0 ? `
-          <div style="${emailStyles.priceRow}">
-            <span style="${emailStyles.priceLabel}">Final Payment</span>
-            <span style="${emailStyles.priceValue}; color: #10b981;">${formatCurrency(finalPaymentAmount)}</span>
-          </div>
-          ` : ''}
-
-          <div style="${emailStyles.priceRow}; font-size: 18px; font-weight: bold; color: ${balanceDue > 0 ? '#ef4444' : '#10b981'};">
-            <span>Balance Due</span>
-            <span>${formatCurrency(balanceDue)}</span>
-          </div>
-        </div>
-        ` : `
+        ${isGift ? `
         <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #e5e5e5;">
           <div style="${emailStyles.priceRow}; font-size: 18px; font-weight: bold; color: #10b981;">
             <span>Gift Invoice</span>
             <span>No Payment Due</span>
           </div>
         </div>
-        `}
+        ` : ''}
       </div>
 
       ${isCharitable ? `
-      <!-- Tax Deductible Information -->
+      <!-- Charitable Donation Note -->
       <div style="${emailStyles.note}">
-        <strong>📋 Tax-Deductible Information:</strong><br>
-        For your charitable contribution, the following amounts may be tax-deductible:<br>
-        <ul style="margin: 10px 0 0 20px; padding: 0;">
-          <li>Materials: ${formatCurrency(pricing.battingCharge || 0)}</li>
-          ${project.mileage ? `<li>Mileage: ${formatCurrency(project.mileage * 0.67)}</li>` : ''}
-          <li style="color: #92400e;">Services are NOT tax-deductible per IRS guidelines</li>
-        </ul>
-        Please consult with your tax advisor for guidance.
+        <strong>📋 Charitable Donation Record:</strong><br>
+        This invoice serves as a record of your charitable contribution. Please consult with your tax advisor regarding deductibility of materials and services.
       </div>
       ` : ''}
 
@@ -209,19 +184,11 @@ export function generateInvoiceEmail(data: InvoiceEmailData): string {
         <strong>📎 PDF Attached:</strong> A detailed PDF copy of this invoice is attached for your records.
       </div>
 
-      ${!isGift && balanceDue > 0 ? `
+      ${!isGift ? `
       <hr style="${emailStyles.divider}">
       
-      <p style="${emailStyles.paragraph}; text-align: center; font-size: 18px; font-weight: 500;">
-        Payment Methods Accepted:
-      </p>
-      
-      <p style="${emailStyles.paragraph}; text-align: center;">
-        Cash • Check • Venmo • PayPal • Zelle • Square • Credit Card
-      </p>
-
-      <p style="${emailStyles.paragraph}; text-align: center; color: #666666;">
-        Please remit payment at your earliest convenience.
+      <p style="${emailStyles.paragraph}; text-align: center; font-size: 16px;">
+        For payment details and methods, please contact ${settings.businessName || 'us'} directly.
       </p>
       ` : ''}
 
@@ -236,10 +203,9 @@ export function generateInvoiceEmail(data: InvoiceEmailData): string {
       </p>
 
       <p style="${emailStyles.paragraph}">
-        ${settings.businessName}<br>
-        ${settings.email}${settings.phone ? `<br>${settings.phone}` : ''}<br>
-        ${settings.address ? `${settings.address}<br>` : ''}
-        ${settings.city && settings.state ? `${settings.city}, ${settings.state} ${settings.postalCode || ''}` : ''}
+        ${settings.businessName || 'StitchQueue'}<br>
+        ${settings.email || ''}${settings.phone ? `<br>${settings.phone}` : ''}<br>
+        ${businessAddress ? `${businessAddress}` : ''}
       </p>
 
       <p style="${emailStyles.paragraph}">
@@ -248,7 +214,7 @@ export function generateInvoiceEmail(data: InvoiceEmailData): string {
 
       <p style="${emailStyles.paragraph}">
         Best regards,<br>
-        ${settings.businessName}
+        ${settings.businessName || 'StitchQueue'}
       </p>
 
     </div>
