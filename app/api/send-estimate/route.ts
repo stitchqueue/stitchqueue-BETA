@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { mapProjectFromDb, mapSettingsFromDb } from '@/app/lib/storage/mappers';
 import { generateEstimateEmail, generateEstimatePDF } from '@/app/lib/email';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -17,51 +18,94 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
     }
 
-    const { data: project, error: projectError } = await supabase.from('projects').select('*').eq('id', projectId).single();
-    if (projectError || !project) {
+    // Get project from database
+    const { data: dbProject, error: projectError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single();
+
+    if (projectError || !dbProject) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const { data: org, error: orgError } = await supabase.from('organizations').select('*').eq('id', project.organization_id).single();
-    if (orgError || !org) {
+    // Get organization settings
+    const { data: dbOrg, error: orgError } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', dbProject.organization_id)
+      .single();
+
+    if (orgError || !dbOrg) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
-    console.log("Organization check:", { id: org.id, isPaidTier: org.is_paid_tier, businessName: org.businessName });
-    if (!org.is_paid_tier) {
+    // Check PRO tier
+    if (dbOrg.subscription_tier !== 'pro') {
       return NextResponse.json({ error: 'Email sending requires PRO tier' }, { status: 403 });
     }
 
-    const projectData = project.data as any;
-    const clientEmail = projectData.clientEmail;
+    // Map to TypeScript types
+    const project = mapProjectFromDb(dbProject);
+    const settings = mapSettingsFromDb(dbOrg);
 
-    if (!clientEmail) {
+    if (!project.clientEmail) {
       return NextResponse.json({ error: 'Client email address is required' }, { status: 400 });
     }
 
-    const emailHtml = generateEstimateEmail(projectData, org);
-    const pdfBuffer = generateEstimatePDF(projectData, org);
+    // Generate email content
+    const estimateNumber = String(project.estimateNumber || 'TBD');
+    const approvalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://beta.stitchqueue.com'}/approve/${project.id}`;
+    
+    const emailData = {
+      project,
+      settings,
+      estimateNumber,
+      approvalUrl,
+    };
 
-    const { data: emailData, error: emailError } = await resend.emails.send({
+    const emailHtml = generateEstimateEmail(emailData);
+    const pdfBuffer = generateEstimatePDF(project, settings, estimateNumber);
+
+    // Send via Resend
+    const { data: emailResult, error: emailError } = await resend.emails.send({
       from: 'noreply@stitchqueue.com',
-      to: clientEmail,
-      replyTo: org.email || 'noreply@stitchqueue.com',
-      subject: `Estimate #${projectData.estimateNumber || 'TBD'} from ${org.businessName || 'StitchQueue'}`,
+      to: project.clientEmail,
+      replyTo: settings.email || 'noreply@stitchqueue.com',
+      subject: `Estimate #${estimateNumber} from ${settings.businessName || 'StitchQueue'}`,
       html: emailHtml,
-      attachments: [{ filename: `Estimate-${projectData.estimateNumber || 'TBD'}.pdf`, content: pdfBuffer }],
+      attachments: [{
+        filename: `Estimate-${estimateNumber}.pdf`,
+        content: pdfBuffer,
+      }],
     });
 
     if (emailError) {
       console.error('Resend error:', emailError);
-      return NextResponse.json({ error: 'Failed to send email' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to send email: ' + emailError.message }, { status: 500 });
     }
 
-    const updatedData = { ...projectData, estimateEmailSent: { timestamp: new Date().toISOString(), recipientEmail: clientEmail, resendId: emailData?.id || null } };
-    await supabase.from('projects').update({ data: updatedData }).eq('id', projectId);
+    // Update project with email tracking
+    await supabase
+      .from('projects')
+      .update({
+        estimate_email_sent: {
+          timestamp: new Date().toISOString(),
+          recipientEmail: project.clientEmail,
+          resendId: emailResult?.id || null,
+        }
+      })
+      .eq('id', projectId);
 
-    return NextResponse.json({ success: true, message: 'Estimate sent successfully' });
+    return NextResponse.json({
+      success: true,
+      message: 'Estimate sent successfully',
+    });
   } catch (error) {
     console.error('Send estimate error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
