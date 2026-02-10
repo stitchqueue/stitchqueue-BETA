@@ -8,7 +8,7 @@ import { Project, Settings } from '@/app/types';
  * Note: Invoice PDFs are not generated via email - invoices are reference documents
  * for quilters to use in their accounting software (QuickBooks/Xero)
  */
-export async function generateEstimatePDF(
+export function generateEstimatePDF(
   project: Project,
   settings: Settings,
   estimateNumber: string
@@ -102,7 +102,7 @@ ${settings?.businessName || 'StitchQueue'}
  * Invoices serve as reference documents for accounting software only
  * This function is kept for backwards compatibility but should not be called
  */
-export async function generateInvoicePDF(
+export function generateInvoicePDF(
   project: Project,
   settings: Settings,
   invoiceNumber: string
