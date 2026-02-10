@@ -4,7 +4,7 @@
 import { Project, Settings } from '@/app/types';
 
 /**
- * Generate estimate PDF content as base64
+ * Generate estimate PDF content as Buffer
  * Note: Invoice PDFs are not generated via email - invoices are reference documents
  * for quilters to use in their accounting software (QuickBooks/Xero)
  */
@@ -13,10 +13,6 @@ export async function generateEstimatePDF(
   settings: Settings,
   estimateNumber: string
 ): Promise<Buffer> {
-  // For now, we'll return a simple text-based PDF
-  // In production, you might want to use a library like jsPDF or puppeteer
-  // to create a proper PDF from HTML
-  
   const estimate = project.estimateData || {};
   const clientName = `${project.clientFirstName} ${project.clientLastName}`;
   
@@ -25,15 +21,15 @@ export async function generateEstimatePDF(
   const discountAmount = estimate.discountAmount || 0;
   const total = subtotal - discountAmount;
 
-  // Format addresses
+  // Format addresses - handle undefined gracefully
   const clientAddress = [
     project.clientStreet,
     project.clientCity && project.clientState ? `${project.clientCity}, ${project.clientState} ${project.clientPostalCode || ''}` : null,
   ].filter(Boolean).join('\n');
 
   const businessAddress = [
-    settings.street,
-    settings.city && settings.state ? `${settings.city}, ${settings.state} ${settings.postalCode || ''}` : null,
+    settings?.street,
+    settings?.city && settings?.state ? `${settings.city}, ${settings.state} ${settings.postalCode || ''}` : null,
   ].filter(Boolean).join('\n');
 
   // Build service type description
@@ -45,9 +41,9 @@ export async function generateEstimatePDF(
   const content = `
 ESTIMATE #${estimateNumber}
 
-${settings.businessName || 'StitchQueue'}
-${settings.email || ''}
-${settings.phone || ''}
+${settings?.businessName || 'StitchQueue'}
+${settings?.email || ''}
+${settings?.phone || ''}
 ${businessAddress}
 
 ---
@@ -86,15 +82,15 @@ TOTAL: $${total.toFixed(2)}
 
 APPROVAL INSTRUCTIONS:
 Please review this estimate and respond via the link in the email to:
-• Approve the estimate
-• Request changes
-• Decline
+- Approve the estimate
+- Request changes
+- Decline
 
 ---
 
-Thank you for considering ${settings.businessName || 'us'} for your quilting project!
+Thank you for considering ${settings?.businessName || 'us'} for your quilting project!
 
-${settings.businessName || 'StitchQueue'}
+${settings?.businessName || 'StitchQueue'}
   `.trim();
 
   // Return as Buffer (API expects Buffer, not base64 string)
