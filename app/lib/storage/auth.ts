@@ -28,11 +28,20 @@ export async function getOrganizationId(): Promise<string | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("profiles")
     .select("organization_id")
     .eq("id", user.id)
     .single();
+
+  // If profile doesn't exist (new user on first login), return null
+  if (error) {
+    if (error.code !== "PGRST116") {
+      // PGRST116 = no rows returned, which is expected for new users
+      console.error("Error fetching organization ID:", error.message);
+    }
+    return null;
+  }
 
   return profile?.organization_id || null;
 }

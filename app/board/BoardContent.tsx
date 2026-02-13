@@ -90,6 +90,7 @@ export default function BoardContent() {
   // ─────────────────────────────────────────────────────────────────────
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<string | null>(stageFilter);
   const [showDueThisWeek, setShowDueThisWeek] = useState(
     specialFilter === "due-this-week"
@@ -123,17 +124,24 @@ export default function BoardContent() {
   // ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const loadData = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/login");
-        return;
-      }
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          router.push("/login");
+          return;
+        }
 
-      const savedProjects = await storage.getProjects();
-      setProjects(savedProjects);
-      setLoading(false);
+        const savedProjects = await storage.getProjects();
+        setProjects(savedProjects || []);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error loading board data:", err);
+        setError(err instanceof Error ? err.message : "Failed to load projects");
+        setProjects([]);
+        setLoading(false);
+      }
     };
     loadData();
   }, [router]);
@@ -148,7 +156,7 @@ export default function BoardContent() {
   // ─────────────────────────────────────────────────────────────────────
   // DERIVED DATA
   // ─────────────────────────────────────────────────────────────────────
-  const activeProjects = projects.filter((p) => p.stage !== "Archived");
+  const activeProjects = (projects || []).filter((p) => p.stage !== "Archived");
   const dueThisWeekCount = activeProjects.filter(isDueThisWeek).length;
 
   /**
@@ -378,6 +386,35 @@ export default function BoardContent() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-plum mx-auto mb-4"></div>
           <div className="text-muted">Loading board...</div>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="max-w-7xl mx-auto px-4 py-6">
+          <div className="bg-white border border-red-300 rounded-xl p-8 text-center">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Unable to Load Board</h2>
+            <p className="text-muted mb-4">{error}</p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors"
+              >
+                Retry
+              </button>
+              <button
+                onClick={() => router.push("/")}
+                className="px-4 py-2 border border-line rounded-xl hover:bg-white transition-colors"
+              >
+                Go Home
+              </button>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
