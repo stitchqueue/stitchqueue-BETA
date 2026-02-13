@@ -1,9 +1,11 @@
 /**
  * BoardContent Component
- * 
+ *
+ * v4.0: Updated for 3-stage workflow (Estimates → In Progress → Completed)
+ *
  * Main orchestrator for the project board. Manages all state,
  * handles drag-and-drop, filtering, sorting, and view switching.
- * 
+ *
  * @module board/BoardContent
  */
 
@@ -46,6 +48,29 @@ import type { SortField, SortDirection } from "./components";
 import { isDueThisWeek } from "./utils";
 
 type ViewMode = "board" | "list" | "calendar";
+
+/**
+ * Stage configuration for v4.0 3-stage workflow
+ * Maps stage names to display information and hover tooltips
+ */
+const STAGE_CONFIG: Record<Stage, { label: string; tooltip: string }> = {
+  Estimates: {
+    label: "Estimates",
+    tooltip: "Intake & Estimating",
+  },
+  "In Progress": {
+    label: "In Progress",
+    tooltip: "Active Work",
+  },
+  Completed: {
+    label: "Completed",
+    tooltip: "Finalizing",
+  },
+  Archived: {
+    label: "Archived",
+    tooltip: "Archived Projects",
+  },
+};
 
 /**
  * Main board content with all state management.
@@ -607,6 +632,7 @@ export default function BoardContent() {
                       stage={stage as Stage}
                       projects={stageProjects}
                       onCardClick={handleCardClick}
+                      stageConfig={STAGE_CONFIG[stage as Stage]}
                     />
                   );
                 })}

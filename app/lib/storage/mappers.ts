@@ -1,12 +1,47 @@
 /**
  * Database Mapping Functions
- * 
+ *
  * Convert between TypeScript types and database schema.
- * 
+ *
  * @module lib/storage/mappers
  */
 
-import type { Project, Settings } from "../../types";
+import type { Project, Settings, Stage } from "../../types";
+
+/**
+ * Map database stage value to TypeScript Stage type
+ * Handles both old (pre-v4.0) and new stage values during migration period
+ */
+function mapStageFromDb(dbStage: string): Stage {
+  const stageMap: Record<string, Stage> = {
+    // Old stages (pre-v4.0) - will be migrated away
+    'intake': 'Estimates',
+    'estimate': 'Estimates',
+    'invoiced': 'Completed',
+    'paid_shipped': 'Completed',
+    // New stages (v4.0+)
+    'estimates': 'Estimates',
+    'in_progress': 'In Progress',
+    'completed': 'Completed',
+    'archived': 'Archived',
+  };
+
+  return stageMap[dbStage] || 'Estimates';
+}
+
+/**
+ * Map TypeScript Stage type to database value
+ */
+function mapStageToDb(stage: Stage): string {
+  const stageMap: Record<Stage, string> = {
+    'Estimates': 'estimates',
+    'In Progress': 'in_progress',
+    'Completed': 'completed',
+    'Archived': 'archived',
+  };
+
+  return stageMap[stage] || 'estimates';
+}
 
 /**
  * Map database row to Project type
@@ -14,7 +49,7 @@ import type { Project, Settings } from "../../types";
 export function mapProjectFromDb(row: any): Project {
   return {
     id: row.id,
-    stage: row.stage,
+    stage: mapStageFromDb(row.stage),
     intakeDate: row.intake_date,
     estimateNumber: row.estimate_number,
     requestedDateType: row.requested_date_type || "no_date",
@@ -43,6 +78,29 @@ export function mapProjectFromDb(row: any): Project {
     bobbinChoice: row.bobbin_choice,
     extraCharges: row.extra_charges,
     isDonation: row.is_donation,
+    invoiceType: row.invoice_type,
+
+    // ============================================================================
+    // v4.0 NEW FIELDS - 3-Stage Workflow Checklist
+    // ============================================================================
+    approvalStatus: row.approval_status,
+    approvalDate: row.approval_date,
+    invoiced: row.invoiced,
+    invoicedAmount: row.invoiced_amount,
+    invoicedDate: row.invoiced_date,
+    paid: row.paid,
+    paidAmount: row.paid_amount,
+    paidDate: row.paid_date,
+    delivered: row.delivered,
+    deliveryMethod: row.delivery_method,
+    deliveryDate: row.delivery_date,
+    balanceRemaining: row.balance_remaining,
+    donatedValue: row.donated_value,
+    projectType: row.project_type,
+
+    // ============================================================================
+    // CURRENT FIELDS (unchanged)
+    // ============================================================================
     depositType: row.deposit_type,
     depositPercentage: row.deposit_percentage,
     depositAmount: row.deposit_amount,
@@ -50,14 +108,24 @@ export function mapProjectFromDb(row: any): Project {
     depositPaidDate: row.deposit_paid_date,
     depositPaidMethod: row.deposit_paid_method,
     depositPaidAmount: row.deposit_paid_amount,
-    finalPaymentAmount: row.final_payment_amount,
-    finalPaymentDate: row.final_payment_date,
-    finalPaymentMethod: row.final_payment_method,
-    paidInFull: row.paid_in_full,
     estimateData: row.estimate_data,
     notes: row.notes || [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+
+    // ============================================================================
+    // DEPRECATED FIELDS (v4.0) - kept for backward compatibility
+    // ============================================================================
+    taxExempt: row.tax_exempt,
+    taxPrimaryRate: row.tax_primary_rate,
+    taxPrimaryAmount: row.tax_primary_amount,
+    taxSecondaryRate: row.tax_secondary_rate,
+    taxSecondaryAmount: row.tax_secondary_amount,
+    taxTotalAmount: row.tax_total_amount,
+    finalPaymentAmount: row.final_payment_amount,
+    finalPaymentDate: row.final_payment_date,
+    finalPaymentMethod: row.final_payment_method,
+    paidInFull: row.paid_in_full,
   };
 }
 
@@ -68,7 +136,7 @@ export function mapProjectToDb(project: Project, orgId: string): any {
   return {
     id: project.id,
     organization_id: orgId,
-    stage: project.stage,
+    stage: mapStageToDb(project.stage),
     intake_date: project.intakeDate,
     estimate_number: project.estimateNumber,
     requested_date_type: project.requestedDateType,
@@ -97,6 +165,29 @@ export function mapProjectToDb(project: Project, orgId: string): any {
     bobbin_choice: project.bobbinChoice,
     extra_charges: project.extraCharges,
     is_donation: project.isDonation,
+    invoice_type: project.invoiceType,
+
+    // ============================================================================
+    // v4.0 NEW FIELDS - 3-Stage Workflow Checklist
+    // ============================================================================
+    approval_status: project.approvalStatus,
+    approval_date: project.approvalDate,
+    invoiced: project.invoiced,
+    invoiced_amount: project.invoicedAmount,
+    invoiced_date: project.invoicedDate,
+    paid: project.paid,
+    paid_amount: project.paidAmount,
+    paid_date: project.paidDate,
+    delivered: project.delivered,
+    delivery_method: project.deliveryMethod,
+    delivery_date: project.deliveryDate,
+    balance_remaining: project.balanceRemaining,
+    donated_value: project.donatedValue,
+    project_type: project.projectType,
+
+    // ============================================================================
+    // CURRENT FIELDS (unchanged)
+    // ============================================================================
     deposit_type: project.depositType,
     deposit_percentage: project.depositPercentage,
     deposit_amount: project.depositAmount,
@@ -104,14 +195,24 @@ export function mapProjectToDb(project: Project, orgId: string): any {
     deposit_paid_date: project.depositPaidDate,
     deposit_paid_method: project.depositPaidMethod,
     deposit_paid_amount: project.depositPaidAmount,
-    final_payment_amount: project.finalPaymentAmount,
-    final_payment_date: project.finalPaymentDate,
-    final_payment_method: project.finalPaymentMethod,
-    paid_in_full: project.paidInFull,
     estimate_data: project.estimateData,
     notes: project.notes,
     created_at: project.createdAt,
     updated_at: project.updatedAt,
+
+    // ============================================================================
+    // DEPRECATED FIELDS (v4.0) - kept for backward compatibility
+    // ============================================================================
+    tax_exempt: project.taxExempt,
+    tax_primary_rate: project.taxPrimaryRate,
+    tax_primary_amount: project.taxPrimaryAmount,
+    tax_secondary_rate: project.taxSecondaryRate,
+    tax_secondary_amount: project.taxSecondaryAmount,
+    tax_total_amount: project.taxTotalAmount,
+    final_payment_amount: project.finalPaymentAmount,
+    final_payment_date: project.finalPaymentDate,
+    final_payment_method: project.finalPaymentMethod,
+    paid_in_full: project.paidInFull,
   };
 }
 
@@ -121,7 +222,10 @@ export function mapProjectToDb(project: Project, orgId: string): any {
 export function mapUpdatesToDb(updates: Partial<Project>): any {
   const dbUpdates: any = {};
 
-  if (updates.stage !== undefined) dbUpdates.stage = updates.stage;
+  // Stage (with enum mapping)
+  if (updates.stage !== undefined) dbUpdates.stage = mapStageToDb(updates.stage);
+
+  // Core project fields
   if (updates.intakeDate !== undefined)
     dbUpdates.intake_date = updates.intakeDate;
   if (updates.estimateNumber !== undefined)
@@ -133,6 +237,8 @@ export function mapUpdatesToDb(updates: Partial<Project>): any {
   if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate;
   if (updates.orderIndex !== undefined)
     dbUpdates.order_index = updates.orderIndex;
+
+  // Client fields
   if (updates.clientFirstName !== undefined)
     dbUpdates.client_first_name = updates.clientFirstName;
   if (updates.clientLastName !== undefined)
@@ -151,6 +257,8 @@ export function mapUpdatesToDb(updates: Partial<Project>): any {
     dbUpdates.client_postal_code = updates.clientPostalCode;
   if (updates.clientCountry !== undefined)
     dbUpdates.client_country = updates.clientCountry;
+
+  // Project details
   if (updates.description !== undefined)
     dbUpdates.description = updates.description;
   if (updates.cardLabel !== undefined) dbUpdates.card_label = updates.cardLabel;
@@ -176,6 +284,44 @@ export function mapUpdatesToDb(updates: Partial<Project>): any {
     dbUpdates.extra_charges = updates.extraCharges;
   if (updates.isDonation !== undefined)
     dbUpdates.is_donation = updates.isDonation;
+  if (updates.invoiceType !== undefined)
+    dbUpdates.invoice_type = updates.invoiceType;
+
+  // ============================================================================
+  // v4.0 NEW FIELDS - 3-Stage Workflow Checklist
+  // ============================================================================
+  if (updates.approvalStatus !== undefined)
+    dbUpdates.approval_status = updates.approvalStatus;
+  if (updates.approvalDate !== undefined)
+    dbUpdates.approval_date = updates.approvalDate;
+  if (updates.invoiced !== undefined)
+    dbUpdates.invoiced = updates.invoiced;
+  if (updates.invoicedAmount !== undefined)
+    dbUpdates.invoiced_amount = updates.invoicedAmount;
+  if (updates.invoicedDate !== undefined)
+    dbUpdates.invoiced_date = updates.invoicedDate;
+  if (updates.paid !== undefined)
+    dbUpdates.paid = updates.paid;
+  if (updates.paidAmount !== undefined)
+    dbUpdates.paid_amount = updates.paidAmount;
+  if (updates.paidDate !== undefined)
+    dbUpdates.paid_date = updates.paidDate;
+  if (updates.delivered !== undefined)
+    dbUpdates.delivered = updates.delivered;
+  if (updates.deliveryMethod !== undefined)
+    dbUpdates.delivery_method = updates.deliveryMethod;
+  if (updates.deliveryDate !== undefined)
+    dbUpdates.delivery_date = updates.deliveryDate;
+  if (updates.balanceRemaining !== undefined)
+    dbUpdates.balance_remaining = updates.balanceRemaining;
+  if (updates.donatedValue !== undefined)
+    dbUpdates.donated_value = updates.donatedValue;
+  if (updates.projectType !== undefined)
+    dbUpdates.project_type = updates.projectType;
+
+  // ============================================================================
+  // CURRENT FIELDS (unchanged)
+  // ============================================================================
   if (updates.depositType !== undefined)
     dbUpdates.deposit_type = updates.depositType;
   if (updates.depositPercentage !== undefined)
@@ -190,6 +336,25 @@ export function mapUpdatesToDb(updates: Partial<Project>): any {
     dbUpdates.deposit_paid_method = updates.depositPaidMethod;
   if (updates.depositPaidAmount !== undefined)
     dbUpdates.deposit_paid_amount = updates.depositPaidAmount;
+  if (updates.estimateData !== undefined)
+    dbUpdates.estimate_data = updates.estimateData;
+  if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+
+  // ============================================================================
+  // DEPRECATED FIELDS (v4.0) - kept for backward compatibility
+  // ============================================================================
+  if (updates.taxExempt !== undefined)
+    dbUpdates.tax_exempt = updates.taxExempt;
+  if (updates.taxPrimaryRate !== undefined)
+    dbUpdates.tax_primary_rate = updates.taxPrimaryRate;
+  if (updates.taxPrimaryAmount !== undefined)
+    dbUpdates.tax_primary_amount = updates.taxPrimaryAmount;
+  if (updates.taxSecondaryRate !== undefined)
+    dbUpdates.tax_secondary_rate = updates.taxSecondaryRate;
+  if (updates.taxSecondaryAmount !== undefined)
+    dbUpdates.tax_secondary_amount = updates.taxSecondaryAmount;
+  if (updates.taxTotalAmount !== undefined)
+    dbUpdates.tax_total_amount = updates.taxTotalAmount;
   if (updates.finalPaymentAmount !== undefined)
     dbUpdates.final_payment_amount = updates.finalPaymentAmount;
   if (updates.finalPaymentDate !== undefined)
@@ -198,9 +363,6 @@ export function mapUpdatesToDb(updates: Partial<Project>): any {
     dbUpdates.final_payment_method = updates.finalPaymentMethod;
   if (updates.paidInFull !== undefined)
     dbUpdates.paid_in_full = updates.paidInFull;
-  if (updates.estimateData !== undefined)
-    dbUpdates.estimate_data = updates.estimateData;
-  if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
 
   return dbUpdates;
 }
@@ -224,14 +386,16 @@ export function mapSettingsFromDb(row: any): Settings {
     brandSecondaryColor: row.brand_secondary_color || "#98823a",
     measurementSystem: row.measurement_system || "imperial",
     currencyCode: row.currency_code || "USD",
+
+    // DEPRECATED in v4.0 - Tax fields (kept for backward compatibility)
     taxRate: row.tax_rate || 0,
     taxLabel: row.tax_label || "Sales Tax",
-    // Dual tax system fields
     taxPrimaryRate: row.tax_primary_rate,
     taxPrimaryLabel: row.tax_primary_label,
     taxSecondaryEnabled: row.tax_secondary_enabled,
     taxSecondaryRate: row.tax_secondary_rate,
     taxSecondaryLabel: row.tax_secondary_label,
+
     nextEstimateNumber: row.next_estimate_number || 1001,
     pricingRates: row.pricing_rates || {},
     bobbinOptions: row.bobbin_options || [],
@@ -267,14 +431,16 @@ export function mapSettingsToDb(settings: Partial<Settings>): any {
     dbSettings.measurement_system = settings.measurementSystem;
   if (settings.currencyCode !== undefined)
     dbSettings.currency_code = settings.currencyCode;
+
+  // DEPRECATED in v4.0 - Tax fields (kept for backward compatibility)
   if (settings.taxRate !== undefined) dbSettings.tax_rate = settings.taxRate;
-  // Dual tax system fields
   if (settings.taxPrimaryRate !== undefined) dbSettings.tax_primary_rate = settings.taxPrimaryRate;
   if (settings.taxPrimaryLabel !== undefined) dbSettings.tax_primary_label = settings.taxPrimaryLabel;
   if (settings.taxSecondaryEnabled !== undefined) dbSettings.tax_secondary_enabled = settings.taxSecondaryEnabled;
   if (settings.taxSecondaryRate !== undefined) dbSettings.tax_secondary_rate = settings.taxSecondaryRate;
   if (settings.taxSecondaryLabel !== undefined) dbSettings.tax_secondary_label = settings.taxSecondaryLabel;
   if (settings.taxLabel !== undefined) dbSettings.tax_label = settings.taxLabel;
+
   if (settings.nextEstimateNumber !== undefined)
     dbSettings.next_estimate_number = settings.nextEstimateNumber;
   if (settings.pricingRates !== undefined)

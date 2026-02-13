@@ -1,11 +1,13 @@
 /**
  * ProjectCard Components
- * 
+ *
+ * v4.0: Updated for 3-stage workflow with checklist display
+ *
  * Three variants of the project card:
  * - DraggableProjectCard: For kanban board with drag-and-drop
  * - ProjectCard: Static card for Due This Week view
  * - ProjectCardOverlay: Floating card shown during drag
- * 
+ *
  * @module board/components/ProjectCard
  */
 
@@ -23,6 +25,248 @@ import {
   getCardStyle,
   getFullName,
 } from "../utils";
+
+// ─────────────────────────────────────────────────────────────────────
+// HELPER FUNCTIONS - v4.0 Checklist Support
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Calculate checklist completion for Stage 3 (Completed) projects
+ */
+function getChecklistProgress(project: Project): {
+  completed: number;
+  total: number;
+  color: "red" | "amber" | "green";
+} {
+  if (project.stage !== "Completed") {
+    return { completed: 0, total: 0, color: "green" };
+  }
+
+  const projectType = project.projectType || "regular";
+  let completed = 0;
+  let total = 0;
+
+  if (projectType === "regular") {
+    // Regular: Invoiced, Paid, Delivered
+    total = 3;
+    if (project.invoiced) completed++;
+    if (project.paid) completed++;
+    if (project.delivered) completed++;
+  } else if (projectType === "gift") {
+    // Gift: Gift Invoice, Delivered
+    total = 2;
+    if (project.invoiced) completed++;
+    if (project.delivered) completed++;
+  } else if (projectType === "charitable") {
+    // Charitable: Donation Invoice, Delivered
+    total = 2;
+    if (project.invoiced) completed++;
+    if (project.delivered) completed++;
+  }
+
+  // Determine color
+  let color: "red" | "amber" | "green";
+  if (completed === 0) {
+    color = "red";
+  } else if (completed === total) {
+    color = "green";
+  } else {
+    color = "amber";
+  }
+
+  return { completed, total, color };
+}
+
+/**
+ * Format date for display (e.g., "Jan 15")
+ */
+function formatDate(dateString?: string): string {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/**
+ * Format currency amount
+ */
+function formatCurrency(amount?: number): string {
+  if (!amount) return "";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+/**
+ * Get project type badge emoji and label
+ */
+function getProjectTypeBadge(projectType?: string): {
+  emoji: string;
+  label: string;
+} | null {
+  if (projectType === "gift") {
+    return { emoji: "🎁", label: "GIFT" };
+  }
+  if (projectType === "charitable") {
+    return { emoji: "❤️", label: "DONATION" };
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// CARD CONTENT COMPONENTS
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Render Stage 1 (Estimates) specific content
+ */
+function EstimatesStageContent({ project }: { project: Project }) {
+  if (project.approvalStatus) {
+    return (
+      <div className="flex items-center gap-1 text-xs mt-2">
+        <span className="text-green-600">✓</span>
+        <span className="text-green-600 font-medium">
+          Approved {project.approvalDate ? `• ${formatDate(project.approvalDate)}` : ""}
+        </span>
+      </div>
+    );
+  } else if (project.approvalStatus === false) {
+    return (
+      <div className="text-xs text-gray-500 mt-2">
+        ○ Pending approval
+      </div>
+    );
+  }
+  return null;
+}
+
+/**
+ * Render Stage 3 (Completed) checklist content
+ */
+function CompletedStageContent({ project }: { project: Project }) {
+  const projectType = project.projectType || "regular";
+
+  if (projectType === "regular") {
+    // Calculate balance
+    const balance =
+      (project.invoicedAmount || 0) -
+      (project.depositPaidAmount || 0) -
+      (project.paidAmount || 0);
+
+    return (
+      <div className="mt-2 space-y-1">
+        <div className="text-xs flex items-center gap-1">
+          <span className={project.invoiced ? "text-green-600" : "text-gray-400"}>
+            {project.invoiced ? "✓" : "○"}
+          </span>
+          <span className={project.invoiced ? "text-gray-700" : "text-gray-500"}>
+            Invoiced
+            {project.invoiced && project.invoicedAmount
+              ? ` ${formatCurrency(project.invoicedAmount)}`
+              : ""}
+            {project.invoiced && project.invoicedDate
+              ? ` • ${formatDate(project.invoicedDate)}`
+              : ""}
+          </span>
+        </div>
+        <div className="text-xs flex items-center gap-1">
+          <span className={project.paid ? "text-green-600" : "text-gray-400"}>
+            {project.paid ? "✓" : "○"}
+          </span>
+          <span className={project.paid ? "text-gray-700" : "text-gray-500"}>
+            Paid
+            {project.paid && project.paidAmount
+              ? ` ${formatCurrency(project.paidAmount)}`
+              : ""}
+            {project.paid && project.paidDate
+              ? ` • ${formatDate(project.paidDate)}`
+              : ""}
+          </span>
+        </div>
+        <div className="text-xs flex items-center gap-1">
+          <span className={project.delivered ? "text-green-600" : "text-gray-400"}>
+            {project.delivered ? "✓" : "○"}
+          </span>
+          <span className={project.delivered ? "text-gray-700" : "text-gray-500"}>
+            Delivered
+            {project.delivered && project.deliveryMethod
+              ? ` (${project.deliveryMethod})`
+              : ""}
+            {project.delivered && project.deliveryDate
+              ? ` • ${formatDate(project.deliveryDate)}`
+              : ""}
+          </span>
+        </div>
+        {balance > 0 && (
+          <div className="text-xs text-orange-600 font-medium mt-1">
+            Balance: {formatCurrency(balance)}
+          </div>
+        )}
+      </div>
+    );
+  } else if (projectType === "gift") {
+    return (
+      <div className="mt-2 space-y-1">
+        <div className="text-xs flex items-center gap-1">
+          <span className={project.invoiced ? "text-green-600" : "text-gray-400"}>
+            {project.invoiced ? "✓" : "○"}
+          </span>
+          <span className={project.invoiced ? "text-gray-700" : "text-gray-500"}>
+            Gift Invoice
+            {project.invoiced && project.invoicedDate
+              ? ` • ${formatDate(project.invoicedDate)}`
+              : ""}
+          </span>
+        </div>
+        <div className="text-xs flex items-center gap-1">
+          <span className={project.delivered ? "text-green-600" : "text-gray-400"}>
+            {project.delivered ? "✓" : "○"}
+          </span>
+          <span className={project.delivered ? "text-gray-700" : "text-gray-500"}>
+            Delivered
+            {project.delivered && project.deliveryMethod
+              ? ` (${project.deliveryMethod})`
+              : ""}
+            {project.delivered && project.deliveryDate
+              ? ` • ${formatDate(project.deliveryDate)}`
+              : ""}
+          </span>
+        </div>
+      </div>
+    );
+  } else if (projectType === "charitable") {
+    return (
+      <div className="mt-2 space-y-1">
+        <div className="text-xs flex items-center gap-1">
+          <span className={project.invoiced ? "text-green-600" : "text-gray-400"}>
+            {project.invoiced ? "✓" : "○"}
+          </span>
+          <span className={project.invoiced ? "text-gray-700" : "text-gray-500"}>
+            Donation Invoice
+            {project.invoiced && project.invoicedDate
+              ? ` • ${formatDate(project.invoicedDate)}`
+              : ""}
+          </span>
+        </div>
+        <div className="text-xs flex items-center gap-1">
+          <span className={project.delivered ? "text-green-600" : "text-gray-400"}>
+            {project.delivered ? "✓" : "○"}
+          </span>
+          <span className={project.delivered ? "text-gray-700" : "text-gray-500"}>
+            Delivered
+            {project.delivered && project.deliveryDate
+              ? ` • ${formatDate(project.deliveryDate)}`
+              : ""}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // DRAGGABLE PROJECT CARD
@@ -78,6 +322,20 @@ export function DraggableProjectCard({
   const projectIsAsap = isAsap(project);
   const dueBadge = getDueBadge(project);
   const cardStyle = getCardStyle(project);
+  const checklistProgress = getChecklistProgress(project);
+  const projectTypeBadge = getProjectTypeBadge(project.projectType);
+
+  // Get left border color for Stage 3 (Completed) cards
+  let leftBorderClass = "";
+  if (project.stage === "Completed") {
+    if (checklistProgress.color === "red") {
+      leftBorderClass = "border-l-4 border-l-red-500";
+    } else if (checklistProgress.color === "amber") {
+      leftBorderClass = "border-l-4 border-l-orange-400";
+    } else if (checklistProgress.color === "green") {
+      leftBorderClass = "border-l-4 border-l-green-500";
+    }
+  }
 
   // Track drag vs click
   const [wasDragging, setWasDragging] = useState(false);
@@ -109,7 +367,7 @@ export function DraggableProjectCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`w-full bg-white border rounded-xl p-3 text-left hover:shadow-md transition-shadow cursor-pointer ${cardStyle} ${
+      className={`w-full bg-white border rounded-xl p-3 text-left hover:shadow-md transition-shadow cursor-pointer ${cardStyle} ${leftBorderClass} ${
         isDragging ? "shadow-lg ring-2 ring-plum/30 cursor-grabbing" : ""
       } ${isOver ? "ring-2 ring-plum/50 border-plum" : ""}`}
       onClick={handleClick}
@@ -118,6 +376,14 @@ export function DraggableProjectCard({
       {...attributes}
       {...listeners}
     >
+      {/* Project Type Badge (Gift/Donation) */}
+      {projectTypeBadge && (
+        <div className="absolute top-2 right-2 flex items-center gap-1">
+          <span className="text-xs">{projectTypeBadge.emoji}</span>
+          <span className="text-xs font-bold text-gray-600">{projectTypeBadge.label}</span>
+        </div>
+      )}
+
       {projectIsAsap && (
         <div className="flex items-center gap-1 text-xs font-bold text-red-600 mb-2">
           <span>🔥</span>
@@ -149,6 +415,11 @@ export function DraggableProjectCard({
               {project.quiltWidth}&quot; × {project.quiltLength}&quot;
             </div>
           )}
+
+          {/* Stage-specific content */}
+          {project.stage === "Estimates" && <EstimatesStageContent project={project} />}
+          {project.stage === "Completed" && <CompletedStageContent project={project} />}
+
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {showStage && (
               <span className="px-2 py-0.5 bg-plum/10 text-plum rounded-full text-xs font-medium">
@@ -203,12 +474,34 @@ export function ProjectCard({
   const projectIsAsap = isAsap(project);
   const dueBadge = getDueBadge(project);
   const cardStyle = getCardStyle(project);
+  const checklistProgress = getChecklistProgress(project);
+  const projectTypeBadge = getProjectTypeBadge(project.projectType);
+
+  // Get left border color for Stage 3 (Completed) cards
+  let leftBorderClass = "";
+  if (project.stage === "Completed") {
+    if (checklistProgress.color === "red") {
+      leftBorderClass = "border-l-4 border-l-red-500";
+    } else if (checklistProgress.color === "amber") {
+      leftBorderClass = "border-l-4 border-l-orange-400";
+    } else if (checklistProgress.color === "green") {
+      leftBorderClass = "border-l-4 border-l-green-500";
+    }
+  }
 
   return (
     <button
       onClick={onClick}
-      className={`w-full bg-white border rounded-xl p-3 text-left hover:shadow-md transition-shadow ${cardStyle}`}
+      className={`w-full bg-white border rounded-xl p-3 text-left hover:shadow-md transition-shadow relative ${cardStyle} ${leftBorderClass}`}
     >
+      {/* Project Type Badge (Gift/Donation) */}
+      {projectTypeBadge && (
+        <div className="absolute top-2 right-2 flex items-center gap-1">
+          <span className="text-xs">{projectTypeBadge.emoji}</span>
+          <span className="text-xs font-bold text-gray-600">{projectTypeBadge.label}</span>
+        </div>
+      )}
+
       {projectIsAsap && (
         <div className="flex items-center gap-1 text-xs font-bold text-red-600 mb-2">
           <span>🔥</span>
@@ -240,6 +533,11 @@ export function ProjectCard({
               {project.quiltWidth}&quot; × {project.quiltLength}&quot;
             </div>
           )}
+
+          {/* Stage-specific content */}
+          {project.stage === "Estimates" && <EstimatesStageContent project={project} />}
+          {project.stage === "Completed" && <CompletedStageContent project={project} />}
+
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {showStage && (
               <span className="px-2 py-0.5 bg-plum/10 text-plum rounded-full text-xs font-medium">
@@ -287,6 +585,8 @@ export function ProjectCardOverlay({ project }: ProjectCardOverlayProps) {
   const avatarColor = getAvatarColor(fullName);
   const projectIsAsap = isAsap(project);
   const dueBadge = getDueBadge(project);
+  const checklistProgress = getChecklistProgress(project);
+  const projectTypeBadge = getProjectTypeBadge(project.projectType);
 
   const getOverlayStyle = () => {
     if (projectIsAsap) {
@@ -298,10 +598,30 @@ export function ProjectCardOverlay({ project }: ProjectCardOverlayProps) {
     return "border-line";
   };
 
+  // Get left border color for Stage 3 (Completed) cards
+  let leftBorderClass = "";
+  if (project.stage === "Completed") {
+    if (checklistProgress.color === "red") {
+      leftBorderClass = "border-l-4 border-l-red-500";
+    } else if (checklistProgress.color === "amber") {
+      leftBorderClass = "border-l-4 border-l-orange-400";
+    } else if (checklistProgress.color === "green") {
+      leftBorderClass = "border-l-4 border-l-green-500";
+    }
+  }
+
   return (
     <div
-      className={`w-72 bg-white border rounded-xl p-3 text-left shadow-xl ring-2 ring-plum/30 ${getOverlayStyle()}`}
+      className={`w-72 bg-white border rounded-xl p-3 text-left shadow-xl ring-2 ring-plum/30 relative ${getOverlayStyle()} ${leftBorderClass}`}
     >
+      {/* Project Type Badge (Gift/Donation) */}
+      {projectTypeBadge && (
+        <div className="absolute top-2 right-2 flex items-center gap-1">
+          <span className="text-xs">{projectTypeBadge.emoji}</span>
+          <span className="text-xs font-bold text-gray-600">{projectTypeBadge.label}</span>
+        </div>
+      )}
+
       {projectIsAsap && (
         <div className="flex items-center gap-1 text-xs font-bold text-red-600 mb-2">
           <span>🔥</span>
@@ -328,6 +648,11 @@ export function ProjectCardOverlay({ project }: ProjectCardOverlayProps) {
           <div className="text-xs text-muted truncate mt-0.5">
             {project.cardLabel || project.description || "No description"}
           </div>
+
+          {/* Stage-specific content */}
+          {project.stage === "Estimates" && <EstimatesStageContent project={project} />}
+          {project.stage === "Completed" && <CompletedStageContent project={project} />}
+
           {dueBadge && (
             <div className="flex items-center gap-2 mt-2">
               <span

@@ -17,17 +17,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
     }
 
-    const { data: project, error: projectError } = await supabase.from('projects').select('*').eq('id', projectId).single();
+    const { data: project, error: projectError } = await supabase.from('projects').select('id, name, email, subscription_tier').eq('id', projectId).single();
     if (projectError || !project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const { data: org, error: orgError } = await supabase.from('organizations').select('*').eq('id', project.organization_id).single();
+    const { data: org, error: orgError } = await supabase.from('organizations').select('id, name, email, subscription_tier').eq('id', project.organization_id).single();
     if (orgError || !org) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
-    if (!org.is_paid_tier) {
+    if (org.subscription_tier !== 'pro') {
       return NextResponse.json({ error: 'Email sending requires PRO tier' }, { status: 403 });
     }
 

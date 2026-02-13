@@ -1,7 +1,9 @@
 export type Stage =
-  | "Estimates"
+  | "Intake"
+  | "Estimate"
   | "In Progress"
-  | "Completed"
+  | "Invoiced"
+  | "Paid/Shipped"
   | "Archived";
 
 export type MeasurementSystem = "imperial" | "metric";
@@ -10,14 +12,12 @@ export type RequestedDateType = "asap" | "no_date" | "specific_date";
 
 export type InvoiceType = "regular" | "gift" | "charitable";
 
-export type ProjectType = "regular" | "gift" | "charitable";
-
-export type DeliveryMethod = "pickup" | "shipped" | "mailed";
-
 export const STAGES: Stage[] = [
-  "Estimates",
+  "Intake",
+  "Estimate",
   "In Progress",
-  "Completed",
+  "Invoiced",
+  "Paid/Shipped",
   "Archived",
 ];
 
@@ -80,44 +80,13 @@ export interface Project {
   // Donation/Gift fields
   isDonation?: boolean;
   invoiceType?: InvoiceType;
-
-  // ============================================================================
-  // v4.0 NEW FIELDS - 3-Stage Workflow Checklist
-  // ============================================================================
-  approvalStatus?: boolean;
-  approvalDate?: string;
-  invoiced?: boolean;
-  invoicedAmount?: number;
-  invoicedDate?: string;
-  paid?: boolean;
-  paidAmount?: number;
-  paidDate?: string;
-  delivered?: boolean;
-  deliveryMethod?: DeliveryMethod;
-  deliveryDate?: string;
-  balanceRemaining?: number;
-  donatedValue?: number;
-  projectType?: ProjectType;
-
-  // ============================================================================
-  // DEPRECATED FIELDS (v4.0) - kept for backward compatibility
-  // ============================================================================
-  // Tax fields (dual rate system) - DEPRECATED: QuickBooks handles tax
+  // Tax fields (dual rate system)
   taxExempt?: boolean;              // Tax-exempt sales (out of state, etc.)
   taxPrimaryRate?: number;          // Primary tax rate (%) - copied from Settings or overridden
   taxPrimaryAmount?: number;        // Calculated primary tax amount
   taxSecondaryRate?: number;        // Secondary tax rate (%) - only if enabled
   taxSecondaryAmount?: number;      // Calculated secondary tax amount
   taxTotalAmount?: number;          // Sum of primary + secondary
-  // Final payment fields - DEPRECATED: Simplified to paid checkbox
-  finalPaymentAmount?: number;
-  finalPaymentDate?: string;
-  finalPaymentMethod?: string;
-  paidInFull?: boolean;
-
-  // ============================================================================
-  // CURRENT FIELDS (unchanged)
-  // ============================================================================
   // Deposit fields
   depositType?: "percentage" | "flat";
   depositPercentage?: number;
@@ -126,6 +95,11 @@ export interface Project {
   depositPaidDate?: string;
   depositPaidMethod?: string;
   depositPaidAmount?: number;
+  // Final payment fields
+  finalPaymentAmount?: number;
+  finalPaymentDate?: string;
+  finalPaymentMethod?: string;
+  paidInFull?: boolean;
   // Estimate data
   estimateData?: {
     quiltArea?: number;
@@ -234,14 +208,14 @@ export interface Settings {
   // Measurement & Currency
   measurementSystem: MeasurementSystem;
   currencyCode?: string;
-
-  // Tax Configuration (Dual Rate System) - DEPRECATED in v4.0
+  
+  // Tax Configuration (Dual Rate System)
   taxPrimaryRate?: number;          // Primary tax rate (e.g., 5.0 for GST or 7.5 for Sales Tax)
   taxPrimaryLabel?: string;         // Label for primary tax (e.g., "GST", "Sales Tax")
   taxSecondaryEnabled?: boolean;    // Enable secondary tax (for dual-rate systems)
   taxSecondaryRate?: number;        // Secondary tax rate (e.g., 7.0 for PST)
   taxSecondaryLabel?: string;       // Label for secondary tax (e.g., "PST", "Provincial Tax")
-
+  
   // Legacy single tax field (backwards compatibility)
   taxRate?: number;
   taxLabel?: string;
@@ -263,18 +237,18 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   measurementSystem: "imperial",
   currencyCode: "USD",
-
-  // Default tax configuration (single-rate US style) - DEPRECATED in v4.0
+  
+  // Default tax configuration (single-rate US style)
   taxPrimaryRate: 0,
   taxPrimaryLabel: "Sales Tax",
   taxSecondaryEnabled: false,
   taxSecondaryRate: 0,
   taxSecondaryLabel: "Provincial Tax",
-
+  
   // Legacy fields for backwards compatibility
   taxRate: 0,
   taxLabel: "Sales Tax",
-
+  
   nextEstimateNumber: 1001,
   bobbinOptions: [],
   battingOptions: [],
