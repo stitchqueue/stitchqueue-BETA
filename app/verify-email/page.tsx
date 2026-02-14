@@ -42,7 +42,7 @@ export default function VerifyEmailPage() {
           .single();
 
         if (existingProfile) {
-          // Already set up - just redirect
+          // Already set up - just redirect to home
           setStatus("success");
           setTimeout(() => router.push("/"), 2000);
           return;
@@ -81,9 +81,9 @@ export default function VerifyEmailPage() {
           throw profileError;
         }
 
-        // Success!
+        // New user — send to plan selection
         setStatus("success");
-        setTimeout(() => router.push("/"), 2000);
+        setTimeout(() => router.push("/signup-trial"), 2000);
       } catch (err: unknown) {
         console.error("Verification error:", err);
         setStatus("error");

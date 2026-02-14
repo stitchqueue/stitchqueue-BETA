@@ -83,8 +83,8 @@ export default function SignupPage() {
 
         if (profileError) throw profileError;
 
-        // Redirect to home
-        window.location.href = "/";
+        // New user — send to plan selection
+        window.location.href = "/signup-trial";
       }
     } catch (err: unknown) {
       const errorMessage =
