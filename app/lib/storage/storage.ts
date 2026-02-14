@@ -43,6 +43,9 @@ export {
   getTaxSummary,
 } from "./reports";
 
+// Export BOC operations
+export { getBOCSettings, saveBOCSettings } from "./boc";
+
 /**
  * Storage object for backwards compatibility
  * Provides the same API as before, but now delegates to modular functions
@@ -139,5 +142,16 @@ export const storage = {
   getTaxSummary: async (year: number) => {
     const { getTaxSummary } = await import("./reports");
     return getTaxSummary(year);
+  },
+
+  // BOC
+  getBOCSettings: async () => {
+    const { getBOCSettings } = await import("./boc");
+    return getBOCSettings();
+  },
+
+  saveBOCSettings: async (settings: any) => {
+    const { saveBOCSettings } = await import("./boc");
+    return saveBOCSettings(settings);
   },
 };

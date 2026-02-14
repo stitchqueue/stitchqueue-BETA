@@ -90,6 +90,13 @@ export default function Header() {
           >
             🗄️
           </button>
+          <button
+            onClick={() => router.push("/boc")}
+            className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+            title="Business Overhead Calculator"
+          >
+            🧮
+          </button>
 
           {/* Settings gear with dropdown */}
           <div

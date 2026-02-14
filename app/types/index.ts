@@ -282,3 +282,86 @@ export const DEFAULT_SETTINGS: Settings = {
   brandPrimaryColor: "#4e283a",
   brandSecondaryColor: "#98823a",
 };
+
+// ============================================================================
+// BOC (Business Overhead Calculator) Types
+// ============================================================================
+
+export type ExperienceLevel = "novice" | "experienced" | "expert";
+
+/** Stitches Per Hour by experience level */
+export const SPH_RATES: Record<ExperienceLevel, number> = {
+  novice: 1600,
+  experienced: 2000,
+  expert: 2400,
+};
+
+/** Itemized monthly overhead costs ($) */
+export interface OverheadItems {
+  machinePayment: number;
+  insurance: number;
+  rentSpace: number;
+  utilities: number;
+  software: number;
+  other: number;
+}
+
+/** Itemized per-project incidentals (minutes) */
+export interface IncidentalsItems {
+  consultationPlanning: number;
+  threadingPrep: number;
+  loadingUnloading: number;
+  packaging: number;
+  photos: number;
+  billingAdmin: number;
+}
+
+export interface BOCSettings {
+  targetHourlyWage: number;
+  experienceLevel: ExperienceLevel;
+  sphRate: number;
+  monthlyOverhead: number;
+  overheadItems: OverheadItems;
+  incidentalsMinutes: number;
+  incidentalsItems: IncidentalsItems;
+  projectsPerMonth: number;
+  avgProjectSize: number;
+}
+
+export const DEFAULT_BOC_SETTINGS: BOCSettings = {
+  targetHourlyWage: 0,
+  experienceLevel: "experienced",
+  sphRate: SPH_RATES.experienced,
+  monthlyOverhead: 0,
+  overheadItems: {
+    machinePayment: 0,
+    insurance: 0,
+    rentSpace: 0,
+    utilities: 0,
+    software: 0,
+    other: 0,
+  },
+  incidentalsMinutes: 0,
+  incidentalsItems: {
+    consultationPlanning: 0,
+    threadingPrep: 0,
+    loadingUnloading: 0,
+    packaging: 0,
+    photos: 0,
+    billingAdmin: 0,
+  },
+  projectsPerMonth: 10,
+  avgProjectSize: 6000,
+};
+
+/** Manual project entry for BOC tracking (future UI) */
+export interface BOCManualProject {
+  id: string;
+  projectDate: string;
+  sqInches: number;
+  revenue: number;
+  projectType: "regular" | "gift" | "charitable";
+  materialsCost: number;
+  mileageMiles: number;
+  charityName?: string;
+}
