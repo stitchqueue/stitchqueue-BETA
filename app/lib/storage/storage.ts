@@ -45,6 +45,8 @@ export {
 
 // Export BOC operations
 export { getBOCSettings, saveBOCSettings } from "./boc";
+export { getBOCMode } from "./boc-mode";
+export { getPerformanceData } from "./boc-performance";
 
 /**
  * Storage object for backwards compatibility

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../components/Header";
 import Toast from "../components/Toast";
 import { getBOCSettings, saveBOCSettings } from "../lib/storage/boc";
+import { getBOCMode, type BOCMode } from "../lib/storage/boc-mode";
 import type { BOCSettings, ExperienceLevel, OverheadItem, IncidentalItem } from "../types";
 import { DEFAULT_BOC_SETTINGS, DEFAULT_OVERHEAD_ITEMS, DEFAULT_INCIDENTAL_ITEMS, SPH_RATES } from "../types";
 import {
@@ -14,6 +15,7 @@ import RateCalculatorSection from "./components/RateCalculatorSection";
 import OverheadSection from "./components/OverheadSection";
 import IncidentalsSection from "./components/IncidentalsSection";
 import ResultsCard from "./components/ResultsCard";
+import PerformanceDashboard from "./components/PerformanceDashboard";
 
 export default function BOCForm() {
   // ── Loading / saving state ──────────────────────────────────────────
@@ -23,6 +25,9 @@ export default function BOCForm() {
     message: string;
     type: "success" | "error";
   } | null>(null);
+
+  // ── Mode detection ───────────────────────────────────────────────────
+  const [bocMode, setBocMode] = useState<BOCMode>({ isConnected: false, hasProjects: false });
 
   // ── Form state ─────────────────────────────────────────────────────
   const [targetHourlyWage, setTargetHourlyWage] = useState("");
@@ -55,8 +60,12 @@ export default function BOCForm() {
   useEffect(() => {
     async function load() {
       try {
-        const saved = await getBOCSettings();
+        const [saved, mode] = await Promise.all([
+          getBOCSettings(),
+          getBOCMode(),
+        ]);
         applySettings(saved);
+        setBocMode(mode);
       } catch (err) {
         console.error("Error loading BOC settings:", err);
       } finally {
@@ -202,6 +211,30 @@ export default function BOCForm() {
 
           {/* Results */}
           <ResultsCard results={results} />
+        </div>
+
+        {/* Performance Dashboard — outside the main card */}
+        {bocMode.isConnected && bocMode.hasProjects ? (
+          <div className="mt-6">
+            <PerformanceDashboard
+              targetHourlyWage={parseFloat(targetHourlyWage) || 0}
+              sphRate={sphRate}
+              incidentalsMinutes={incidentalsTotal}
+              monthlyOverhead={overheadTotal}
+              minimumRatePerSqIn={results?.isValid ? results.minimumRatePerSqIn : 0}
+            />
+          </div>
+        ) : (
+          <div className="mt-6 bg-background border border-line rounded-xl p-4 sm:p-6 text-center">
+            <p className="text-sm text-muted">
+              Complete and archive projects to see your actual performance
+              compared to your target rate.
+            </p>
+          </div>
+        )}
+
+        {/* Save button — below dashboard */}
+        <div className="bg-white border border-line rounded-xl p-4 sm:p-6 mt-6">
 
           {/* Save button */}
           <div className="flex justify-end pt-2">
