@@ -65,7 +65,7 @@ export default function Footer() {
               Privacy Policy
             </Link>
             <a
-              href="mailto:beta@stitchqueue.com"
+              href="mailto:support@stitchqueue.com"
               className="text-muted hover:text-plum transition-colors"
             >
               Contact
@@ -78,10 +78,10 @@ export default function Footer() {
           <span className="text-xs text-muted">
             🚧 Beta Version — Send feedback to{" "}
             <a
-              href="mailto:beta@stitchqueue.com"
+              href="mailto:support@stitchqueue.com"
               className="text-plum hover:underline"
             >
-              beta@stitchqueue.com
+              support@stitchqueue.com
             </a>
           </span>
         </div>

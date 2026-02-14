@@ -276,7 +276,7 @@ export default function TermsPage() {
               <div className="mt-3 bg-[#faf7f2] border border-[#e7e2dc] rounded-xl p-4">
                 <p className="font-semibold text-[#4e283a]">StitchQueue</p>
                 <p className="text-[#6c6c6c] text-sm mt-1">David Smith</p>
-                <p className="text-[#6c6c6c] text-sm">beta@stitchqueue.com</p>
+                <p className="text-[#6c6c6c] text-sm">support@stitchqueue.com</p>
               </div>
             </section>
           </div>
