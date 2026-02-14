@@ -170,12 +170,55 @@ UPDATE projects SET stage =
 | 2 | UI/UX polish (checklist, colors) | 4-6 days | Not started |
 | 3 | Deprecate accounting features | 2-3 days | Not started |
 | 4 | Photo uploads (Supabase Storage) | 3-4 days | Not started |
-| 5 | Trial + subscriptions (Stripe) | 5-6 days | ~15% |
+| 5 | Trial + subscriptions (Stripe) | 5-6 days | Complete |
 | 6 | Business Overhead Calculator | 10-12 days | Not started |
 | 7 | Client intake form (embeddable) | 4-5 days | Not started |
 | 8 | Multi-user (Admin/Operator) | 5-6 days | Not started |
 | 9 | Polish + testing | 5-7 days | Not started |
 | 10 | Legal + marketing + launch | 3-4 days | ~10% |
+
+## Stripe Integration (Phase 5)
+
+**Payment System:** Stripe with 14-day trial
+- Trial requires credit card, no charge during trial
+- Monthly: $19/month
+- Annual: $190/year
+- BOC Add-on: $49 (subscribers) / $79 (standalone)
+
+**Key Files:**
+- `app/lib/stripe.ts` - Stripe client singleton
+- `app/api/create-checkout-session/route.ts` - Creates checkout sessions with trial
+- `app/api/create-portal-session/route.ts` - Customer billing portal
+- `app/api/webhooks/stripe/route.ts` - Webhook handler (5 events)
+- `app/lib/subscription.ts` - Subscription helper functions
+- `app/components/SubscriptionGate.tsx` - Access control wrapper
+- `app/components/TrialBanner.tsx` - Trial status banner
+- `app/signup-trial/page.tsx` - Plan selection page
+
+**Database:**
+- `subscriptions` table tracks trial/subscription status
+- Webhooks update subscription data automatically
+
+**Environment Variables (Production only):**
+- `STRIPE_SECRET_KEY` - Server-side API key
+- `STRIPE_WEBHOOK_SECRET` - Webhook signature verification
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` - Client-side key
+- `NEXT_PUBLIC_STRIPE_MONTHLY_PRICE_ID` - Monthly plan price ID
+- `NEXT_PUBLIC_STRIPE_ANNUAL_PRICE_ID` - Annual plan price ID
+- `NEXT_PUBLIC_STRIPE_BOC_SUBSCRIBER_PRICE_ID` - BOC subscriber price
+- `NEXT_PUBLIC_STRIPE_BOC_STANDALONE_PRICE_ID` - BOC standalone price
+
+**Webhook Events Handled:**
+1. `checkout.session.completed` - Trial started
+2. `customer.subscription.created` - Subscription active
+3. `customer.subscription.updated` - Plan changes, trial to active
+4. `customer.subscription.deleted` - Cancellation
+5. `invoice.payment_failed` - Payment issues
+
+**Access Control:**
+- Trial users: Full access with banner showing days remaining
+- Active subscribers: Full access
+- Expired/canceled: 3-day grace period with warning, then redirect to signup
 
 ## Features Being Deprecated (v4.0)
 
