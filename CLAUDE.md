@@ -20,7 +20,7 @@ StitchQueue is a **workflow management system** for professional longarm quilter
 - **Framework:** Next.js 15, TypeScript, Tailwind CSS
 - **Backend:** Supabase (PostgreSQL + Auth + Storage)
 - **Email:** Resend
-- **Payments:** Lemon Squeezy
+- **Payments:** Stripe (+ Stripe Tax for international sales tax)
 - **Hosting:** Vercel (auto-deploys from `main`)
 - **Package Manager:** pnpm (NOT npm)
 
@@ -170,7 +170,7 @@ UPDATE projects SET stage =
 | 2 | UI/UX polish (checklist, colors) | 4-6 days | Not started |
 | 3 | Deprecate accounting features | 2-3 days | Not started |
 | 4 | Photo uploads (Supabase Storage) | 3-4 days | Not started |
-| 5 | Trial + subscriptions (Lemon Squeezy) | 5-6 days | ~15% |
+| 5 | Trial + subscriptions (Stripe) | 5-6 days | ~15% |
 | 6 | Business Overhead Calculator | 10-12 days | Not started |
 | 7 | Client intake form (embeddable) | 4-5 days | Not started |
 | 8 | Multi-user (Admin/Operator) | 5-6 days | Not started |
