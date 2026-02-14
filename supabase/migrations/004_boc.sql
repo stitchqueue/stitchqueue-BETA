@@ -13,13 +13,13 @@ CREATE TABLE boc_settings (
   experience_level text DEFAULT 'experienced' CHECK (experience_level IN ('novice', 'experienced', 'expert')),
   sph_rate numeric DEFAULT 2000,
 
-  -- Overhead (computed total + itemized breakdown)
+  -- Overhead (computed total + itemized breakdown as array)
   monthly_overhead numeric DEFAULT 0,
-  overhead_items jsonb DEFAULT '{"machinePayment":0,"insurance":0,"rentSpace":0,"utilities":0,"software":0,"other":0}'::jsonb,
+  overhead_items jsonb DEFAULT '[{"label":"Machine payment","amount":0},{"label":"Supporting equipment & tools","amount":0},{"label":"Consumable supplies","amount":0},{"label":"Digital/pantograph patterns","amount":0},{"label":"Insurance","amount":0},{"label":"Tech maintenance","amount":0},{"label":"Electricity","amount":0},{"label":"Phone usage","amount":0},{"label":"Recordkeeping software","amount":0},{"label":"Shelving/bins/organization","amount":0},{"label":"Business cards/marketing","amount":0},{"label":"Training/classes","amount":0}]'::jsonb,
 
-  -- Incidentals (computed total + itemized breakdown)
+  -- Incidentals (computed total + itemized breakdown as array)
   incidentals_minutes numeric DEFAULT 0,
-  incidentals_items jsonb DEFAULT '{"consultationPlanning":0,"threadingPrep":0,"loadingUnloading":0,"packaging":0,"photos":0,"billingAdmin":0}'::jsonb,
+  incidentals_items jsonb DEFAULT '[{"label":"Consultation & measurement","minutes":0},{"label":"Planning & design","minutes":0},{"label":"Threading & bobbin winding","minutes":0},{"label":"Prep (trimming, pressing, seaming)","minutes":0},{"label":"Loading quilt","minutes":0},{"label":"Packaging & delivery","minutes":0},{"label":"Photos & social media","minutes":0},{"label":"Seam ripper time","minutes":0},{"label":"Billing & recordkeeping","minutes":0},{"label":"Cleaning & maintenance","minutes":0},{"label":"","minutes":0},{"label":"","minutes":0}]'::jsonb,
 
   -- Project parameters
   projects_per_month numeric DEFAULT 10,

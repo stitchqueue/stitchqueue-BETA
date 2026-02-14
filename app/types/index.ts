@@ -296,24 +296,16 @@ export const SPH_RATES: Record<ExperienceLevel, number> = {
   expert: 2400,
 };
 
-/** Itemized monthly overhead costs ($) */
-export interface OverheadItems {
-  machinePayment: number;
-  insurance: number;
-  rentSpace: number;
-  utilities: number;
-  software: number;
-  other: number;
+/** One row in the overhead itemized list */
+export interface OverheadItem {
+  label: string;
+  amount: number;
 }
 
-/** Itemized per-project incidentals (minutes) */
-export interface IncidentalsItems {
-  consultationPlanning: number;
-  threadingPrep: number;
-  loadingUnloading: number;
-  packaging: number;
-  photos: number;
-  billingAdmin: number;
+/** One row in the incidentals itemized list */
+export interface IncidentalItem {
+  label: string;
+  minutes: number;
 }
 
 export interface BOCSettings {
@@ -321,35 +313,51 @@ export interface BOCSettings {
   experienceLevel: ExperienceLevel;
   sphRate: number;
   monthlyOverhead: number;
-  overheadItems: OverheadItems;
+  overheadItems: OverheadItem[];
   incidentalsMinutes: number;
-  incidentalsItems: IncidentalsItems;
+  incidentalsItems: IncidentalItem[];
   projectsPerMonth: number;
   avgProjectSize: number;
 }
+
+export const DEFAULT_OVERHEAD_ITEMS: OverheadItem[] = [
+  { label: "Machine payment", amount: 0 },
+  { label: "Supporting equipment & tools", amount: 0 },
+  { label: "Consumable supplies", amount: 0 },
+  { label: "Digital/pantograph patterns", amount: 0 },
+  { label: "Insurance", amount: 0 },
+  { label: "Tech maintenance", amount: 0 },
+  { label: "Electricity", amount: 0 },
+  { label: "Phone usage", amount: 0 },
+  { label: "Recordkeeping software", amount: 0 },
+  { label: "Shelving/bins/organization", amount: 0 },
+  { label: "Business cards/marketing", amount: 0 },
+  { label: "Training/classes", amount: 0 },
+];
+
+export const DEFAULT_INCIDENTAL_ITEMS: IncidentalItem[] = [
+  { label: "Consultation & measurement", minutes: 0 },
+  { label: "Planning & design", minutes: 0 },
+  { label: "Threading & bobbin winding", minutes: 0 },
+  { label: "Prep (trimming, pressing, seaming)", minutes: 0 },
+  { label: "Loading quilt", minutes: 0 },
+  { label: "Packaging & delivery", minutes: 0 },
+  { label: "Photos & social media", minutes: 0 },
+  { label: "Seam ripper time", minutes: 0 },
+  { label: "Billing & recordkeeping", minutes: 0 },
+  { label: "Cleaning & maintenance", minutes: 0 },
+  { label: "", minutes: 0 },
+  { label: "", minutes: 0 },
+];
 
 export const DEFAULT_BOC_SETTINGS: BOCSettings = {
   targetHourlyWage: 0,
   experienceLevel: "experienced",
   sphRate: SPH_RATES.experienced,
   monthlyOverhead: 0,
-  overheadItems: {
-    machinePayment: 0,
-    insurance: 0,
-    rentSpace: 0,
-    utilities: 0,
-    software: 0,
-    other: 0,
-  },
+  overheadItems: DEFAULT_OVERHEAD_ITEMS,
   incidentalsMinutes: 0,
-  incidentalsItems: {
-    consultationPlanning: 0,
-    threadingPrep: 0,
-    loadingUnloading: 0,
-    packaging: 0,
-    photos: 0,
-    billingAdmin: 0,
-  },
+  incidentalsItems: DEFAULT_INCIDENTAL_ITEMS,
   projectsPerMonth: 10,
   avgProjectSize: 6000,
 };

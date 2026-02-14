@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../components/Header";
 import Toast from "../components/Toast";
 import { getBOCSettings, saveBOCSettings } from "../lib/storage/boc";
-import type { BOCSettings, ExperienceLevel, OverheadItems, IncidentalsItems } from "../types";
-import { DEFAULT_BOC_SETTINGS, SPH_RATES } from "../types";
+import type { BOCSettings, ExperienceLevel, OverheadItem, IncidentalItem } from "../types";
+import { DEFAULT_BOC_SETTINGS, DEFAULT_OVERHEAD_ITEMS, DEFAULT_INCIDENTAL_ITEMS, SPH_RATES } from "../types";
 import {
   calculateMinimumRate,
   type BOCCalculationResults,
@@ -17,8 +16,6 @@ import IncidentalsSection from "./components/IncidentalsSection";
 import ResultsCard from "./components/ResultsCard";
 
 export default function BOCForm() {
-  const router = useRouter();
-
   // ── Loading / saving state ──────────────────────────────────────────
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -27,28 +24,16 @@ export default function BOCForm() {
     type: "success" | "error";
   } | null>(null);
 
-  // ── Form state (strings for controlled inputs) ─────────────────────
+  // ── Form state ─────────────────────────────────────────────────────
   const [targetHourlyWage, setTargetHourlyWage] = useState("");
   const [experienceLevel, setExperienceLevel] =
     useState<ExperienceLevel>("experienced");
   const [projectsPerMonth, setProjectsPerMonth] = useState("10");
   const [avgProjectSize, setAvgProjectSize] = useState("6000");
 
-  // Overhead items
-  const [machinePayment, setMachinePayment] = useState("");
-  const [insurance, setInsurance] = useState("");
-  const [rentSpace, setRentSpace] = useState("");
-  const [utilities, setUtilities] = useState("");
-  const [software, setSoftware] = useState("");
-  const [overheadOther, setOverheadOther] = useState("");
-
-  // Incidentals items (minutes)
-  const [consultationPlanning, setConsultationPlanning] = useState("");
-  const [threadingPrep, setThreadingPrep] = useState("");
-  const [loadingUnloading, setLoadingUnloading] = useState("");
-  const [packaging, setPackaging] = useState("");
-  const [photos, setPhotos] = useState("");
-  const [billingAdmin, setBillingAdmin] = useState("");
+  // Array-based items
+  const [overheadItems, setOverheadItems] = useState<OverheadItem[]>(DEFAULT_OVERHEAD_ITEMS);
+  const [incidentalItems, setIncidentalItems] = useState<IncidentalItem[]>(DEFAULT_INCIDENTAL_ITEMS);
 
   // ── Computed results ────────────────────────────────────────────────
   const [results, setResults] = useState<BOCCalculationResults | null>(null);
@@ -56,21 +41,15 @@ export default function BOCForm() {
   // ── Derived values ──────────────────────────────────────────────────
   const sphRate = SPH_RATES[experienceLevel];
 
-  const overheadTotal =
-    (parseFloat(machinePayment) || 0) +
-    (parseFloat(insurance) || 0) +
-    (parseFloat(rentSpace) || 0) +
-    (parseFloat(utilities) || 0) +
-    (parseFloat(software) || 0) +
-    (parseFloat(overheadOther) || 0);
+  const overheadTotal = useMemo(
+    () => overheadItems.reduce((sum, item) => sum + (item.amount || 0), 0),
+    [overheadItems]
+  );
 
-  const incidentalsTotal =
-    (parseFloat(consultationPlanning) || 0) +
-    (parseFloat(threadingPrep) || 0) +
-    (parseFloat(loadingUnloading) || 0) +
-    (parseFloat(packaging) || 0) +
-    (parseFloat(photos) || 0) +
-    (parseFloat(billingAdmin) || 0);
+  const incidentalsTotal = useMemo(
+    () => incidentalItems.reduce((sum, item) => sum + (item.minutes || 0), 0),
+    [incidentalItems]
+  );
 
   // ── Load saved settings ─────────────────────────────────────────────
   useEffect(() => {
@@ -92,28 +71,8 @@ export default function BOCForm() {
     setExperienceLevel(s.experienceLevel);
     setProjectsPerMonth(s.projectsPerMonth ? String(s.projectsPerMonth) : "10");
     setAvgProjectSize(s.avgProjectSize ? String(s.avgProjectSize) : "6000");
-
-    // Overhead items
-    const o = s.overheadItems;
-    setMachinePayment(o.machinePayment ? String(o.machinePayment) : "");
-    setInsurance(o.insurance ? String(o.insurance) : "");
-    setRentSpace(o.rentSpace ? String(o.rentSpace) : "");
-    setUtilities(o.utilities ? String(o.utilities) : "");
-    setSoftware(o.software ? String(o.software) : "");
-    setOverheadOther(o.other ? String(o.other) : "");
-
-    // Incidentals items
-    const i = s.incidentalsItems;
-    setConsultationPlanning(
-      i.consultationPlanning ? String(i.consultationPlanning) : ""
-    );
-    setThreadingPrep(i.threadingPrep ? String(i.threadingPrep) : "");
-    setLoadingUnloading(
-      i.loadingUnloading ? String(i.loadingUnloading) : ""
-    );
-    setPackaging(i.packaging ? String(i.packaging) : "");
-    setPhotos(i.photos ? String(i.photos) : "");
-    setBillingAdmin(i.billingAdmin ? String(i.billingAdmin) : "");
+    setOverheadItems(s.overheadItems.length > 0 ? s.overheadItems : DEFAULT_OVERHEAD_ITEMS);
+    setIncidentalItems(s.incidentalsItems.length > 0 ? s.incidentalsItems : DEFAULT_INCIDENTAL_ITEMS);
   }
 
   // ── Auto-calculate on every input change ────────────────────────────
@@ -145,23 +104,9 @@ export default function BOCForm() {
         experienceLevel,
         sphRate,
         monthlyOverhead: overheadTotal,
-        overheadItems: {
-          machinePayment: parseFloat(machinePayment) || 0,
-          insurance: parseFloat(insurance) || 0,
-          rentSpace: parseFloat(rentSpace) || 0,
-          utilities: parseFloat(utilities) || 0,
-          software: parseFloat(software) || 0,
-          other: parseFloat(overheadOther) || 0,
-        },
+        overheadItems,
         incidentalsMinutes: incidentalsTotal,
-        incidentalsItems: {
-          consultationPlanning: parseFloat(consultationPlanning) || 0,
-          threadingPrep: parseFloat(threadingPrep) || 0,
-          loadingUnloading: parseFloat(loadingUnloading) || 0,
-          packaging: parseFloat(packaging) || 0,
-          photos: parseFloat(photos) || 0,
-          billingAdmin: parseFloat(billingAdmin) || 0,
-        },
+        incidentalsItems: incidentalItems,
         projectsPerMonth: parseFloat(projectsPerMonth) || 0,
         avgProjectSize: parseFloat(avgProjectSize) || 0,
       };
@@ -185,19 +130,9 @@ export default function BOCForm() {
     experienceLevel,
     sphRate,
     overheadTotal,
-    machinePayment,
-    insurance,
-    rentSpace,
-    utilities,
-    software,
-    overheadOther,
+    overheadItems,
     incidentalsTotal,
-    consultationPlanning,
-    threadingPrep,
-    loadingUnloading,
-    packaging,
-    photos,
-    billingAdmin,
+    incidentalItems,
     projectsPerMonth,
     avgProjectSize,
   ]);
@@ -250,36 +185,16 @@ export default function BOCForm() {
           <hr className="border-line" />
 
           <OverheadSection
-            machinePayment={machinePayment}
-            onMachinePaymentChange={setMachinePayment}
-            insurance={insurance}
-            onInsuranceChange={setInsurance}
-            rentSpace={rentSpace}
-            onRentSpaceChange={setRentSpace}
-            utilities={utilities}
-            onUtilitiesChange={setUtilities}
-            software={software}
-            onSoftwareChange={setSoftware}
-            other={overheadOther}
-            onOtherChange={setOverheadOther}
+            items={overheadItems}
+            onChange={setOverheadItems}
             total={overheadTotal}
           />
 
           <hr className="border-line" />
 
           <IncidentalsSection
-            consultationPlanning={consultationPlanning}
-            onConsultationPlanningChange={setConsultationPlanning}
-            threadingPrep={threadingPrep}
-            onThreadingPrepChange={setThreadingPrep}
-            loadingUnloading={loadingUnloading}
-            onLoadingUnloadingChange={setLoadingUnloading}
-            packaging={packaging}
-            onPackagingChange={setPackaging}
-            photos={photos}
-            onPhotosChange={setPhotos}
-            billingAdmin={billingAdmin}
-            onBillingAdminChange={setBillingAdmin}
+            items={incidentalItems}
+            onChange={setIncidentalItems}
             total={incidentalsTotal}
           />
 

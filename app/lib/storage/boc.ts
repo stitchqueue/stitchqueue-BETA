@@ -7,21 +7,32 @@
  */
 
 import { supabase } from "../supabase";
-import type { BOCSettings, OverheadItems, IncidentalsItems } from "../../types";
-import { DEFAULT_BOC_SETTINGS } from "../../types";
+import type { BOCSettings, OverheadItem, IncidentalItem } from "../../types";
+import { DEFAULT_BOC_SETTINGS, DEFAULT_OVERHEAD_ITEMS, DEFAULT_INCIDENTAL_ITEMS } from "../../types";
 import { getCurrentUser } from "./auth";
 
 // ── Mappers (inline — BOC is self-contained) ────────────────────────
 
 function mapBOCFromDb(row: Record<string, unknown>): BOCSettings {
+  // JSONB arrays come back as-is from Supabase; fall back to defaults
+  const rawOverhead = row.overhead_items;
+  const overheadItems: OverheadItem[] = Array.isArray(rawOverhead)
+    ? rawOverhead
+    : DEFAULT_OVERHEAD_ITEMS;
+
+  const rawIncidentals = row.incidentals_items;
+  const incidentalsItems: IncidentalItem[] = Array.isArray(rawIncidentals)
+    ? rawIncidentals
+    : DEFAULT_INCIDENTAL_ITEMS;
+
   return {
     targetHourlyWage: (row.target_hourly_wage as number) ?? 0,
     experienceLevel: (row.experience_level as BOCSettings["experienceLevel"]) ?? "experienced",
     sphRate: (row.sph_rate as number) ?? 2000,
     monthlyOverhead: (row.monthly_overhead as number) ?? 0,
-    overheadItems: (row.overhead_items as OverheadItems) ?? DEFAULT_BOC_SETTINGS.overheadItems,
+    overheadItems,
     incidentalsMinutes: (row.incidentals_minutes as number) ?? 0,
-    incidentalsItems: (row.incidentals_items as IncidentalsItems) ?? DEFAULT_BOC_SETTINGS.incidentalsItems,
+    incidentalsItems,
     projectsPerMonth: (row.projects_per_month as number) ?? 10,
     avgProjectSize: (row.avg_project_size as number) ?? 6000,
   };

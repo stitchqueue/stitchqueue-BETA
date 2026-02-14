@@ -1,64 +1,21 @@
 "use client";
 
+import type { IncidentalItem } from "../../types";
+
 interface Props {
-  consultationPlanning: string;
-  onConsultationPlanningChange: (v: string) => void;
-  threadingPrep: string;
-  onThreadingPrepChange: (v: string) => void;
-  loadingUnloading: string;
-  onLoadingUnloadingChange: (v: string) => void;
-  packaging: string;
-  onPackagingChange: (v: string) => void;
-  photos: string;
-  onPhotosChange: (v: string) => void;
-  billingAdmin: string;
-  onBillingAdminChange: (v: string) => void;
+  items: IncidentalItem[];
+  onChange: (items: IncidentalItem[]) => void;
   total: number;
 }
 
-const FIELDS: {
-  key: string;
-  label: string;
-  placeholder: string;
-}[] = [
-  { key: "consultationPlanning", label: "Consultation & Planning", placeholder: "e.g. 15" },
-  { key: "threadingPrep", label: "Threading & Prep", placeholder: "e.g. 10" },
-  { key: "loadingUnloading", label: "Loading & Unloading", placeholder: "e.g. 10" },
-  { key: "packaging", label: "Packaging", placeholder: "e.g. 5" },
-  { key: "photos", label: "Photos", placeholder: "e.g. 5" },
-  { key: "billingAdmin", label: "Billing & Admin", placeholder: "e.g. 10" },
-];
-
-export default function IncidentalsSection({
-  consultationPlanning,
-  onConsultationPlanningChange,
-  threadingPrep,
-  onThreadingPrepChange,
-  loadingUnloading,
-  onLoadingUnloadingChange,
-  packaging,
-  onPackagingChange,
-  photos,
-  onPhotosChange,
-  billingAdmin,
-  onBillingAdminChange,
-  total,
-}: Props) {
-  const values: Record<string, string> = {
-    consultationPlanning,
-    threadingPrep,
-    loadingUnloading,
-    packaging,
-    photos,
-    billingAdmin,
-  };
-  const setters: Record<string, (v: string) => void> = {
-    consultationPlanning: onConsultationPlanningChange,
-    threadingPrep: onThreadingPrepChange,
-    loadingUnloading: onLoadingUnloadingChange,
-    packaging: onPackagingChange,
-    photos: onPhotosChange,
-    billingAdmin: onBillingAdminChange,
+export default function IncidentalsSection({ items, onChange, total }: Props) {
+  const updateItem = (index: number, field: "label" | "minutes", value: string) => {
+    const updated = items.map((item, i) => {
+      if (i !== index) return item;
+      if (field === "label") return { ...item, label: value };
+      return { ...item, minutes: parseFloat(value) || 0 };
+    });
+    onChange(updated);
   };
 
   return (
@@ -71,21 +28,39 @@ export default function IncidentalsSection({
         affect your effective rate.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {FIELDS.map((field) => (
-          <div key={field.key}>
-            <label className="block text-sm font-bold text-muted mb-2">
-              {field.label}
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={values[field.key]}
-              onChange={(e) => setters[field.key](e.target.value)}
-              placeholder={field.placeholder}
-              className="w-full px-4 py-2 border border-line rounded-xl"
-            />
+      <div className="space-y-3">
+        {items.map((item, index) => (
+          <div key={index} className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2 items-end">
+            <div>
+              {index === 0 && (
+                <label className="block text-sm font-bold text-muted mb-2">
+                  Task
+                </label>
+              )}
+              <input
+                type="text"
+                value={item.label}
+                onChange={(e) => updateItem(index, "label", e.target.value)}
+                placeholder="Label"
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
+            <div>
+              {index === 0 && (
+                <label className="block text-sm font-bold text-muted mb-2">
+                  Minutes
+                </label>
+              )}
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={item.minutes || ""}
+                onChange={(e) => updateItem(index, "minutes", e.target.value)}
+                placeholder="0"
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
           </div>
         ))}
       </div>

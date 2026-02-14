@@ -1,64 +1,21 @@
 "use client";
 
+import type { OverheadItem } from "../../types";
+
 interface Props {
-  machinePayment: string;
-  onMachinePaymentChange: (v: string) => void;
-  insurance: string;
-  onInsuranceChange: (v: string) => void;
-  rentSpace: string;
-  onRentSpaceChange: (v: string) => void;
-  utilities: string;
-  onUtilitiesChange: (v: string) => void;
-  software: string;
-  onSoftwareChange: (v: string) => void;
-  other: string;
-  onOtherChange: (v: string) => void;
+  items: OverheadItem[];
+  onChange: (items: OverheadItem[]) => void;
   total: number;
 }
 
-const FIELDS: {
-  key: string;
-  label: string;
-  placeholder: string;
-}[] = [
-  { key: "machinePayment", label: "Machine Payment", placeholder: "e.g. 300" },
-  { key: "insurance", label: "Insurance", placeholder: "e.g. 50" },
-  { key: "rentSpace", label: "Rent / Studio Space", placeholder: "e.g. 200" },
-  { key: "utilities", label: "Utilities", placeholder: "e.g. 75" },
-  { key: "software", label: "Software / Subscriptions", placeholder: "e.g. 40" },
-  { key: "other", label: "Other", placeholder: "e.g. 25" },
-];
-
-export default function OverheadSection({
-  machinePayment,
-  onMachinePaymentChange,
-  insurance,
-  onInsuranceChange,
-  rentSpace,
-  onRentSpaceChange,
-  utilities,
-  onUtilitiesChange,
-  software,
-  onSoftwareChange,
-  other,
-  onOtherChange,
-  total,
-}: Props) {
-  const values: Record<string, string> = {
-    machinePayment,
-    insurance,
-    rentSpace,
-    utilities,
-    software,
-    other,
-  };
-  const setters: Record<string, (v: string) => void> = {
-    machinePayment: onMachinePaymentChange,
-    insurance: onInsuranceChange,
-    rentSpace: onRentSpaceChange,
-    utilities: onUtilitiesChange,
-    software: onSoftwareChange,
-    other: onOtherChange,
+export default function OverheadSection({ items, onChange, total }: Props) {
+  const updateItem = (index: number, field: "label" | "amount", value: string) => {
+    const updated = items.map((item, i) => {
+      if (i !== index) return item;
+      if (field === "label") return { ...item, label: value };
+      return { ...item, amount: parseFloat(value) || 0 };
+    });
+    onChange(updated);
   };
 
   return (
@@ -67,21 +24,39 @@ export default function OverheadSection({
         Monthly Overhead ($)
       </h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {FIELDS.map((field) => (
-          <div key={field.key}>
-            <label className="block text-sm font-bold text-muted mb-2">
-              {field.label}
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={values[field.key]}
-              onChange={(e) => setters[field.key](e.target.value)}
-              placeholder={field.placeholder}
-              className="w-full px-4 py-2 border border-line rounded-xl"
-            />
+      <div className="space-y-3">
+        {items.map((item, index) => (
+          <div key={index} className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2 items-end">
+            <div>
+              {index === 0 && (
+                <label className="block text-sm font-bold text-muted mb-2">
+                  Item
+                </label>
+              )}
+              <input
+                type="text"
+                value={item.label}
+                onChange={(e) => updateItem(index, "label", e.target.value)}
+                placeholder="Label"
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
+            <div>
+              {index === 0 && (
+                <label className="block text-sm font-bold text-muted mb-2">
+                  $/month
+                </label>
+              )}
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={item.amount || ""}
+                onChange={(e) => updateItem(index, "amount", e.target.value)}
+                placeholder="0.00"
+                className="w-full px-4 py-2 border border-line rounded-xl"
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -93,6 +68,13 @@ export default function OverheadSection({
           ${total.toFixed(2)}
         </span>
       </div>
+
+      {/* Helper text */}
+      <p className="text-xs text-muted mt-3 italic">
+        Tip: Enter your actual monthly payment for financed equipment. For
+        paid-off items, you can spread the cost over time (e.g., $20,000
+        machine &divide; 240 months = $83/month)
+      </p>
     </div>
   );
 }
