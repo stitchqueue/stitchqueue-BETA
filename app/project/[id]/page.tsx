@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Toast from "../../components/Toast";
 import Header from "../../components/Header";
 import { storage } from "../../lib/storage";
+import { FeatureGate } from "../../lib/featureFlags";
 import { STAGES } from "../../types";
 import type { Project, Stage, Settings } from "../../types";
 
@@ -56,6 +57,33 @@ export default function ProjectDetailPage() {
   // Toast notification state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
+
+  // Approval state
+  const [showApprovalConfirm, setShowApprovalConfirm] = useState(false);
+  const [pendingApprovalValue, setPendingApprovalValue] = useState(false);
+  const [approvingProject, setApprovingProject] = useState(false);
+
+  // Completion checklist state
+  const [showChecklistConfirm, setShowChecklistConfirm] = useState(false);
+  const [pendingChecklistItem, setPendingChecklistItem] = useState<'invoiced' | 'paid' | 'delivered' | null>(null);
+  const [pendingChecklistValue, setPendingChecklistValue] = useState(false);
+  const [updatingChecklist, setUpdatingChecklist] = useState(false);
+  const [checklistInputs, setChecklistInputs] = useState({
+    invoicedAmount: '',
+    invoicedDate: new Date().toISOString().split('T')[0],
+    paidAmount: '',
+    paidDate: new Date().toISOString().split('T')[0],
+    deliveryMethod: 'pickup' as 'pickup' | 'shipped' | 'mailed',
+    deliveryDate: new Date().toISOString().split('T')[0],
+  });
+  const [validationErrors, setValidationErrors] = useState({
+    invoicedAmount: '',
+    invoicedDate: '',
+    paidAmount: '',
+    paidDate: '',
+    deliveryMethod: '',
+    deliveryDate: '',
+  });
 
   // Set document title for PDF naming
   useEffect(() => {
@@ -417,6 +445,261 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleApprovalChange = (checked: boolean) => {
+    setPendingApprovalValue(checked);
+    setShowApprovalConfirm(true);
+  };
+
+  const handleConfirmApproval = async () => {
+    setShowApprovalConfirm(false);
+    setApprovingProject(true);
+
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const updates: Partial<Project> = {
+        approvalStatus: pendingApprovalValue,
+        approvalDate: pendingApprovalValue ? today : undefined,
+      };
+
+      // Auto-advance to In Progress when approving
+      if (pendingApprovalValue && project.stage === "Estimates") {
+        updates.stage = "In Progress" as Stage;
+      }
+
+      // Move back to Estimates when removing approval
+      if (!pendingApprovalValue && project.stage === "In Progress" && project.approvalStatus) {
+        updates.stage = "Estimates" as Stage;
+      }
+
+      await storage.updateProject(project.id, updates);
+
+      setProject({
+        ...project,
+        ...updates,
+      });
+
+      if (pendingApprovalValue) {
+        showToast("Estimate approved! Moved to In Progress.", "success");
+      } else {
+        showToast("Approval removed. Moved back to Estimates.", "info");
+      }
+    } catch (error) {
+      console.error("Error updating approval:", error);
+      showToast("Failed to update approval status. Please try again.", "error");
+    } finally {
+      setApprovingProject(false);
+    }
+  };
+
+  // Checklist handlers
+  const handleChecklistChange = (item: 'invoiced' | 'paid' | 'delivered', checked: boolean) => {
+    setPendingChecklistItem(item);
+    setPendingChecklistValue(checked);
+
+    // Clear validation errors
+    setValidationErrors({
+      invoicedAmount: '',
+      invoicedDate: '',
+      paidAmount: '',
+      paidDate: '',
+      deliveryMethod: '',
+      deliveryDate: '',
+    });
+
+    // Pre-fill amounts from estimate if checking invoiced
+    if (item === 'invoiced' && checked && estimate?.total) {
+      setChecklistInputs(prev => ({
+        ...prev,
+        invoicedAmount: estimate.total.toFixed(2),
+      }));
+    }
+
+    setShowChecklistConfirm(true);
+  };
+
+  const handleConfirmChecklist = async () => {
+    if (!pendingChecklistItem) return;
+
+    // Validate inputs
+    if (pendingChecklistValue && !validateChecklistInputs()) {
+      showToast("Please correct the errors before submitting.", "error");
+      return;
+    }
+
+    setShowChecklistConfirm(false);
+    setUpdatingChecklist(true);
+
+    try {
+      const updates: Partial<Project> = {};
+
+      if (pendingChecklistItem === 'invoiced') {
+        updates.invoiced = pendingChecklistValue;
+        if (pendingChecklistValue) {
+          updates.invoicedAmount = parseFloat(checklistInputs.invoicedAmount);
+          updates.invoicedDate = checklistInputs.invoicedDate;
+        } else {
+          updates.invoicedAmount = undefined;
+          updates.invoicedDate = undefined;
+        }
+      } else if (pendingChecklistItem === 'paid') {
+        updates.paid = pendingChecklistValue;
+        if (pendingChecklistValue) {
+          updates.paidAmount = parseFloat(checklistInputs.paidAmount);
+          updates.paidDate = checklistInputs.paidDate;
+        } else {
+          updates.paidAmount = undefined;
+          updates.paidDate = undefined;
+        }
+      } else if (pendingChecklistItem === 'delivered') {
+        updates.delivered = pendingChecklistValue;
+        if (pendingChecklistValue) {
+          updates.deliveryMethod = checklistInputs.deliveryMethod;
+          updates.deliveryDate = checklistInputs.deliveryDate;
+        } else {
+          updates.deliveryMethod = undefined;
+          updates.deliveryDate = undefined;
+        }
+      }
+
+      // Calculate balance remaining for regular projects
+      if (project.projectType === 'regular' || !project.projectType) {
+        const invoicedAmt = pendingChecklistItem === 'invoiced' && pendingChecklistValue
+          ? parseFloat(checklistInputs.invoicedAmount)
+          : project.invoicedAmount || 0;
+        const paidAmt = pendingChecklistItem === 'paid' && pendingChecklistValue
+          ? parseFloat(checklistInputs.paidAmount)
+          : project.paidAmount || 0;
+        const depositAmt = project.depositPaidAmount || 0;
+
+        updates.balanceRemaining = invoicedAmt - depositAmt - paidAmt;
+      }
+
+      await storage.updateProject(project.id, updates);
+
+      setProject({
+        ...project,
+        ...updates,
+      });
+
+      const itemName = pendingChecklistItem.charAt(0).toUpperCase() + pendingChecklistItem.slice(1);
+      if (pendingChecklistValue) {
+        showToast(`${itemName} status updated!`, "success");
+      } else {
+        showToast(`${itemName} status removed.`, "info");
+      }
+    } catch (error) {
+      console.error("Error updating checklist:", error);
+      showToast("Failed to update checklist. Please try again.", "error");
+    } finally {
+      setUpdatingChecklist(false);
+      setPendingChecklistItem(null);
+    }
+  };
+
+  const handleArchiveComplete = async () => {
+    if (!confirm("Archive this project? Completed projects are moved to Archive for record-keeping.")) return;
+
+    setUpdating(true);
+    try {
+      await storage.updateProject(project.id, { stage: "Archived" as Stage });
+      showToast("Project archived successfully!", "success");
+      setTimeout(() => {
+        router.push("/board");
+      }, 1000);
+    } catch (error) {
+      console.error("Error archiving project:", error);
+      showToast("Failed to archive project. Please try again.", "error");
+      setUpdating(false);
+    }
+  };
+
+  // Check if all checklist items are complete
+  const isChecklistComplete = (): boolean => {
+    if (project.stage !== "Completed") return false;
+
+    const projectType = project.projectType || 'regular';
+
+    if (projectType === 'regular') {
+      return !!(project.invoiced && project.paid && project.delivered);
+    } else if (projectType === 'gift') {
+      return !!(project.invoiced && project.delivered);
+    } else if (projectType === 'charitable') {
+      return !!(project.invoiced && project.delivered);
+    }
+
+    return false;
+  };
+
+  // Validation helpers
+  const validateAmount = (value: string, fieldName: string): string => {
+    if (!value || value.trim() === '') {
+      return 'Amount is required';
+    }
+    const amount = parseFloat(value);
+    if (isNaN(amount)) {
+      return 'Please enter a valid number';
+    }
+    if (amount <= 0) {
+      return 'Amount must be greater than $0';
+    }
+    // Check for max 2 decimal places
+    if (!/^\d+(\.\d{1,2})?$/.test(value)) {
+      return 'Amount can have at most 2 decimal places';
+    }
+    // Additional validation for paid amount
+    if (fieldName === 'paidAmount' && project.invoicedAmount) {
+      const maxPaid = project.invoicedAmount - (project.depositPaidAmount || 0);
+      if (amount > maxPaid) {
+        return `Amount cannot exceed remaining balance (${formatCurrency(maxPaid)})`;
+      }
+    }
+    return '';
+  };
+
+  const validateDate = (value: string): string => {
+    if (!value || value.trim() === '') {
+      return 'Date is required';
+    }
+    const selectedDate = new Date(value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate > today) {
+      return 'Date cannot be in the future';
+    }
+    return '';
+  };
+
+  const validateDeliveryMethod = (value: string): string => {
+    if (!value || !['pickup', 'shipped', 'mailed'].includes(value)) {
+      return 'Delivery method is required';
+    }
+    return '';
+  };
+
+  const validateChecklistInputs = (): boolean => {
+    if (!pendingChecklistItem || !pendingChecklistValue) return true;
+
+    const errors = { ...validationErrors };
+    let hasErrors = false;
+
+    if (pendingChecklistItem === 'invoiced') {
+      errors.invoicedAmount = validateAmount(checklistInputs.invoicedAmount, 'invoicedAmount');
+      errors.invoicedDate = validateDate(checklistInputs.invoicedDate);
+      hasErrors = !!(errors.invoicedAmount || errors.invoicedDate);
+    } else if (pendingChecklistItem === 'paid') {
+      errors.paidAmount = validateAmount(checklistInputs.paidAmount, 'paidAmount');
+      errors.paidDate = validateDate(checklistInputs.paidDate);
+      hasErrors = !!(errors.paidAmount || errors.paidDate);
+    } else if (pendingChecklistItem === 'delivered') {
+      errors.deliveryMethod = validateDeliveryMethod(checklistInputs.deliveryMethod);
+      errors.deliveryDate = validateDate(checklistInputs.deliveryDate);
+      hasErrors = !!(errors.deliveryMethod || errors.deliveryDate);
+    }
+
+    setValidationErrors(errors);
+    return !hasErrors;
+  };
+
   const getCompletionDateDisplay = () => {
     if (project.requestedDateType === "asap") {
       return "ASAP";
@@ -494,6 +777,254 @@ export default function ProjectDetailPage() {
               <button
                 onClick={() => setShowInvoiceConfirm(false)}
                 disabled={sendingEmail}
+                className="px-4 py-3 border border-line rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal - Approval Status */}
+      {showApprovalConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-plum mb-3">
+              {pendingApprovalValue ? "Mark Estimate as Approved?" : "Remove Approval?"}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {pendingApprovalValue
+                ? "This will move the project to In Progress stage."
+                : "This will move the project back to Estimates stage."}
+            </p>
+            {pendingApprovalValue && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600 text-lg">✓</span>
+                  <div className="text-sm text-green-700">
+                    <div className="font-medium">Project will advance automatically</div>
+                    <div className="text-xs mt-1">Estimates → In Progress</div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmApproval}
+                disabled={approvingProject}
+                className="flex-1 px-4 py-3 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors disabled:opacity-50"
+              >
+                {approvingProject ? "Updating..." : pendingApprovalValue ? "Approve" : "Remove Approval"}
+              </button>
+              <button
+                onClick={() => setShowApprovalConfirm(false)}
+                disabled={approvingProject}
+                className="px-4 py-3 border border-line rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal - Checklist Item */}
+      {showChecklistConfirm && pendingChecklistItem && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-plum mb-3">
+              {pendingChecklistValue
+                ? `Mark as ${pendingChecklistItem.charAt(0).toUpperCase() + pendingChecklistItem.slice(1)}?`
+                : `Remove ${pendingChecklistItem.charAt(0).toUpperCase() + pendingChecklistItem.slice(1)} status?`}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {pendingChecklistValue
+                ? "This will update the project status."
+                : "The associated data will be cleared."}
+            </p>
+
+            {/* Input fields when checking */}
+            {pendingChecklistValue && (
+              <div className="space-y-3 mb-4">
+                {pendingChecklistItem === 'invoiced' && (
+                  <>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Amount *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={checklistInputs.invoicedAmount}
+                        onChange={(e) => {
+                          setChecklistInputs(prev => ({ ...prev, invoicedAmount: e.target.value }));
+                          setValidationErrors(prev => ({ ...prev, invoicedAmount: '' }));
+                        }}
+                        onBlur={(e) => {
+                          const error = validateAmount(e.target.value, 'invoicedAmount');
+                          setValidationErrors(prev => ({ ...prev, invoicedAmount: error }));
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                          validationErrors.invoicedAmount
+                            ? 'border-red-500 focus:ring-red-500'
+                            : 'border-line focus:ring-plum'
+                        }`}
+                        placeholder="0.00"
+                      />
+                      {validationErrors.invoicedAmount && (
+                        <p className="text-xs text-red-600 mt-1">{validationErrors.invoicedAmount}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Date *</label>
+                      <input
+                        type="date"
+                        value={checklistInputs.invoicedDate}
+                        max={new Date().toISOString().split('T')[0]}
+                        onChange={(e) => {
+                          setChecklistInputs(prev => ({ ...prev, invoicedDate: e.target.value }));
+                          setValidationErrors(prev => ({ ...prev, invoicedDate: '' }));
+                        }}
+                        onBlur={(e) => {
+                          const error = validateDate(e.target.value);
+                          setValidationErrors(prev => ({ ...prev, invoicedDate: error }));
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                          validationErrors.invoicedDate
+                            ? 'border-red-500 focus:ring-red-500'
+                            : 'border-line focus:ring-plum'
+                        }`}
+                      />
+                      {validationErrors.invoicedDate && (
+                        <p className="text-xs text-red-600 mt-1">{validationErrors.invoicedDate}</p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {pendingChecklistItem === 'paid' && (
+                  <>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Amount *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={checklistInputs.paidAmount}
+                        onChange={(e) => {
+                          setChecklistInputs(prev => ({ ...prev, paidAmount: e.target.value }));
+                          setValidationErrors(prev => ({ ...prev, paidAmount: '' }));
+                        }}
+                        onBlur={(e) => {
+                          const error = validateAmount(e.target.value, 'paidAmount');
+                          setValidationErrors(prev => ({ ...prev, paidAmount: error }));
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                          validationErrors.paidAmount
+                            ? 'border-red-500 focus:ring-red-500'
+                            : 'border-line focus:ring-plum'
+                        }`}
+                        placeholder="0.00"
+                      />
+                      {validationErrors.paidAmount && (
+                        <p className="text-xs text-red-600 mt-1">{validationErrors.paidAmount}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Date *</label>
+                      <input
+                        type="date"
+                        value={checklistInputs.paidDate}
+                        max={new Date().toISOString().split('T')[0]}
+                        onChange={(e) => {
+                          setChecklistInputs(prev => ({ ...prev, paidDate: e.target.value }));
+                          setValidationErrors(prev => ({ ...prev, paidDate: '' }));
+                        }}
+                        onBlur={(e) => {
+                          const error = validateDate(e.target.value);
+                          setValidationErrors(prev => ({ ...prev, paidDate: error }));
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                          validationErrors.paidDate
+                            ? 'border-red-500 focus:ring-red-500'
+                            : 'border-line focus:ring-plum'
+                        }`}
+                      />
+                      {validationErrors.paidDate && (
+                        <p className="text-xs text-red-600 mt-1">{validationErrors.paidDate}</p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {pendingChecklistItem === 'delivered' && (
+                  <>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Delivery Method *</label>
+                      <select
+                        value={checklistInputs.deliveryMethod}
+                        onChange={(e) => {
+                          setChecklistInputs(prev => ({
+                            ...prev,
+                            deliveryMethod: e.target.value as 'pickup' | 'shipped' | 'mailed'
+                          }));
+                          setValidationErrors(prev => ({ ...prev, deliveryMethod: '' }));
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                          validationErrors.deliveryMethod
+                            ? 'border-red-500 focus:ring-red-500'
+                            : 'border-line focus:ring-plum'
+                        }`}
+                      >
+                        <option value="pickup">Pickup</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="mailed">Mailed</option>
+                      </select>
+                      {validationErrors.deliveryMethod && (
+                        <p className="text-xs text-red-600 mt-1">{validationErrors.deliveryMethod}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Date *</label>
+                      <input
+                        type="date"
+                        value={checklistInputs.deliveryDate}
+                        max={new Date().toISOString().split('T')[0]}
+                        onChange={(e) => {
+                          setChecklistInputs(prev => ({ ...prev, deliveryDate: e.target.value }));
+                          setValidationErrors(prev => ({ ...prev, deliveryDate: '' }));
+                        }}
+                        onBlur={(e) => {
+                          const error = validateDate(e.target.value);
+                          setValidationErrors(prev => ({ ...prev, deliveryDate: error }));
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                          validationErrors.deliveryDate
+                            ? 'border-red-500 focus:ring-red-500'
+                            : 'border-line focus:ring-plum'
+                        }`}
+                      />
+                      {validationErrors.deliveryDate && (
+                        <p className="text-xs text-red-600 mt-1">{validationErrors.deliveryDate}</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmChecklist}
+                disabled={updatingChecklist}
+                className="flex-1 px-4 py-3 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors disabled:opacity-50"
+              >
+                {updatingChecklist ? "Updating..." : "Confirm"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowChecklistConfirm(false);
+                  setPendingChecklistItem(null);
+                }}
+                disabled={updatingChecklist}
                 className="px-4 py-3 border border-line rounded-xl hover:bg-gray-50 transition-colors"
               >
                 Cancel
@@ -848,12 +1379,15 @@ export default function ProjectDetailPage() {
                 <span className="text-muted">Subtotal</span>
                 <span className="font-medium">{formatCurrency(estimate.subtotal)}</span>
               </div>
-              {estimate.taxAmount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted">Tax ({estimate.taxRate}%)</span>
-                  <span className="font-medium">{formatCurrency(estimate.taxAmount)}</span>
-                </div>
-              )}
+              {/* v4.0 DEPRECATED - Tax display hidden by ENABLE_TAX_SYSTEM flag */}
+              <FeatureGate flag="ENABLE_TAX_SYSTEM">
+                {estimate.taxAmount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted">Tax ({estimate.taxRate}%)</span>
+                    <span className="font-medium">{formatCurrency(estimate.taxAmount)}</span>
+                  </div>
+                )}
+              </FeatureGate>
               <div className="flex justify-between py-1 font-bold text-base border-t border-line">
                 <span>Total</span>
                 <span className="text-plum">{formatCurrency(estimate.total)}</span>
@@ -1015,6 +1549,303 @@ export default function ProjectDetailPage() {
                 <span>Balance Due</span>
                 <span>{balanceDue <= 0 ? "✓ PAID IN FULL" : formatCurrency(balanceDue)}</span>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Approval Section - Only for Estimates Stage */}
+        {project.stage === "Estimates" && (
+          <div className="bg-white border border-line rounded-xl p-6 mb-6 print:hidden">
+            <h2 className="font-bold text-plum mb-4">Approval</h2>
+
+            <div className="space-y-4">
+              {/* Approval Checkbox */}
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={project.approvalStatus || false}
+                  onChange={(e) => handleApprovalChange(e.target.checked)}
+                  disabled={approvingProject}
+                  className="mt-1 w-5 h-5 text-plum border-gray-300 rounded focus:ring-plum focus:ring-2 disabled:opacity-50 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <span className="font-medium text-gray-900 group-hover:text-plum transition-colors">
+                    Mark as Approved
+                  </span>
+                  {approvingProject && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-plum"></div>
+                      <span className="text-xs text-gray-500">Updating...</span>
+                    </div>
+                  )}
+                </div>
+              </label>
+
+              {/* Approval Status Display */}
+              {project.approvalStatus && project.approvalDate && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600 text-xl">✓</span>
+                    <div className="flex-1">
+                      <div className="font-medium text-green-700">
+                        Approved on {formatDate(project.approvalDate)}
+                      </div>
+                      <div className="text-xs text-green-600 mt-1">
+                        Project will auto-advance to &quot;In Progress&quot; stage
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Info Box - When Not Approved */}
+              {!project.approvalStatus && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <span className="text-blue-600 text-xl">ℹ️</span>
+                    <div className="text-sm text-blue-700">
+                      <div className="font-medium">Ready to start work?</div>
+                      <div className="text-xs mt-1">
+                        Check the box above to approve this estimate and automatically move it to &quot;In Progress&quot;
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Completion Checklist - Only for Completed Stage */}
+        {project.stage === "Completed" && (
+          <div className="bg-white border border-line rounded-xl p-6 mb-6 print:hidden">
+            <h2 className="font-bold text-plum mb-4">Completion Checklist</h2>
+
+            {/* All Complete Banner */}
+            {isChecklistComplete() && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-green-600 text-2xl">✓</span>
+                    <div>
+                      <div className="font-bold text-green-700">All tasks complete!</div>
+                      <div className="text-sm text-green-600">Ready to archive this project.</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleArchiveComplete}
+                    disabled={updating}
+                    className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {updating ? "Archiving..." : "Archive Project"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {/* REGULAR PROJECT CHECKLIST */}
+              {(!project.projectType || project.projectType === 'regular') && (
+                <>
+                  {/* Invoiced */}
+                  <div className="border border-line rounded-lg p-4">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={project.invoiced || false}
+                        onChange={(e) => handleChecklistChange('invoiced', e.target.checked)}
+                        disabled={updatingChecklist}
+                        className="mt-1 w-5 h-5 text-plum border-gray-300 rounded focus:ring-plum focus:ring-2 disabled:opacity-50 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 group-hover:text-plum transition-colors">
+                          Invoiced
+                        </div>
+                        {project.invoiced && (
+                          <div className="text-sm text-green-700 mt-1">
+                            {formatCurrency(project.invoicedAmount)} • {formatDate(project.invoicedDate)}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Paid */}
+                  <div className="border border-line rounded-lg p-4">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={project.paid || false}
+                        onChange={(e) => handleChecklistChange('paid', e.target.checked)}
+                        disabled={updatingChecklist}
+                        className="mt-1 w-5 h-5 text-plum border-gray-300 rounded focus:ring-plum focus:ring-2 disabled:opacity-50 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 group-hover:text-plum transition-colors">
+                          Paid
+                        </div>
+                        {project.paid && (
+                          <div className="text-sm text-green-700 mt-1">
+                            {formatCurrency(project.paidAmount)} • {formatDate(project.paidDate)}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Delivered */}
+                  <div className="border border-line rounded-lg p-4">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={project.delivered || false}
+                        onChange={(e) => handleChecklistChange('delivered', e.target.checked)}
+                        disabled={updatingChecklist}
+                        className="mt-1 w-5 h-5 text-plum border-gray-300 rounded focus:ring-plum focus:ring-2 disabled:opacity-50 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 group-hover:text-plum transition-colors">
+                          Delivered
+                        </div>
+                        {project.delivered && (
+                          <div className="text-sm text-green-700 mt-1">
+                            {project.deliveryMethod?.charAt(0).toUpperCase() + (project.deliveryMethod?.slice(1) || '')} • {formatDate(project.deliveryDate)}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Balance Remaining */}
+                  {project.invoiced && (
+                    <div className={`p-4 rounded-lg border-2 ${
+                      (project.balanceRemaining || 0) > 0
+                        ? 'bg-orange-50 border-orange-300'
+                        : 'bg-green-50 border-green-300'
+                    }`}>
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-gray-900">Balance Remaining:</span>
+                        <span className={`font-bold text-lg ${
+                          (project.balanceRemaining || 0) > 0
+                            ? 'text-orange-600'
+                            : 'text-green-600'
+                        }`}>
+                          {(project.balanceRemaining || 0) <= 0
+                            ? '✓ PAID IN FULL'
+                            : formatCurrency(project.balanceRemaining)}
+                        </span>
+                      </div>
+                      {(project.balanceRemaining || 0) > 0 && (
+                        <div className="text-xs text-orange-600 mt-1">
+                          Invoiced: {formatCurrency(project.invoicedAmount)} - Deposit: {formatCurrency(project.depositPaidAmount || 0)} - Paid: {formatCurrency(project.paidAmount || 0)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* GIFT PROJECT CHECKLIST */}
+              {project.projectType === 'gift' && (
+                <>
+                  {/* Gift Invoice */}
+                  <div className="border border-line rounded-lg p-4">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={project.invoiced || false}
+                        onChange={(e) => handleChecklistChange('invoiced', e.target.checked)}
+                        disabled={updatingChecklist}
+                        className="mt-1 w-5 h-5 text-plum border-gray-300 rounded focus:ring-plum focus:ring-2 disabled:opacity-50 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 group-hover:text-plum transition-colors">
+                          Gift Invoice Generated
+                        </div>
+                        {project.invoiced && (
+                          <div className="text-sm text-green-700 mt-1">
+                            {formatDate(project.invoicedDate)}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Delivered */}
+                  <div className="border border-line rounded-lg p-4">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={project.delivered || false}
+                        onChange={(e) => handleChecklistChange('delivered', e.target.checked)}
+                        disabled={updatingChecklist}
+                        className="mt-1 w-5 h-5 text-plum border-gray-300 rounded focus:ring-plum focus:ring-2 disabled:opacity-50 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 group-hover:text-plum transition-colors">
+                          Delivered
+                        </div>
+                        {project.delivered && (
+                          <div className="text-sm text-green-700 mt-1">
+                            {project.deliveryMethod?.charAt(0).toUpperCase() + (project.deliveryMethod?.slice(1) || '')} • {formatDate(project.deliveryDate)}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {/* CHARITABLE PROJECT CHECKLIST */}
+              {project.projectType === 'charitable' && (
+                <>
+                  {/* Donation Invoice */}
+                  <div className="border border-line rounded-lg p-4">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={project.invoiced || false}
+                        onChange={(e) => handleChecklistChange('invoiced', e.target.checked)}
+                        disabled={updatingChecklist}
+                        className="mt-1 w-5 h-5 text-plum border-gray-300 rounded focus:ring-plum focus:ring-2 disabled:opacity-50 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 group-hover:text-plum transition-colors">
+                          Donation Invoice Generated
+                        </div>
+                        {project.invoiced && (
+                          <div className="text-sm text-green-700 mt-1">
+                            {formatDate(project.invoicedDate)}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Delivered */}
+                  <div className="border border-line rounded-lg p-4">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={project.delivered || false}
+                        onChange={(e) => handleChecklistChange('delivered', e.target.checked)}
+                        disabled={updatingChecklist}
+                        className="mt-1 w-5 h-5 text-plum border-gray-300 rounded focus:ring-plum focus:ring-2 disabled:opacity-50 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 group-hover:text-plum transition-colors">
+                          Delivered
+                        </div>
+                        {project.delivered && (
+                          <div className="text-sm text-green-700 mt-1">
+                            {formatDate(project.deliveryDate)}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

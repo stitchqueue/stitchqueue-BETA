@@ -10,6 +10,7 @@
 "use client";
 
 import type { ExtraCharge } from "../../types";
+import { FeatureGate, isFeatureEnabled } from "../../lib/featureFlags";
 
 interface ExtraChargesSectionProps {
   /** List of current extra charges */
@@ -82,15 +83,18 @@ export default function ExtraChargesSection({
           </div>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={newChargeTaxable}
-              onChange={(e) => setNewChargeTaxable(e.target.checked)}
-              className="w-4 h-4 rounded border-line"
-            />
-            <span className="text-sm text-muted">Taxable</span>
-          </label>
+          {/* v4.0 DEPRECATED - Taxable checkbox hidden by ENABLE_TAX_SYSTEM flag */}
+          <FeatureGate flag="ENABLE_TAX_SYSTEM">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={newChargeTaxable}
+                onChange={(e) => setNewChargeTaxable(e.target.checked)}
+                className="w-4 h-4 rounded border-line"
+              />
+              <span className="text-sm text-muted">Taxable</span>
+            </label>
+          </FeatureGate>
           <button
             type="button"
             onClick={onAddCharge}
@@ -113,7 +117,7 @@ export default function ExtraChargesSection({
                 <div className="text-sm font-bold">{charge.name}</div>
                 <div className="text-xs text-muted">
                   {formatCurrency(charge.amount)}
-                  {charge.taxable ? " (taxable)" : " (non-taxable)"}
+                  {isFeatureEnabled("ENABLE_TAX_SYSTEM") && (charge.taxable ? " (taxable)" : " (non-taxable)")}
                 </div>
               </div>
               <button

@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { storage } from "../../../lib/storage";
+import { FeatureGate, isFeatureEnabled } from "../../../lib/featureFlags";
 import type { Settings } from "../../../types";
 import { AccordionHeader, AccordionBody, SectionKey } from "../Accordion";
 
@@ -249,67 +250,81 @@ export default function ReportsSection({
     }
   };
 
+  // Dynamic label: show "Reports & Data" when reports enabled, "Data Management" when hidden
+  const sectionLabel = isFeatureEnabled("ENABLE_FINANCIAL_REPORTS")
+    ? "Reports & Data"
+    : "Data Management";
+  const sectionSubtitle = isFeatureEnabled("ENABLE_FINANCIAL_REPORTS")
+    ? "Business analytics and data management"
+    : "Export data and manage your account";
+
   return (
     <div>
       <AccordionHeader
         sectionKey="data"
-        label="Reports & Data"
+        label={sectionLabel}
         icon="📊"
-        subtitle="Business analytics and data management"
+        subtitle={sectionSubtitle}
         isOpen={isOpen}
         onToggle={onToggle}
       />
       <AccordionBody isOpen={isOpen}>
         <div className="space-y-6">
-          {/* Report Type Selector */}
-          <ReportTypeTabs
-            selectedReport={selectedReport}
-            onSelectReport={setSelectedReport}
-          />
-
-          {/* Date Range Selector (not shown for clients or tax) */}
-          {selectedReport !== "clients" && selectedReport !== "tax" && (
-            <DateRangeSelector
-              dateRange={dateRange}
-              customStartDate={customStartDate}
-              customEndDate={customEndDate}
-              onSelectRange={setDateRange}
-              onCustomStartChange={setCustomStartDate}
-              onCustomEndChange={setCustomEndDate}
+          {/* v4.0 DEPRECATED - Financial reports hidden by ENABLE_FINANCIAL_REPORTS flag */}
+          {/* QuickBooks/Xero handles revenue, cash flow, and financial analytics */}
+          <FeatureGate flag="ENABLE_FINANCIAL_REPORTS">
+            {/* Report Type Selector */}
+            <ReportTypeTabs
+              selectedReport={selectedReport}
+              onSelectReport={setSelectedReport}
             />
-          )}
 
-          {/* Report Content Container */}
-          <div className="border border-line rounded-xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-plum">
-                {selectedReport === "revenue" && "Revenue Report"}
-                {selectedReport === "payments" && "Payments Report"}
-                {selectedReport === "materials" && "Materials Usage Report"}
-                {selectedReport === "clients" && "Client Analysis"}
-                {selectedReport === "tax" && `Tax Summary ${new Date().getFullYear()}`}
-              </h3>
-              <ExportMenu
-                isOpen={showExportMenu}
-                onToggle={() => setShowExportMenu(!showExportMenu)}
-                onExportCSV={handleExportCSV}
-                onExportPDF={handleExportPDF}
+            {/* Date Range Selector (not shown for clients or tax) */}
+            {selectedReport !== "clients" && selectedReport !== "tax" && (
+              <DateRangeSelector
+                dateRange={dateRange}
+                customStartDate={customStartDate}
+                customEndDate={customEndDate}
+                onSelectRange={setDateRange}
+                onCustomStartChange={setCustomStartDate}
+                onCustomEndChange={setCustomEndDate}
               />
+            )}
+
+            {/* Report Content Container */}
+            <div className="border border-line rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-plum">
+                  {selectedReport === "revenue" && "Revenue Report"}
+                  {selectedReport === "payments" && "Payments Report"}
+                  {selectedReport === "materials" && "Materials Usage Report"}
+                  {selectedReport === "clients" && "Client Analysis"}
+                  {selectedReport === "tax" && `Tax Summary ${new Date().getFullYear()}`}
+                </h3>
+                <ExportMenu
+                  isOpen={showExportMenu}
+                  onToggle={() => setShowExportMenu(!showExportMenu)}
+                  onExportCSV={handleExportCSV}
+                  onExportPDF={handleExportPDF}
+                />
+              </div>
+
+              {renderReportContent()}
             </div>
+          </FeatureGate>
 
-            {renderReportContent()}
-          </div>
-
-          {/* Data Management Section */}
+          {/* Data Management Section - always visible */}
           <DataManagement />
         </div>
 
         {/* Report Detail Modal */}
-        <ReportModal
-          modal={modal}
-          currencyCode={settings.currencyCode || "USD"}
-          onClose={closeModal}
-        />
+        <FeatureGate flag="ENABLE_FINANCIAL_REPORTS">
+          <ReportModal
+            modal={modal}
+            currencyCode={settings.currencyCode || "USD"}
+            onClose={closeModal}
+          />
+        </FeatureGate>
       </AccordionBody>
     </div>
   );

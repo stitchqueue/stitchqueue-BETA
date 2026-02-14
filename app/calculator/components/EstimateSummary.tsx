@@ -10,6 +10,7 @@
 "use client";
 
 import type { Settings, ExtraCharge } from "../../types";
+import { FeatureGate, isFeatureEnabled } from "../../lib/featureFlags";
 
 interface EstimateSummaryProps {
   settings: Settings;
@@ -149,14 +150,17 @@ export default function EstimateSummary({
               <div key={charge.id} className="flex justify-between text-sm pl-2">
                 <span className="text-muted">
                   {charge.name}
-                  {!charge.taxable && " *"}
+                  {isFeatureEnabled("ENABLE_TAX_SYSTEM") && !charge.taxable && " *"}
                 </span>
                 <span className="font-bold">{formatCurrency(charge.amount)}</span>
               </div>
             ))}
-            {extraCharges.some((c) => !c.taxable) && (
-              <p className="text-xs text-muted pl-2">* Non-taxable</p>
-            )}
+            {/* v4.0 DEPRECATED - Non-taxable footnote hidden by ENABLE_TAX_SYSTEM flag */}
+            <FeatureGate flag="ENABLE_TAX_SYSTEM">
+              {extraCharges.some((c) => !c.taxable) && (
+                <p className="text-xs text-muted pl-2">* Non-taxable</p>
+              )}
+            </FeatureGate>
           </>
         )}
       </div>
@@ -232,54 +236,30 @@ export default function EstimateSummary({
           )}
         </div>
 
-        {/* Tax Exempt Checkbox */}
-        <div className="pt-2 border-t border-line">
-          <label className="flex items-center gap-2 cursor-pointer py-2">
-            <input
-              type="checkbox"
-              checked={taxExempt}
-              onChange={(e) => setTaxExempt(e.target.checked)}
-              className="w-4 h-4 rounded border-line accent-plum"
-            />
-            <span className="text-sm font-bold text-muted">Tax Exempt</span>
-            <span className="text-xs text-muted">(out-of-state, tax-free sales)</span>
-          </label>
-        </div>
+        {/* v4.0 DEPRECATED - Tax system hidden by ENABLE_TAX_SYSTEM flag */}
+        {/* QuickBooks/Xero handles tax calculations */}
+        <FeatureGate flag="ENABLE_TAX_SYSTEM">
+          {/* Tax Exempt Checkbox */}
+          <div className="pt-2 border-t border-line">
+            <label className="flex items-center gap-2 cursor-pointer py-2">
+              <input
+                type="checkbox"
+                checked={taxExempt}
+                onChange={(e) => setTaxExempt(e.target.checked)}
+                className="w-4 h-4 rounded border-line accent-plum"
+              />
+              <span className="text-sm font-bold text-muted">Tax Exempt</span>
+              <span className="text-xs text-muted">(out-of-state, tax-free sales)</span>
+            </label>
+          </div>
 
-        {/* Tax Configuration */}
-        {!taxExempt && (
-          <div className="space-y-2 mt-2">
-            {/* Primary Tax */}
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm text-muted">
-                {settings.taxPrimaryLabel || "Sales Tax"}
-              </span>
-              <div className="flex items-center gap-2">
-                <div className="relative w-20">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={taxPrimaryRate}
-                    onChange={(e) => setTaxPrimaryRate(e.target.value)}
-                    className="w-full py-1 px-2 text-sm border border-line rounded-lg text-right pr-6"
-                  />
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted">
-                    %
-                  </span>
-                </div>
-                <span className="font-bold text-sm w-20 text-right">
-                  {formatCurrency(taxPrimaryAmount)}
-                </span>
-              </div>
-            </div>
-
-            {/* Secondary Tax (if enabled) */}
-            {settings.taxSecondaryEnabled && (
+          {/* Tax Configuration */}
+          {!taxExempt && (
+            <div className="space-y-2 mt-2">
+              {/* Primary Tax */}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-muted">
-                  {settings.taxSecondaryLabel || "Provincial Tax"}
+                  {settings.taxPrimaryLabel || "Sales Tax"}
                 </span>
                 <div className="flex items-center gap-2">
                   <div className="relative w-20">
@@ -288,8 +268,8 @@ export default function EstimateSummary({
                       step="0.01"
                       min="0"
                       max="100"
-                      value={taxSecondaryRate}
-                      onChange={(e) => setTaxSecondaryRate(e.target.value)}
+                      value={taxPrimaryRate}
+                      onChange={(e) => setTaxPrimaryRate(e.target.value)}
                       className="w-full py-1 px-2 text-sm border border-line rounded-lg text-right pr-6"
                     />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted">
@@ -297,34 +277,62 @@ export default function EstimateSummary({
                     </span>
                   </div>
                   <span className="font-bold text-sm w-20 text-right">
-                    {formatCurrency(taxSecondaryAmount)}
+                    {formatCurrency(taxPrimaryAmount)}
                   </span>
                 </div>
               </div>
-            )}
 
-            {/* Total Tax (if dual rate) */}
-            {settings.taxSecondaryEnabled && (
-              <div className="flex justify-between text-sm pl-4 pt-1 border-t border-line/50">
-                <span className="text-muted font-bold">Total Tax</span>
-                <span className="font-bold w-20 text-right">{formatCurrency(taxAmount)}</span>
-              </div>
-            )}
+              {/* Secondary Tax (if enabled) */}
+              {settings.taxSecondaryEnabled && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted">
+                    {settings.taxSecondaryLabel || "Provincial Tax"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="relative w-20">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={taxSecondaryRate}
+                        onChange={(e) => setTaxSecondaryRate(e.target.value)}
+                        className="w-full py-1 px-2 text-sm border border-line rounded-lg text-right pr-6"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted">
+                        %
+                      </span>
+                    </div>
+                    <span className="font-bold text-sm w-20 text-right">
+                      {formatCurrency(taxSecondaryAmount)}
+                    </span>
+                  </div>
+                </div>
+              )}
 
-            {/* Helper Text */}
-            <p className="text-xs text-muted italic">
-              ℹ️ Verify tax rate for client's location. Rates can be adjusted per-project.
-              {discountAmount > 0 && " Tax applied to discounted amount."}
-            </p>
-          </div>
-        )}
+              {/* Total Tax (if dual rate) */}
+              {settings.taxSecondaryEnabled && (
+                <div className="flex justify-between text-sm pl-4 pt-1 border-t border-line/50">
+                  <span className="text-muted font-bold">Total Tax</span>
+                  <span className="font-bold w-20 text-right">{formatCurrency(taxAmount)}</span>
+                </div>
+              )}
 
-        {/* Tax Exempt Message */}
-        {taxExempt && (
-          <div className="text-sm text-muted italic bg-gray-50 p-2 rounded mt-2">
-            ✓ This estimate is tax-exempt. No tax will be charged.
-          </div>
-        )}
+              {/* Helper Text */}
+              <p className="text-xs text-muted italic">
+                ℹ️ Verify tax rate for client's location. Rates can be adjusted per-project.
+                {discountAmount > 0 && " Tax applied to discounted amount."}
+              </p>
+            </div>
+          )}
+
+          {/* Tax Exempt Message */}
+          {taxExempt && (
+            <div className="text-sm text-muted italic bg-gray-50 p-2 rounded mt-2">
+              ✓ This estimate is tax-exempt. No tax will be charged.
+            </div>
+          )}
+        </FeatureGate>
 
         {/* Total */}
         <div className="flex justify-between text-lg border-t border-line pt-3">

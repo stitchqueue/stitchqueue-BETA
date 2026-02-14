@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { storage } from "../../lib/storage";
+import { FeatureGate } from "../../lib/featureFlags";
 import type { Project, Settings } from "../../types";
 
 export default function InvoicePage() {
@@ -862,10 +863,12 @@ export default function InvoicePage() {
             </tbody>
           </table>
 
-          {/* Non-taxable footnote */}
-          {hasNonTaxableCharges && (
-            <p className="text-xs text-gray-500 mb-4">* Non-taxable item</p>
-          )}
+          {/* v4.0 DEPRECATED - Non-taxable footnote hidden by ENABLE_TAX_SYSTEM flag */}
+          <FeatureGate flag="ENABLE_TAX_SYSTEM">
+            {hasNonTaxableCharges && (
+              <p className="text-xs text-gray-500 mb-4">* Non-taxable item</p>
+            )}
+          </FeatureGate>
 
           {/* Totals - Compact, right aligned */}
           <div className="flex justify-end mb-4">
@@ -884,41 +887,45 @@ export default function InvoicePage() {
                   </span>
                 </div>
               )}
-              {/* Tax Display - Dual Rate System */}
-              {!estimate.taxExempt && estimate.taxPrimaryAmount && estimate.taxPrimaryAmount > 0 && (
-                <div className="flex justify-between py-1 text-sm border-t border-gray-100">
-                  <span className="text-gray-600">
-                    {estimate.taxPrimaryLabel || settings.taxPrimaryLabel || "Sales Tax"} ({estimate.taxPrimaryRate}%)
-                  </span>
-                  <span className="font-medium">
-                    {formatCurrency(estimate.taxPrimaryAmount)}
-                  </span>
-                </div>
-              )}
-              {!estimate.taxExempt && settings.taxSecondaryEnabled && estimate.taxSecondaryAmount && estimate.taxSecondaryAmount > 0 && (
-                <div className="flex justify-between py-1 text-sm">
-                  <span className="text-gray-600">
-                    {estimate.taxSecondaryLabel || settings.taxSecondaryLabel || "Provincial Tax"} ({estimate.taxSecondaryRate}%)
-                  </span>
-                  <span className="font-medium">
-                    {formatCurrency(estimate.taxSecondaryAmount)}
-                  </span>
-                </div>
-              )}
-              {!estimate.taxExempt && settings.taxSecondaryEnabled && estimate.taxSecondaryAmount && estimate.taxSecondaryAmount > 0 && (
-                <div className="flex justify-between py-1 text-sm font-semibold">
-                  <span className="text-gray-600">Total Tax</span>
-                  <span className="font-medium">
-                    {formatCurrency(estimate.taxTotalAmount || taxAmount)}
-                  </span>
-                </div>
-              )}
-              {/* Tax Exempt Message */}
-              {estimate.taxExempt && (
-                <div className="flex justify-between py-1 text-sm border-t border-gray-100">
-                  <span className="text-gray-600 italic">Tax Exempt</span>
-                </div>
-              )}
+              {/* v4.0 DEPRECATED - Tax display hidden by ENABLE_TAX_SYSTEM flag */}
+              {/* QuickBooks/Xero handles tax calculations */}
+              <FeatureGate flag="ENABLE_TAX_SYSTEM">
+                {/* Tax Display - Dual Rate System */}
+                {!estimate.taxExempt && estimate.taxPrimaryAmount && estimate.taxPrimaryAmount > 0 && (
+                  <div className="flex justify-between py-1 text-sm border-t border-gray-100">
+                    <span className="text-gray-600">
+                      {estimate.taxPrimaryLabel || settings.taxPrimaryLabel || "Sales Tax"} ({estimate.taxPrimaryRate}%)
+                    </span>
+                    <span className="font-medium">
+                      {formatCurrency(estimate.taxPrimaryAmount)}
+                    </span>
+                  </div>
+                )}
+                {!estimate.taxExempt && settings.taxSecondaryEnabled && estimate.taxSecondaryAmount && estimate.taxSecondaryAmount > 0 && (
+                  <div className="flex justify-between py-1 text-sm">
+                    <span className="text-gray-600">
+                      {estimate.taxSecondaryLabel || settings.taxSecondaryLabel || "Provincial Tax"} ({estimate.taxSecondaryRate}%)
+                    </span>
+                    <span className="font-medium">
+                      {formatCurrency(estimate.taxSecondaryAmount)}
+                    </span>
+                  </div>
+                )}
+                {!estimate.taxExempt && settings.taxSecondaryEnabled && estimate.taxSecondaryAmount && estimate.taxSecondaryAmount > 0 && (
+                  <div className="flex justify-between py-1 text-sm font-semibold">
+                    <span className="text-gray-600">Total Tax</span>
+                    <span className="font-medium">
+                      {formatCurrency(estimate.taxTotalAmount || taxAmount)}
+                    </span>
+                  </div>
+                )}
+                {/* Tax Exempt Message */}
+                {estimate.taxExempt && (
+                  <div className="flex justify-between py-1 text-sm border-t border-gray-100">
+                    <span className="text-gray-600 italic">Tax Exempt</span>
+                  </div>
+                )}
+              </FeatureGate>
 
               <div
                 className="flex justify-between py-2 text-base font-bold border-t-2"

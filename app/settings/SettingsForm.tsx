@@ -18,6 +18,7 @@ import {
   DEFAULT_SETTINGS,
 } from "../lib/storage";
 import type { Settings, BobbinOption, BattingOption } from "../types";
+import { FeatureGate, isFeatureEnabled } from "../lib/featureFlags";
 
 // Import child components
 import {
@@ -38,14 +39,24 @@ import { formatPhoneNumber } from "./utils";
 /**
  * Section configuration for navigation
  */
-const SECTIONS: { key: SectionKey; label: string; icon: string }[] = [
+const ALL_SECTIONS: { key: SectionKey; label: string; icon: string }[] = [
   { key: "business", label: "Business Info", icon: "🏢" },
+  // v4.0 DEPRECATED - Tax section hidden by ENABLE_TAX_SYSTEM flag
+  // QuickBooks/Xero handles tax calculations
   { key: "tax", label: "Tax Configuration", icon: "💰" },
   { key: "pricing", label: "Pricing Rates", icon: "💲" },
   { key: "bobbin", label: "Bobbin Options", icon: "🧵" },
   { key: "batting", label: "Batting Options", icon: "🛏️" },
-  { key: "data", label: "Reports & Data", icon: "📊" },
+  // v4.0 DEPRECATED - Financial reports hidden by ENABLE_FINANCIAL_REPORTS flag
+  // QuickBooks/Xero handles revenue, cash flow, and financial analytics
+  // Section stays visible for Data Management (export/clear), label changes dynamically
+  { key: "data", label: isFeatureEnabled("ENABLE_FINANCIAL_REPORTS") ? "Reports & Data" : "Data Management", icon: "📊" },
 ];
+
+const SECTIONS = ALL_SECTIONS.filter((s) => {
+  if (s.key === "tax" && !isFeatureEnabled("ENABLE_TAX_SYSTEM")) return false;
+  return true;
+});
 
 /**
  * Main settings form component.
@@ -595,13 +606,16 @@ export default function SettingsForm() {
             onRemoveLogo={handleRemoveLogo}
           />
 
-          {/* Tax Configuration */}
-          <TaxConfigSection
-            settings={settings}
-            isOpen={openSections.has("tax")}
-            onToggle={toggleSection}
-            handleInputChange={handleFieldChange}
-          />
+          {/* v4.0 DEPRECATED - Tax system hidden by ENABLE_TAX_SYSTEM flag */}
+          {/* QuickBooks/Xero handles tax calculations */}
+          <FeatureGate flag="ENABLE_TAX_SYSTEM">
+            <TaxConfigSection
+              settings={settings}
+              isOpen={openSections.has("tax")}
+              onToggle={toggleSection}
+              handleInputChange={handleFieldChange}
+            />
+          </FeatureGate>
 
           {/* Pricing Rates */}
           <PricingRatesSection

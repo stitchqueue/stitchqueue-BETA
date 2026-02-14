@@ -16,6 +16,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import { storage } from "../lib/storage";
+import { isFeatureEnabled } from "../lib/featureFlags";
 import type { Settings, Project, ExtraCharge } from "../types";
 
 // Import child components
@@ -307,6 +308,12 @@ export default function CalculatorForm() {
             setNextEstimateNumber(project.estimateNumber);
           }
         }
+      }
+
+      // v4.0 DEPRECATED: Force tax exempt when tax system is disabled
+      // This ensures saved estimates have $0 tax and total = subtotal - discount
+      if (!isFeatureEnabled("ENABLE_TAX_SYSTEM")) {
+        setTaxExempt(true);
       }
     };
 
