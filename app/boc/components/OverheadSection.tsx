@@ -37,7 +37,7 @@ export default function OverheadSection({ items, onChange, total }: Props) {
                 type="text"
                 value={item.label}
                 onChange={(e) => updateItem(index, "label", e.target.value)}
-                placeholder="Label"
+                placeholder="Add your own..."
                 className="w-full px-4 py-2 border border-line rounded-xl"
               />
             </div>
