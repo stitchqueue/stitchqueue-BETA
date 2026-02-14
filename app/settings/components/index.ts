@@ -14,4 +14,5 @@ export type { RateStrings } from './PricingRatesSection';
 export { default as BobbinOptionsSection } from './BobbinOptionsSection';
 export { default as BattingOptionsSection } from './BattingOptionsSection';
 export { default as DataSection } from './DataSection';
+export { default as SubscriptionSection } from './SubscriptionSection';
 export { ReportsSection } from './reports';

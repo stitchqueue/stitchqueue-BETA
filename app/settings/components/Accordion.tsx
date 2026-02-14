@@ -8,7 +8,7 @@
 
 "use client";
 
-export type SectionKey = "business" | "tax" | "pricing" | "bobbin" | "batting" | "data";
+export type SectionKey = "business" | "tax" | "pricing" | "bobbin" | "batting" | "data" | "subscription";
 
 interface AccordionHeaderProps {
   sectionKey: SectionKey;

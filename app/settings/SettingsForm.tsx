@@ -14,6 +14,7 @@ import {
   PricingRatesSection,
   BobbinOptionsSection,
   BattingOptionsSection,
+  SubscriptionSection,
   ReportsSection,
 } from "./components";
 import type { RateStrings } from "./components";
@@ -22,6 +23,7 @@ import { useBobbinOptions, useBattingOptions } from "./hooks";
 
 const ALL_SECTIONS: { key: SectionKey; label: string; icon: string }[] = [
   { key: "business", label: "Business Info", icon: "🏢" },
+  { key: "subscription", label: "Subscription", icon: "💳" },
   { key: "tax", label: "Tax Configuration", icon: "💰" },
   { key: "pricing", label: "Pricing Rates", icon: "💲" },
   { key: "bobbin", label: "Bobbin Options", icon: "🧵" },
@@ -239,6 +241,11 @@ export default function SettingsForm() {
             onPhoneChange={handlePhoneChange}
             onLogoUpload={handleLogoUpload}
             onRemoveLogo={handleRemoveLogo}
+          />
+
+          <SubscriptionSection
+            isOpen={openSections.has("subscription")}
+            onToggle={toggleSection}
           />
 
           <FeatureGate flag="ENABLE_TAX_SYSTEM">
