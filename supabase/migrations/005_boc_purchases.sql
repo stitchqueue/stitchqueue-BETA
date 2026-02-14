@@ -27,7 +27,7 @@ USING (user_id = auth.uid());
 CREATE POLICY "Service role can insert BOC purchases"
 ON boc_purchases FOR INSERT
 TO service_role
-USING (true);
+WITH CHECK (true);
 
 -- Index
 CREATE INDEX idx_boc_purchases_user_id ON boc_purchases(user_id);
