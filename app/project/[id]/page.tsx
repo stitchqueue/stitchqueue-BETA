@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Toast from "../../components/Toast";
 import Header from "../../components/Header";
+import PhotoUpload from "../../components/PhotoUpload";
+import PhotoGallery from "../../components/PhotoGallery";
 import { storage } from "../../lib/storage";
+import { getOrganizationId } from "../../lib/storage/auth";
 import { FeatureGate } from "../../lib/featureFlags";
 import { STAGES } from "../../types";
 import type { Project, Stage, Settings } from "../../types";
@@ -85,6 +88,11 @@ export default function ProjectDetailPage() {
     deliveryDate: '',
   });
 
+  // Photo state
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [photoCount, setPhotoCount] = useState(0);
+  const [photoGalleryKey, setPhotoGalleryKey] = useState(0);
+
   // Set document title for PDF naming
   useEffect(() => {
     if (project?.estimateNumber) {
@@ -109,13 +117,15 @@ export default function ProjectDetailPage() {
         }
         setIsAuthenticated(true);
 
-        // Load project and settings
-        const [savedProject, savedSettings] = await Promise.all([
+        // Load project, settings, and organization ID
+        const [savedProject, savedSettings, orgId] = await Promise.all([
           storage.getProjectById(projectId),
           storage.getSettings(),
+          getOrganizationId(),
         ]);
         setProject(savedProject || null);
         setSettings(savedSettings);
+        setOrganizationId(orgId);
 
         // Pre-fill payment amount with balance due
         if (savedProject?.estimateData?.total) {
@@ -1847,6 +1857,36 @@ export default function ProjectDetailPage() {
                 </>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Photos Section */}
+        {organizationId && (
+          <div className="bg-white border border-line rounded-xl p-6 no-print print:hidden print:!hidden">
+            <h2 className="font-bold text-plum mb-4">
+              Photos {photoCount > 0 && <span className="text-sm font-normal text-muted">({photoCount})</span>}
+            </h2>
+
+            {/* Photo Gallery */}
+            <PhotoGallery
+              key={photoGalleryKey}
+              projectId={projectId}
+              organizationId={organizationId}
+              onPhotoCountChange={setPhotoCount}
+              editable={project.stage !== 'archived'}
+            />
+
+            {/* Photo Upload (hidden for archived projects) */}
+            {project.stage !== 'archived' && (
+              <div className={photoCount > 0 ? "mt-4" : ""}>
+                <PhotoUpload
+                  projectId={projectId}
+                  organizationId={organizationId}
+                  existingPhotoCount={photoCount}
+                  onUploadComplete={() => setPhotoGalleryKey((k) => k + 1)}
+                />
+              </div>
+            )}
           </div>
         )}
 
