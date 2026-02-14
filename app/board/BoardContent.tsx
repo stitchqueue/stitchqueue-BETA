@@ -288,16 +288,26 @@ export default function BoardContent() {
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
+    console.log("[handleDragEnd] active:", active.id, "over:", over?.id ?? "NULL (no drop target)", "over data:", over?.data?.current);
     setActiveProject(null);
     setStageError(null);
 
-    if (!over) return;
+    if (!over) {
+      console.log("[handleDragEnd] No drop target — drag cancelled or missed all droppables");
+      return;
+    }
 
     const projectId = active.id as string;
     const overId = over.id as string;
+    console.log("[handleDragEnd] projectId:", projectId, "overId:", overId, "overId type:", typeof overId);
 
     const project = projects.find((p) => p.id === projectId);
-    if (!project) return;
+    if (!project) {
+      console.log("[handleDragEnd] Project not found in state:", projectId);
+      return;
+    }
+
+    console.log("[handleDragEnd] current stage:", project.stage, "STAGES.includes(overId):", STAGES.includes(overId as Stage));
 
     // Snapshot for revert on failure
     const previousProjects = [...projects];
