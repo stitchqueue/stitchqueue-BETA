@@ -83,15 +83,15 @@ const columnAwareCollision: CollisionDetection = (args) => {
 const STAGE_CONFIG: Record<Stage, { label: string; tooltip: string }> = {
   Estimates: {
     label: "Estimates",
-    tooltip: "Intake & Estimating",
+    tooltip: "Generate quotes and track approvals",
   },
   "In Progress": {
     label: "In Progress",
-    tooltip: "Active Work",
+    tooltip: "Active quilting projects",
   },
   Completed: {
     label: "Completed",
-    tooltip: "Finalizing",
+    tooltip: "Projects ready for invoicing and delivery",
   },
   Archived: {
     label: "Archived",
@@ -709,10 +709,10 @@ export default function BoardContent() {
           activeProjects.length === 0 ? (
             <div className="bg-white border border-line rounded-xl">
               <EmptyState
-                icon="📋"
-                title="No projects yet"
-                message="Your board is waiting for its first quilt! Create an estimate to get started."
-                actionLabel="+ New Estimate"
+                icon="🧵"
+                title="Welcome to your board!"
+                message="Start by creating your first estimate using the Calculator. Projects flow through Estimates, In Progress, and Completed stages."
+                actionLabel="Go to Calculator"
                 actionHref="/calculator"
               />
             </div>

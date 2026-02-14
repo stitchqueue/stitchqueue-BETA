@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
           organization_id: organizationId,
         },
       },
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/board?checkout=success`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/onboarding?checkout=success`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/signup?checkout=canceled`,
       metadata: {
         user_id: userId,

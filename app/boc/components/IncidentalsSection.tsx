@@ -1,6 +1,7 @@
 "use client";
 
 import type { IncidentalItem } from "../../types";
+import Tooltip from "../../components/Tooltip";
 
 interface Props {
   items: IncidentalItem[];
@@ -21,7 +22,8 @@ export default function IncidentalsSection({ items, onChange, total }: Props) {
   return (
     <div>
       <h3 className="text-lg font-bold text-plum mb-4">
-        Per-Project Incidentals (minutes)
+        Per-Project Incidentals (minutes){" "}
+        <Tooltip content="Non-quilting time spent on each project — consultation, threading, loading, packaging, photos, billing, etc." position="right" />
       </h3>
       <p className="text-xs text-muted mb-4">
         Time spent on each project beyond actual quilting — these add up and

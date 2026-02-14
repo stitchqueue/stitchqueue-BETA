@@ -174,7 +174,7 @@ export default function ArchivePage() {
             <EmptyState
               icon="📦"
               title="Archive is empty"
-              message="No finished quilts here yet — they're all still on the frame! Completed projects will appear here once you archive them from Paid/Shipped."
+              message="Completed projects appear here after all checklist items are checked. Finish a project in the Completed stage to archive it."
               actionLabel="View Board"
               actionHref="/board"
             />

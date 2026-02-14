@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import BOCForm from "./BOCForm";
 import SubscriptionGate from "../components/SubscriptionGate";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 function BOCLoading() {
   return (
@@ -17,10 +18,12 @@ function BOCLoading() {
 
 export default function BOCPage() {
   return (
-    <Suspense fallback={<BOCLoading />}>
-      <SubscriptionGate>
-        <BOCForm />
-      </SubscriptionGate>
-    </Suspense>
+    <ErrorBoundary fallbackTitle="BOC error">
+      <Suspense fallback={<BOCLoading />}>
+        <SubscriptionGate>
+          <BOCForm />
+        </SubscriptionGate>
+      </Suspense>
+    </ErrorBoundary>
   );
 }

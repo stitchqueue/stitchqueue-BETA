@@ -14,6 +14,7 @@
 import { Suspense } from "react";
 import BoardContent from "./BoardContent";
 import SubscriptionGate from "../components/SubscriptionGate";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 /**
  * Loading fallback shown while BoardContent loads
@@ -34,10 +35,12 @@ function BoardLoading() {
  */
 export default function BoardPage() {
   return (
-    <Suspense fallback={<BoardLoading />}>
-      <SubscriptionGate>
-        <BoardContent />
-      </SubscriptionGate>
-    </Suspense>
+    <ErrorBoundary fallbackTitle="Board error">
+      <Suspense fallback={<BoardLoading />}>
+        <SubscriptionGate>
+          <BoardContent />
+        </SubscriptionGate>
+      </Suspense>
+    </ErrorBoundary>
   );
 }

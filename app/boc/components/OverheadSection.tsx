@@ -1,6 +1,7 @@
 "use client";
 
 import type { OverheadItem } from "../../types";
+import Tooltip from "../../components/Tooltip";
 
 interface Props {
   items: OverheadItem[];
@@ -21,7 +22,8 @@ export default function OverheadSection({ items, onChange, total }: Props) {
   return (
     <div>
       <h3 className="text-lg font-bold text-plum mb-4">
-        Monthly Overhead ($)
+        Monthly Overhead ($){" "}
+        <Tooltip content="Fixed costs you pay every month whether you quilt or not — machine payments, insurance, rent, software, etc." position="right" />
       </h3>
 
       <div className="space-y-3">

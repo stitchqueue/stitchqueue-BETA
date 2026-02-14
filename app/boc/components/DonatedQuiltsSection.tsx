@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { jsPDF } from "jspdf";
+// jsPDF loaded dynamically when PDF generation is triggered
 import {
   getDonatedQuiltsData,
   getDonationRecords,
@@ -77,6 +77,7 @@ export default function DonatedQuiltsSection({
       const records = await getDonationRecords(startStr, endStr);
       if (records.length === 0) return;
 
+      const { jsPDF } = await import("jspdf");
       const doc = new jsPDF();
       const margin = 20;
       const pageWidth = doc.internal.pageSize.getWidth();

@@ -93,6 +93,7 @@ export default function CalendarView({
         <button
           onClick={() => onMonthChange(new Date(year, month - 1, 1))}
           className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+          aria-label="Previous month"
         >
           ←
         </button>
@@ -102,6 +103,7 @@ export default function CalendarView({
         <button
           onClick={() => onMonthChange(new Date(year, month + 1, 1))}
           className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+          aria-label="Next month"
         >
           →
         </button>

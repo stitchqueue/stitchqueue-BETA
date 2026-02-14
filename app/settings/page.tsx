@@ -13,6 +13,7 @@
 
 import { Suspense } from "react";
 import SettingsForm from "./SettingsForm";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 /**
  * Loading fallback shown while SettingsForm loads
@@ -36,8 +37,10 @@ function SettingsLoading() {
  */
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<SettingsLoading />}>
-      <SettingsForm />
-    </Suspense>
+    <ErrorBoundary fallbackTitle="Settings error">
+      <Suspense fallback={<SettingsLoading />}>
+        <SettingsForm />
+      </Suspense>
+    </ErrorBoundary>
   );
 }

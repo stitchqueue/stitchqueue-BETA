@@ -53,9 +53,10 @@ export default function PerformanceDashboard({
   if (!data || data.projectCount === 0) {
     return (
       <div className="bg-background border border-line rounded-xl p-4 sm:p-6 text-center">
+        <div className="text-3xl mb-2">📊</div>
+        <p className="font-bold text-plum text-sm mb-1">No performance data yet</p>
         <p className="text-muted text-sm">
-          No delivered projects in the last 3 months. Complete and archive
-          projects to see your actual performance here.
+          Complete and archive projects to see your actual hourly rate compared to your target here.
         </p>
       </div>
     );

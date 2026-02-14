@@ -2,6 +2,7 @@
 
 import type { ExperienceLevel } from "../../types";
 import { SPH_RATES } from "../../types";
+import Tooltip from "../../components/Tooltip";
 
 interface Props {
   targetHourlyWage: string;
@@ -42,7 +43,8 @@ export default function RateCalculatorSection({
         {/* Target hourly wage */}
         <div>
           <label className="block text-sm font-bold text-muted mb-2">
-            Target Hourly Wage ($)
+            Target Hourly Wage ($){" "}
+            <Tooltip content="What you want to earn per hour of quilting work, including prep time." position="right" />
           </label>
           <input
             type="number"
@@ -74,7 +76,8 @@ export default function RateCalculatorSection({
         {/* Average project size */}
         <div>
           <label className="block text-sm font-bold text-muted mb-2">
-            Average Project Size (sq in)
+            Average Project Size (sq in){" "}
+            <Tooltip content="Width x Length of a typical quilt. A 60x80 quilt = 4,800 sq in." position="right" />
           </label>
           <input
             type="number"

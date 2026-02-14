@@ -79,23 +79,23 @@ export default function Header() {
           <button
             onClick={() => router.push("/board")}
             className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
-            title="Board"
+            aria-label="Board"
           >
-            📊
+            <span aria-hidden="true">📊</span>
           </button>
           <button
             onClick={() => router.push("/archive")}
             className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
-            title="Archive"
+            aria-label="Archive"
           >
-            🗄️
+            <span aria-hidden="true">🗄️</span>
           </button>
           <button
             onClick={() => router.push("/boc")}
             className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
-            title="Business Overhead Calculator"
+            aria-label="Business Overhead Calculator"
           >
-            🧮
+            <span aria-hidden="true">🧮</span>
           </button>
 
           {/* Settings gear with dropdown */}
@@ -112,14 +112,16 @@ export default function Header() {
                   ? "bg-white/30"
                   : "bg-white/10 hover:bg-white/20"
               }`}
-              title="Settings"
+              aria-label="Settings menu"
+              aria-expanded={showSettingsMenu}
+              aria-haspopup="menu"
             >
-              ⚙️
+              <span aria-hidden="true">⚙️</span>
             </button>
 
             {/* Dropdown menu */}
             {showSettingsMenu && (
-              <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-line overflow-hidden">
+              <div role="menu" className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-line overflow-hidden">
                 {/* Settings sections */}
                 {settingsMenuItems.map((item) => (
                   <button

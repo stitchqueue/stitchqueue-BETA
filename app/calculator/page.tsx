@@ -14,6 +14,7 @@
 import { Suspense } from "react";
 import CalculatorForm from "./CalculatorForm";
 import SubscriptionGate from "../components/SubscriptionGate";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 /**
  * Loading fallback shown while CalculatorForm loads
@@ -37,10 +38,12 @@ function CalculatorLoading() {
  */
 export default function CalculatorPage() {
   return (
-    <Suspense fallback={<CalculatorLoading />}>
-      <SubscriptionGate>
-        <CalculatorForm />
-      </SubscriptionGate>
-    </Suspense>
+    <ErrorBoundary fallbackTitle="Calculator error">
+      <Suspense fallback={<CalculatorLoading />}>
+        <SubscriptionGate>
+          <CalculatorForm />
+        </SubscriptionGate>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
