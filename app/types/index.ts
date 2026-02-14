@@ -278,7 +278,7 @@ export const DEFAULT_SETTINGS: Settings = {
   nextEstimateNumber: 1001,
   bobbinOptions: [],
   battingOptions: [],
-  isPaidTier: false,
+  isPaidTier: true,
   brandPrimaryColor: "#4e283a",
   brandSecondaryColor: "#98823a",
 };

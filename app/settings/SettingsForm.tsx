@@ -8,7 +8,6 @@ import type { Settings } from "../types";
 import { FeatureGate, isFeatureEnabled } from "../lib/featureFlags";
 import {
   SectionKey,
-  TierCard,
   BusinessInfoSection,
   TaxConfigSection,
   PricingRatesSection,
@@ -134,19 +133,6 @@ export default function SettingsForm() {
     await storage.saveSettings(updated);
   };
 
-  // Tier handlers
-  const handleToggleTier = async () => {
-    const updated = { ...settings, isPaidTier: !settings.isPaidTier };
-    setSettings(updated);
-    await storage.saveSettings(updated);
-  };
-
-  const handleEnablePaidTier = async () => {
-    const updated = { ...settings, isPaidTier: true };
-    setSettings(updated);
-    await storage.saveSettings(updated);
-  };
-
   // Pricing rate handlers
   const handleRateChange = (field: keyof RateStrings, value: string) => {
     setRateStrings((prev) => ({ ...prev, [field]: value }));
@@ -227,11 +213,6 @@ export default function SettingsForm() {
           </button>
         </div>
 
-        <TierCard
-          isPaidTier={settings.isPaidTier || false}
-          onToggleTier={handleToggleTier}
-        />
-
         <div className="space-y-3">
           <BusinessInfoSection
             settings={settings}
@@ -264,14 +245,12 @@ export default function SettingsForm() {
             onToggle={toggleSection}
             onRateChange={handleRateChange}
             onRateBlur={handleRateBlur}
-            onEnablePaidTier={handleEnablePaidTier}
           />
 
           <BobbinOptionsSection
             settings={settings}
             isOpen={openSections.has("bobbin")}
             onToggle={toggleSection}
-            onEnablePaidTier={handleEnablePaidTier}
             {...bobbin}
           />
 
@@ -279,7 +258,6 @@ export default function SettingsForm() {
             settings={settings}
             isOpen={openSections.has("batting")}
             onToggle={toggleSection}
-            onEnablePaidTier={handleEnablePaidTier}
             {...batting}
           />
 

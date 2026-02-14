@@ -16,8 +16,7 @@ interface BobbinOptionsSectionProps {
   settings: Settings;
   isOpen: boolean;
   onToggle: (key: SectionKey) => void;
-  onEnablePaidTier: () => void;
-  
+
   // New bobbin form state
   newBobbinName: string;
   setNewBobbinName: (value: string) => void;
@@ -42,9 +41,7 @@ interface BobbinOptionsSectionProps {
 
 /**
  * Bobbin options settings section.
- * 
- * PRO tier only - shows upgrade prompt for FREE tier users.
- * 
+ *
  * Features:
  * - Add new bobbin options with name and price
  * - Edit existing options inline
@@ -55,7 +52,6 @@ export default function BobbinOptionsSection({
   settings,
   isOpen,
   onToggle,
-  onEnablePaidTier,
   newBobbinName,
   setNewBobbinName,
   newBobbinPrice,
@@ -72,7 +68,6 @@ export default function BobbinOptionsSection({
   onDelete,
   onSetDefault,
 }: BobbinOptionsSectionProps) {
-  const isPaidTier = settings.isPaidTier || false;
   const bobbinOptions = settings.bobbinOptions || [];
 
   return (
@@ -81,29 +76,11 @@ export default function BobbinOptionsSection({
         sectionKey="bobbin"
         label="Bobbin Options"
         icon="🧵"
-        subtitle={
-          isPaidTier
-            ? `${bobbinOptions.length} option${bobbinOptions.length !== 1 ? "s" : ""} saved`
-            : "Available in PAID tier"
-        }
+        subtitle={`${bobbinOptions.length} option${bobbinOptions.length !== 1 ? "s" : ""} saved`}
         isOpen={isOpen}
         onToggle={onToggle}
       />
       <AccordionBody isOpen={isOpen}>
-        {!isPaidTier ? (
-          <div className="p-6 bg-gold/10 rounded-xl text-center">
-            <p className="text-sm text-muted mb-4">
-              Upgrade to PAID tier to save bobbin options
-            </p>
-            <button
-              onClick={onEnablePaidTier}
-              className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
-            >
-              Enable PAID Tier (Demo)
-            </button>
-          </div>
-        ) : (
-          <>
             {/* Add New Bobbin Form */}
             <div className="p-4 bg-background rounded-xl">
               <h3 className="text-sm font-bold text-plum mb-3">
@@ -231,8 +208,6 @@ export default function BobbinOptionsSection({
                 ))
               )}
             </div>
-          </>
-        )}
       </AccordionBody>
     </div>
   );

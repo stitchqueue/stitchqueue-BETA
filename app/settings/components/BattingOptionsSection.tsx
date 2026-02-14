@@ -16,8 +16,7 @@ interface BattingOptionsSectionProps {
   settings: Settings;
   isOpen: boolean;
   onToggle: (key: SectionKey) => void;
-  onEnablePaidTier: () => void;
-  
+
   // New batting form state
   newBattingName: string;
   setNewBattingName: (value: string) => void;
@@ -46,9 +45,7 @@ interface BattingOptionsSectionProps {
 
 /**
  * Batting options settings section.
- * 
- * PRO tier only - shows upgrade prompt for FREE tier users.
- * 
+ *
  * Features:
  * - Add new batting options with name, width, and price per inch
  * - Edit existing options inline
@@ -59,7 +56,6 @@ export default function BattingOptionsSection({
   settings,
   isOpen,
   onToggle,
-  onEnablePaidTier,
   newBattingName,
   setNewBattingName,
   newBattingWidth,
@@ -80,7 +76,6 @@ export default function BattingOptionsSection({
   onDelete,
   onSetDefault,
 }: BattingOptionsSectionProps) {
-  const isPaidTier = settings.isPaidTier || false;
   const battingOptions = settings.battingOptions || [];
 
   return (
@@ -89,29 +84,11 @@ export default function BattingOptionsSection({
         sectionKey="batting"
         label="Batting Options"
         icon="🛏️"
-        subtitle={
-          isPaidTier
-            ? `${battingOptions.length} option${battingOptions.length !== 1 ? "s" : ""} saved`
-            : "Available in PAID tier"
-        }
+        subtitle={`${battingOptions.length} option${battingOptions.length !== 1 ? "s" : ""} saved`}
         isOpen={isOpen}
         onToggle={onToggle}
       />
       <AccordionBody isOpen={isOpen}>
-        {!isPaidTier ? (
-          <div className="p-6 bg-gold/10 rounded-xl text-center">
-            <p className="text-sm text-muted mb-4">
-              Upgrade to PAID tier to save batting options
-            </p>
-            <button
-              onClick={onEnablePaidTier}
-              className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
-            >
-              Enable PAID Tier (Demo)
-            </button>
-          </div>
-        ) : (
-          <>
             {/* Add New Batting Form */}
             <div className="p-4 bg-background rounded-xl">
               <h3 className="text-sm font-bold text-plum mb-3">
@@ -256,8 +233,6 @@ export default function BattingOptionsSection({
                 })
               )}
             </div>
-          </>
-        )}
       </AccordionBody>
     </div>
   );

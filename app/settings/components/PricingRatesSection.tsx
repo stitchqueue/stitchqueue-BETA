@@ -32,58 +32,33 @@ interface PricingRatesSectionProps {
   onToggle: (key: SectionKey) => void;
   onRateChange: (field: keyof RateStrings, value: string) => void;
   onRateBlur: (field: keyof RateStrings) => void;
-  onEnablePaidTier: () => void;
 }
 
 /**
  * Pricing rates settings section.
- * 
- * PRO tier only - shows upgrade prompt for FREE tier users.
- * 
+ *
  * Rates:
  * - Light E2E, Standard E2E, Light Custom, Custom, Dense Custom ($/sq in)
  * - Binding: Top Attached, Fully Attached ($/in)
  */
 export default function PricingRatesSection({
-  settings,
   rateStrings,
   isOpen,
   onToggle,
   onRateChange,
   onRateBlur,
-  onEnablePaidTier,
 }: PricingRatesSectionProps) {
-  const isPaidTier = settings.isPaidTier || false;
-
   return (
     <div>
       <AccordionHeader
         sectionKey="pricing"
         label="Pricing Rates"
         icon="💲"
-        subtitle={
-          isPaidTier
-            ? "Per square inch quilting rates"
-            : "Available in PAID tier"
-        }
+        subtitle="Per square inch quilting rates"
         isOpen={isOpen}
         onToggle={onToggle}
       />
       <AccordionBody isOpen={isOpen}>
-        {!isPaidTier ? (
-          <div className="p-6 bg-gold/10 rounded-xl text-center">
-            <p className="text-sm text-muted mb-4">
-              Upgrade to PAID tier to save pricing rates and auto-populate the
-              calculator
-            </p>
-            <button
-              onClick={onEnablePaidTier}
-              className="px-6 py-3 bg-plum text-white rounded-xl font-bold"
-            >
-              Enable PAID Tier (Demo)
-            </button>
-          </div>
-        ) : (
           <div className="space-y-4">
             {/* Quilting Rates Header */}
             <div>
@@ -210,7 +185,6 @@ export default function PricingRatesSection({
               </div>
             </div>
           </div>
-        )}
       </AccordionBody>
     </div>
   );
