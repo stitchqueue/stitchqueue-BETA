@@ -121,6 +121,9 @@ export async function addProject(
 
 /**
  * Update existing project
+ *
+ * Throws on failure so callers' catch blocks fire correctly.
+ * Still returns { success: true } on success for backward compat.
  */
 export async function updateProject(
   id: string,
@@ -128,7 +131,7 @@ export async function updateProject(
 ): Promise<{ success: boolean; error?: string }> {
   const orgId = await getOrganizationId();
   if (!orgId) {
-    return { success: false, error: "No organization found" };
+    throw new Error("No organization found");
   }
 
   // SECURITY: Verify project belongs to this organization
@@ -139,7 +142,7 @@ export async function updateProject(
     .single();
 
   if (!existingProject || existingProject.organization_id !== orgId) {
-    return { success: false, error: "Project not found or access denied" };
+    throw new Error("Project not found or access denied");
   }
 
   const dbUpdates = mapUpdatesToDb(updates);
@@ -152,8 +155,8 @@ export async function updateProject(
     .eq("organization_id", orgId); // Extra safety
 
   if (error) {
-    console.error("Error updating project:", error.message);
-    return { success: false, error: error.message };
+    console.error("Error updating project:", error.message, error.details, error.hint);
+    throw new Error(error.message);
   }
 
   return { success: true };

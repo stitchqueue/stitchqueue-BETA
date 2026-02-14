@@ -101,6 +101,7 @@ export default function BoardContent() {
   const [sortField, setSortField] = useState<SortField>("estimateNumber");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [stageError, setStageError] = useState<string | null>(null);
 
   // ─────────────────────────────────────────────────────────────────────
   // DRAG SENSORS
@@ -288,6 +289,7 @@ export default function BoardContent() {
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveProject(null);
+    setStageError(null);
 
     if (!over) return;
 
@@ -296,6 +298,9 @@ export default function BoardContent() {
 
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
+
+    // Snapshot for revert on failure
+    const previousProjects = [...projects];
 
     try {
       // Dropped on another card (reorder within column or move to new column)
@@ -377,6 +382,12 @@ export default function BoardContent() {
       }
     } catch (err) {
       console.error("Error updating project stage:", err);
+      // Revert optimistic UI update
+      setProjects(previousProjects);
+      const message = err instanceof Error ? err.message : "Failed to move project";
+      setStageError(message);
+      // Auto-clear error after 8 seconds
+      setTimeout(() => setStageError(null), 8000);
     }
   };
 
@@ -580,6 +591,23 @@ export default function BoardContent() {
                 Clear filters
               </button>
             )}
+          </div>
+        )}
+
+        {/* Stage update error */}
+        {stageError && (
+          <div className="bg-red-50 border border-red-300 rounded-xl p-4 mb-4 flex items-start gap-3">
+            <span className="text-red-600 text-lg flex-shrink-0">⚠️</span>
+            <div className="flex-1">
+              <div className="font-bold text-red-700 text-sm">Failed to move project</div>
+              <div className="text-red-600 text-xs mt-1">{stageError}</div>
+            </div>
+            <button
+              onClick={() => setStageError(null)}
+              className="text-red-400 hover:text-red-600 text-lg flex-shrink-0"
+            >
+              ×
+            </button>
           </div>
         )}
 
