@@ -26,6 +26,7 @@ import {
   DndContext,
   DragOverlay,
   closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -34,6 +35,7 @@ import {
   DragStartEvent,
   DragEndEvent,
 } from "@dnd-kit/core";
+import type { CollisionDetection } from "@dnd-kit/core";
 
 // Components
 import {
@@ -49,6 +51,30 @@ import type { SortField, SortDirection } from "./components";
 import { isDueThisWeek } from "./utils";
 
 type ViewMode = "board" | "list" | "calendar";
+
+/**
+ * Custom collision detection: uses pointerWithin so the column the
+ * pointer is actually inside always wins, then prefers card droppables
+ * (for reordering) over column droppables (for stage moves).
+ * Falls back to closestCenter when the pointer isn't inside any droppable.
+ */
+const columnAwareCollision: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+
+  if (pointerCollisions.length > 0) {
+    // If pointer is over a card, use it (for reordering within/across columns)
+    const cardHit = pointerCollisions.find(
+      (c) => typeof c.id === "string" && (c.id as string).startsWith("card-")
+    );
+    if (cardHit) return [cardHit];
+
+    // Otherwise use the column (for dropping into empty area)
+    return [pointerCollisions[0]];
+  }
+
+  // Pointer isn't inside any droppable — fall back to closest center
+  return closestCenter(args);
+};
 
 /**
  * Stage configuration for v4.0 3-stage workflow
@@ -706,7 +732,7 @@ export default function BoardContent() {
           ) : (
             <DndContext
               sensors={sensors}
-              collisionDetection={closestCenter}
+              collisionDetection={columnAwareCollision}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               onDragCancel={handleDragCancel}
