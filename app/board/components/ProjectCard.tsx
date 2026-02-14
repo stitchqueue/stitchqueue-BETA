@@ -13,7 +13,7 @@
 
 "use client";
 
-import { useState, useRef } from "react";
+import { useRef, useEffect } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type { Project } from "../../types";
 import {
@@ -311,6 +311,7 @@ export function DraggableProjectCard({
       : undefined,
     opacity: isDragging ? 0 : 1,
     visibility: isDragging ? ("hidden" as const) : ("visible" as const),
+    touchAction: "none",
   };
 
   const initials = getInitials(
@@ -337,30 +338,28 @@ export function DraggableProjectCard({
     }
   }
 
-  // Track drag vs click
-  const [wasDragging, setWasDragging] = useState(false);
-  const startPos = useRef<{ x: number; y: number } | null>(null);
+  // Track drag to prevent click navigation after drag.
+  // dnd-kit's {...listeners} overrides any custom onPointerDown, so we
+  // rely on isDragging from useDraggable as the source of truth.
+  const hasDraggedRef = useRef(false);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    startPos.current = { x: e.clientX, y: e.clientY };
-    setWasDragging(false);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (startPos.current) {
-      const dx = Math.abs(e.clientX - startPos.current.x);
-      const dy = Math.abs(e.clientY - startPos.current.y);
-      if (dx > 5 || dy > 5) {
-        setWasDragging(true);
-      }
+  useEffect(() => {
+    if (isDragging) {
+      hasDraggedRef.current = true;
+    } else if (hasDraggedRef.current) {
+      // Reset after a short delay so the post-drag click event is caught
+      const timer = setTimeout(() => {
+        hasDraggedRef.current = false;
+      }, 300);
+      return () => clearTimeout(timer);
     }
-  };
+  }, [isDragging]);
 
   const handleClick = () => {
-    if (!wasDragging && !isDragging) {
-      onClick();
+    if (hasDraggedRef.current || isDragging) {
+      return;
     }
-    startPos.current = null;
+    onClick();
   };
 
   return (
@@ -371,8 +370,6 @@ export function DraggableProjectCard({
         isDragging ? "shadow-lg ring-2 ring-plum/30 cursor-grabbing" : ""
       } ${isOver ? "ring-2 ring-plum/50 border-plum" : ""}`}
       onClick={handleClick}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
       {...attributes}
       {...listeners}
     >

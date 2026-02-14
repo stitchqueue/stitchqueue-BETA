@@ -296,78 +296,86 @@ export default function BoardContent() {
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
 
-    // Dropped on another card (reorder within column or move to new column)
-    if (overId.startsWith("card-")) {
-      const targetCardId = overId.replace("card-", "");
-      const targetProject = projects.find((p) => p.id === targetCardId);
+    try {
+      // Dropped on another card (reorder within column or move to new column)
+      if (overId.startsWith("card-")) {
+        const targetCardId = overId.replace("card-", "");
+        const targetProject = projects.find((p) => p.id === targetCardId);
 
-      if (!targetProject || targetCardId === projectId) return;
+        if (!targetProject || targetCardId === projectId) return;
 
-      const targetStage = targetProject.stage;
+        const targetStage = targetProject.stage;
 
-      const stageProjects = projects
-        .filter((p) => p.stage === targetStage && p.id !== projectId)
-        .sort((a, b) => {
-          if (a.orderIndex !== undefined && b.orderIndex !== undefined) {
-            return a.orderIndex - b.orderIndex;
-          }
-          if (a.orderIndex !== undefined) return -1;
-          if (b.orderIndex !== undefined) return 1;
-          const numA = a.estimateNumber || 999999;
-          const numB = b.estimateNumber || 999999;
-          return numA - numB;
-        });
-
-      const targetIndex = stageProjects.findIndex((p) => p.id === targetCardId);
-
-      stageProjects.splice(targetIndex, 0, { ...project, stage: targetStage });
-
-      for (let i = 0; i < stageProjects.length; i++) {
-        const p = stageProjects[i];
-        if (p.id === projectId) {
-          await storage.updateProject(p.id, {
-            orderIndex: i,
-            stage: targetStage !== project.stage ? targetStage : undefined,
+        const stageProjects = projects
+          .filter((p) => p.stage === targetStage && p.id !== projectId)
+          .sort((a, b) => {
+            if (a.orderIndex !== undefined && b.orderIndex !== undefined) {
+              return a.orderIndex - b.orderIndex;
+            }
+            if (a.orderIndex !== undefined) return -1;
+            if (b.orderIndex !== undefined) return 1;
+            const numA = a.estimateNumber || 999999;
+            const numB = b.estimateNumber || 999999;
+            return numA - numB;
           });
-        } else {
-          await storage.updateProject(p.id, { orderIndex: i });
-        }
-      }
 
-      setProjects((prev) => {
-        const newProjects = [...prev];
-        stageProjects.forEach((p, index) => {
-          const idx = newProjects.findIndex((np) => np.id === p.id);
-          if (idx !== -1) {
-            newProjects[idx] = {
-              ...newProjects[idx],
-              orderIndex: index,
-              ...(p.id === projectId && targetStage !== project.stage
-                ? { stage: targetStage }
-                : {}),
-            };
-          }
+        const targetIndex = stageProjects.findIndex((p) => p.id === targetCardId);
+
+        stageProjects.splice(targetIndex, 0, { ...project, stage: targetStage });
+
+        // Update UI immediately so the card moves before the DB call
+        setProjects((prev) => {
+          const newProjects = [...prev];
+          stageProjects.forEach((p, index) => {
+            const idx = newProjects.findIndex((np) => np.id === p.id);
+            if (idx !== -1) {
+              newProjects[idx] = {
+                ...newProjects[idx],
+                orderIndex: index,
+                ...(p.id === projectId && targetStage !== project.stage
+                  ? { stage: targetStage }
+                  : {}),
+              };
+            }
+          });
+          return newProjects;
         });
-        return newProjects;
-      });
-    } else if (STAGES.includes(overId as Stage)) {
-      // Dropped on empty column
-      const newStage = overId as Stage;
 
-      if (project.stage === newStage) return;
+        // Persist to database
+        for (let i = 0; i < stageProjects.length; i++) {
+          const p = stageProjects[i];
+          if (p.id === projectId) {
+            await storage.updateProject(p.id, {
+              orderIndex: i,
+              stage: targetStage !== project.stage ? targetStage : undefined,
+            });
+          } else {
+            await storage.updateProject(p.id, { orderIndex: i });
+          }
+        }
+      } else if (STAGES.includes(overId as Stage)) {
+        // Dropped on empty column
+        const newStage = overId as Stage;
 
-      await storage.updateProject(projectId, {
-        stage: newStage,
-        orderIndex: undefined,
-      });
+        if (project.stage === newStage) return;
 
-      setProjects((prev) =>
-        prev.map((p) =>
-          p.id === projectId
-            ? { ...p, stage: newStage, orderIndex: undefined }
-            : p
-        )
-      );
+        // Update UI immediately
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === projectId
+              ? { ...p, stage: newStage, orderIndex: undefined }
+              : p
+          )
+        );
+
+        // Persist to database
+        await storage.updateProject(projectId, {
+          stage: newStage,
+          orderIndex: undefined,
+        });
+      }
+    } catch (err) {
+      console.error("Error updating project stage:", err);
     }
   };
 
