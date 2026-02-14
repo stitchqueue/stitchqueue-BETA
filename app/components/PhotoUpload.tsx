@@ -122,13 +122,14 @@ export default function PhotoUpload({
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
+  const filesRef = useRef<SelectedFile[]>([]);
+  filesRef.current = files;
 
   // Clean up preview URLs on unmount
   useEffect(() => {
     return () => {
-      files.forEach((f) => URL.revokeObjectURL(f.previewUrl));
+      filesRef.current.forEach((f) => URL.revokeObjectURL(f.previewUrl));
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-dismiss toast
@@ -423,7 +424,6 @@ export default function PhotoUpload({
           ref={fileInputRef}
           type="file"
           accept="image/jpeg,image/png,image/webp,image/heic,.jpg,.jpeg,.png,.webp,.heic"
-          capture="environment"
           multiple
           onChange={handleFileInputChange}
           className="hidden"
