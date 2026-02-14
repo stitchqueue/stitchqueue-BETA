@@ -314,26 +314,16 @@ export default function BoardContent() {
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    console.log("[handleDragEnd] active:", active.id, "over:", over?.id ?? "NULL (no drop target)", "over data:", over?.data?.current);
     setActiveProject(null);
     setStageError(null);
 
-    if (!over) {
-      console.log("[handleDragEnd] No drop target — drag cancelled or missed all droppables");
-      return;
-    }
+    if (!over) return;
 
     const projectId = active.id as string;
     const overId = over.id as string;
-    console.log("[handleDragEnd] projectId:", projectId, "overId:", overId, "overId type:", typeof overId);
 
     const project = projects.find((p) => p.id === projectId);
-    if (!project) {
-      console.log("[handleDragEnd] Project not found in state:", projectId);
-      return;
-    }
-
-    console.log("[handleDragEnd] current stage:", project.stage, "STAGES.includes(overId):", STAGES.includes(overId as Stage));
+    if (!project) return;
 
     // Snapshot for revert on failure
     const previousProjects = [...projects];
@@ -387,11 +377,9 @@ export default function BoardContent() {
         for (let i = 0; i < stageProjects.length; i++) {
           const p = stageProjects[i];
           if (p.id === projectId) {
-            const stageUpdate = targetStage !== project.stage ? targetStage : undefined;
-            console.log("[drag] card drop — projectId:", p.id, "from:", project.stage, "to:", stageUpdate, "orderIndex:", i);
             await storage.updateProject(p.id, {
               orderIndex: i,
-              stage: stageUpdate,
+              stage: targetStage !== project.stage ? targetStage : undefined,
             });
           } else {
             await storage.updateProject(p.id, { orderIndex: i });
@@ -413,7 +401,6 @@ export default function BoardContent() {
         );
 
         // Persist to database
-        console.log("[drag] column drop — projectId:", projectId, "from:", project.stage, "to:", newStage);
         await storage.updateProject(projectId, {
           stage: newStage,
           orderIndex: undefined,

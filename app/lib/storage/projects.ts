@@ -145,27 +145,22 @@ export async function updateProject(
     throw new Error("Project not found or access denied");
   }
 
-  console.log("[updateProject] input updates:", JSON.stringify(updates));
   const dbUpdates = mapUpdatesToDb(updates);
   dbUpdates.updated_at = new Date().toISOString();
-  console.log("[updateProject] mapped dbUpdates:", JSON.stringify(dbUpdates));
 
-  const { error, data, count, status, statusText } = await supabase
+  const { error, data } = await supabase
     .from("projects")
     .update(dbUpdates)
     .eq("id", id)
     .eq("organization_id", orgId) // Extra safety
     .select();
 
-  console.log("[updateProject] supabase response:", { error, rowCount: data?.length, status, statusText });
-
   if (error) {
-    console.error("Error updating project:", error.message, error.details, error.hint, error.code);
+    console.error("Error updating project:", error.message, error.details, error.hint);
     throw new Error(error.message);
   }
 
   if (!data || data.length === 0) {
-    console.error("[updateProject] No rows updated — possible RLS issue. id:", id, "orgId:", orgId);
     throw new Error("Update failed — no rows affected (possible permissions issue)");
   }
 
