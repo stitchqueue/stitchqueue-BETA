@@ -15,3 +15,4 @@ export { default as BattingOptionsSection } from './BattingOptionsSection';
 export { default as DataSection } from './DataSection';
 export { default as SubscriptionSection } from './SubscriptionSection';
 export { ReportsSection } from './reports';
+export { default as IntakeFormSection } from './IntakeFormSection';

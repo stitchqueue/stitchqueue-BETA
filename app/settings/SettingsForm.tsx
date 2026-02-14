@@ -15,6 +15,7 @@ import {
   BattingOptionsSection,
   SubscriptionSection,
   ReportsSection,
+  IntakeFormSection,
 } from "./components";
 import type { RateStrings } from "./components";
 import { formatPhoneNumber } from "./utils";
@@ -27,6 +28,7 @@ const ALL_SECTIONS: { key: SectionKey; label: string; icon: string }[] = [
   { key: "pricing", label: "Pricing Rates", icon: "💲" },
   { key: "bobbin", label: "Bobbin Options", icon: "🧵" },
   { key: "batting", label: "Batting Options", icon: "🛏️" },
+  { key: "intake", label: "Client Intake Form", icon: "📋" },
   { key: "data", label: isFeatureEnabled("ENABLE_FINANCIAL_REPORTS") ? "Reports & Data" : "Data Management", icon: "📊" },
 ];
 
@@ -259,6 +261,11 @@ export default function SettingsForm() {
             isOpen={openSections.has("batting")}
             onToggle={toggleSection}
             {...batting}
+          />
+
+          <IntakeFormSection
+            isOpen={openSections.has("intake")}
+            onToggle={toggleSection}
           />
 
           <ReportsSection
