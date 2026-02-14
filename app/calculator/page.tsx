@@ -13,6 +13,7 @@
 
 import { Suspense } from "react";
 import CalculatorForm from "./CalculatorForm";
+import SubscriptionGate from "../components/SubscriptionGate";
 
 /**
  * Loading fallback shown while CalculatorForm loads
@@ -37,7 +38,9 @@ function CalculatorLoading() {
 export default function CalculatorPage() {
   return (
     <Suspense fallback={<CalculatorLoading />}>
-      <CalculatorForm />
+      <SubscriptionGate>
+        <CalculatorForm />
+      </SubscriptionGate>
     </Suspense>
   );
 }

@@ -13,6 +13,7 @@
 
 import { Suspense } from "react";
 import BoardContent from "./BoardContent";
+import SubscriptionGate from "../components/SubscriptionGate";
 
 /**
  * Loading fallback shown while BoardContent loads
@@ -34,7 +35,9 @@ function BoardLoading() {
 export default function BoardPage() {
   return (
     <Suspense fallback={<BoardLoading />}>
-      <BoardContent />
+      <SubscriptionGate>
+        <BoardContent />
+      </SubscriptionGate>
     </Suspense>
   );
 }

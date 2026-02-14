@@ -17,6 +17,7 @@ import Header from "../components/Header";
 import EmptyState from "../components/EmptyState";
 import { storage } from "../lib/storage";
 import { supabase } from "../lib/supabase";
+import TrialBanner from "../components/TrialBanner";
 import { STAGES } from "../types";
 import type { Project, Stage } from "../types";
 
@@ -432,6 +433,7 @@ export default function BoardContent() {
       <Header />
 
       <main className="max-w-7xl mx-auto px-4 py-6">
+        <TrialBanner />
         {/* Page Header */}
         <div className="flex items-center justify-between mb-4">
           <div>

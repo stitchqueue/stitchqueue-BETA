@@ -9,6 +9,7 @@ import PhotoGallery from "../../components/PhotoGallery";
 import { storage } from "../../lib/storage";
 import { getOrganizationId } from "../../lib/storage/auth";
 import { FeatureGate } from "../../lib/featureFlags";
+import SubscriptionGate from "../../components/SubscriptionGate";
 import { STAGES } from "../../types";
 import type { Project, Stage, Settings } from "../../types";
 
@@ -35,6 +36,14 @@ function isAsap(project: Project): boolean {
 }
 
 export default function ProjectDetailPage() {
+  return (
+    <SubscriptionGate>
+      <ProjectDetailContent />
+    </SubscriptionGate>
+  );
+}
+
+function ProjectDetailContent() {
   const router = useRouter();
   const params = useParams();
   const projectId = decodeURIComponent(params.id as string);
