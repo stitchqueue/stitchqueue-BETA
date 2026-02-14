@@ -351,9 +351,11 @@ export default function BoardContent() {
         for (let i = 0; i < stageProjects.length; i++) {
           const p = stageProjects[i];
           if (p.id === projectId) {
+            const stageUpdate = targetStage !== project.stage ? targetStage : undefined;
+            console.log("[drag] card drop — projectId:", p.id, "from:", project.stage, "to:", stageUpdate, "orderIndex:", i);
             await storage.updateProject(p.id, {
               orderIndex: i,
-              stage: targetStage !== project.stage ? targetStage : undefined,
+              stage: stageUpdate,
             });
           } else {
             await storage.updateProject(p.id, { orderIndex: i });
@@ -375,6 +377,7 @@ export default function BoardContent() {
         );
 
         // Persist to database
+        console.log("[drag] column drop — projectId:", projectId, "from:", project.stage, "to:", newStage);
         await storage.updateProject(projectId, {
           stage: newStage,
           orderIndex: undefined,
