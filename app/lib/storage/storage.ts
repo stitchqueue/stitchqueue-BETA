@@ -48,6 +48,7 @@ export { getBOCSettings, saveBOCSettings } from "./boc";
 export { getBOCMode } from "./boc-mode";
 export { getPerformanceData } from "./boc-performance";
 export { getDonatedQuiltsData, getDonationRecords } from "./boc-donations";
+export { getBOCPurchaseStatus } from "./boc-stripe";
 
 /**
  * Storage object for backwards compatibility

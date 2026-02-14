@@ -14,6 +14,7 @@ import { getOrganizationId } from "./auth";
 export interface BOCMode {
   isConnected: boolean;
   hasProjects: boolean;
+  isSubscribed: boolean;
 }
 
 /**
@@ -21,7 +22,7 @@ export interface BOCMode {
  */
 export async function getBOCMode(): Promise<BOCMode> {
   const user = await getCurrentUser();
-  if (!user) return { isConnected: false, hasProjects: false };
+  if (!user) return { isConnected: false, hasProjects: false, isSubscribed: false };
 
   // Check subscription status
   const { data: sub } = await supabase
@@ -35,7 +36,7 @@ export async function getBOCMode(): Promise<BOCMode> {
 
   // Check for archived projects with a delivery_date
   const orgId = await getOrganizationId();
-  if (!orgId) return { isConnected: false, hasProjects: false };
+  if (!orgId) return { isConnected: false, hasProjects: false, isSubscribed };
 
   const { count } = await supabase
     .from("projects")
@@ -49,5 +50,6 @@ export async function getBOCMode(): Promise<BOCMode> {
   return {
     isConnected: isSubscribed && hasProjects,
     hasProjects,
+    isSubscribed,
   };
 }

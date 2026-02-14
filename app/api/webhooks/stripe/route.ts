@@ -9,6 +9,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+const BOC_SUBSCRIBER_PRICE = process.env.NEXT_PUBLIC_STRIPE_BOC_SUBSCRIBER_PRICE_ID;
+const BOC_STANDALONE_PRICE = process.env.NEXT_PUBLIC_STRIPE_BOC_STANDALONE_PRICE_ID;
+
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
@@ -60,10 +63,17 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * checkout.session.completed — trial started via Stripe Checkout.
- * Creates the initial subscription record in our database.
+ * checkout.session.completed — handles both subscription trials and
+ * one-time BOC purchases.
  */
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  // BOC one-time purchase
+  if (session.metadata?.purchase_type === 'boc') {
+    await handleBOCPurchase(session);
+    return;
+  }
+
+  // Subscription checkout
   const userId = session.metadata?.user_id;
   const organizationId = session.metadata?.organization_id;
 
@@ -101,6 +111,30 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   if (error) {
     console.error('Error upserting subscription on checkout:', error);
+  }
+}
+
+/**
+ * Handle BOC one-time purchase completion.
+ */
+async function handleBOCPurchase(session: Stripe.Checkout.Session) {
+  const userId = session.metadata?.user_id;
+  if (!userId) {
+    console.error('Missing user_id on BOC purchase session:', session.id);
+    return;
+  }
+
+  const amount = (session.amount_total || 0) / 100; // cents to dollars
+
+  const { error } = await supabase.from('boc_purchases').insert({
+    user_id: userId,
+    stripe_session_id: session.id,
+    stripe_payment_intent_id: session.payment_intent as string,
+    amount,
+  });
+
+  if (error) {
+    console.error('Error recording BOC purchase:', error);
   }
 }
 

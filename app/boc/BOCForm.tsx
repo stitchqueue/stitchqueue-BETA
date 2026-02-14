@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import Toast from "../components/Toast";
+import { useAuth } from "../lib/auth-context";
 import { getBOCSettings, saveBOCSettings } from "../lib/storage/boc";
 import { getBOCMode, type BOCMode } from "../lib/storage/boc-mode";
+import { getBOCPurchaseStatus, type BOCPurchaseStatus } from "../lib/storage/boc-stripe";
 import type { BOCSettings, ExperienceLevel, OverheadItem, IncidentalItem } from "../types";
 import { DEFAULT_BOC_SETTINGS, DEFAULT_OVERHEAD_ITEMS, DEFAULT_INCIDENTAL_ITEMS, SPH_RATES } from "../types";
 import {
@@ -18,17 +21,32 @@ import ResultsCard from "./components/ResultsCard";
 import PerformanceDashboard from "./components/PerformanceDashboard";
 import DonatedQuiltsSection from "./components/DonatedQuiltsSection";
 
+const BOC_SUBSCRIBER_PRICE = process.env.NEXT_PUBLIC_STRIPE_BOC_SUBSCRIBER_PRICE_ID;
+const BOC_STANDALONE_PRICE = process.env.NEXT_PUBLIC_STRIPE_BOC_STANDALONE_PRICE_ID;
+
 export default function BOCForm() {
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
+
   // ── Loading / saving state ──────────────────────────────────────────
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
   } | null>(null);
 
-  // ── Mode detection ───────────────────────────────────────────────────
-  const [bocMode, setBocMode] = useState<BOCMode>({ isConnected: false, hasProjects: false });
+  // ── Mode + purchase detection ───────────────────────────────────────
+  const [bocMode, setBocMode] = useState<BOCMode>({
+    isConnected: false,
+    hasProjects: false,
+    isSubscribed: false,
+  });
+  const [purchaseStatus, setPurchaseStatus] = useState<BOCPurchaseStatus>({
+    hasPurchased: false,
+    purchaseDate: null,
+  });
 
   // ── Form state ─────────────────────────────────────────────────────
   const [targetHourlyWage, setTargetHourlyWage] = useState("");
@@ -57,16 +75,20 @@ export default function BOCForm() {
     [incidentalItems]
   );
 
-  // ── Load saved settings ─────────────────────────────────────────────
+  // ── Load saved settings + mode + purchase status ────────────────────
   useEffect(() => {
     async function load() {
       try {
-        const [saved, mode] = await Promise.all([
+        const promises: [Promise<BOCSettings>, Promise<BOCMode>, Promise<BOCPurchaseStatus | null>] = [
           getBOCSettings(),
           getBOCMode(),
-        ]);
+          user ? getBOCPurchaseStatus(user.id) : Promise.resolve(null),
+        ];
+
+        const [saved, mode, purchase] = await Promise.all(promises);
         applySettings(saved);
         setBocMode(mode);
+        if (purchase) setPurchaseStatus(purchase);
       } catch (err) {
         console.error("Error loading BOC settings:", err);
       } finally {
@@ -74,7 +96,14 @@ export default function BOCForm() {
       }
     }
     load();
-  }, []);
+  }, [user]);
+
+  // Show toast on successful purchase redirect
+  useEffect(() => {
+    if (searchParams.get("purchase") === "success") {
+      setToast({ message: "BOC purchased! Performance tracking unlocked.", type: "success" });
+    }
+  }, [searchParams]);
 
   function applySettings(s: BOCSettings) {
     setTargetHourlyWage(s.targetHourlyWage ? String(s.targetHourlyWage) : "");
@@ -147,6 +176,38 @@ export default function BOCForm() {
     avgProjectSize,
   ]);
 
+  // ── Purchase handler ────────────────────────────────────────────────
+  const handlePurchase = useCallback(
+    async (priceId: string) => {
+      if (!user) return;
+      setPurchasing(true);
+      try {
+        const res = await fetch("/api/boc/create-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ priceId, userId: user.id }),
+        });
+        const data = await res.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          setToast({
+            message: data.error || "Failed to start checkout",
+            type: "error",
+          });
+          setPurchasing(false);
+        }
+      } catch (err) {
+        setToast({ message: "Failed to start checkout", type: "error" });
+        setPurchasing(false);
+      }
+    },
+    [user]
+  );
+
+  // ── Derived: should show dashboards ─────────────────────────────────
+  const showDashboards = purchaseStatus.hasPurchased;
+
   // ── Loading screen ──────────────────────────────────────────────────
   if (loading) {
     return (
@@ -178,7 +239,7 @@ export default function BOCForm() {
           </p>
         </div>
 
-        {/* Main card */}
+        {/* Main card — always visible (rate calculator is free) */}
         <div className="bg-white border border-line rounded-xl p-4 sm:p-6 space-y-8">
           <RateCalculatorSection
             targetHourlyWage={targetHourlyWage}
@@ -214,41 +275,81 @@ export default function BOCForm() {
           <ResultsCard results={results} />
         </div>
 
-        {/* Performance Dashboard — outside the main card */}
-        {bocMode.isConnected && bocMode.hasProjects ? (
-          <div className="mt-6">
-            <PerformanceDashboard
-              targetHourlyWage={parseFloat(targetHourlyWage) || 0}
-              sphRate={sphRate}
-              incidentalsMinutes={incidentalsTotal}
-              monthlyOverhead={overheadTotal}
-              minimumRatePerSqIn={results?.isValid ? results.minimumRatePerSqIn : 0}
-            />
-          </div>
-        ) : (
-          <div className="mt-6 bg-background border border-line rounded-xl p-4 sm:p-6 text-center">
-            <p className="text-sm text-muted">
-              Complete and archive projects to see your actual performance
-              compared to your target rate.
-            </p>
-          </div>
-        )}
+        {/* Performance Dashboard + Donations — paywall gated */}
+        {showDashboards ? (
+          <>
+            {/* Performance Dashboard */}
+            {bocMode.isConnected && bocMode.hasProjects ? (
+              <div className="mt-6">
+                <PerformanceDashboard
+                  targetHourlyWage={parseFloat(targetHourlyWage) || 0}
+                  sphRate={sphRate}
+                  incidentalsMinutes={incidentalsTotal}
+                  monthlyOverhead={overheadTotal}
+                  minimumRatePerSqIn={results?.isValid ? results.minimumRatePerSqIn : 0}
+                />
+              </div>
+            ) : (
+              <div className="mt-6 bg-background border border-line rounded-xl p-4 sm:p-6 text-center">
+                <p className="text-sm text-muted">
+                  Complete and archive projects to see your actual performance
+                  compared to your target rate.
+                </p>
+              </div>
+            )}
 
-        {/* Donated Quilts — below dashboard */}
-        {bocMode.isConnected && (
-          <div className="mt-6">
-            <DonatedQuiltsSection
-              sphRate={sphRate}
-              incidentalsMinutes={incidentalsTotal}
-              targetHourlyWage={parseFloat(targetHourlyWage) || 0}
-            />
+            {/* Donated Quilts */}
+            {bocMode.isConnected && (
+              <div className="mt-6">
+                <DonatedQuiltsSection
+                  sphRate={sphRate}
+                  incidentalsMinutes={incidentalsTotal}
+                  targetHourlyWage={parseFloat(targetHourlyWage) || 0}
+                />
+              </div>
+            )}
+          </>
+        ) : (
+          /* Paywall */
+          <div className="mt-6 bg-white border-2 border-gold/40 rounded-xl p-6 sm:p-8 text-center">
+            <div className="text-3xl mb-3">📊</div>
+            <h3 className="text-lg font-bold text-plum mb-2">
+              Unlock Performance Tracking &amp; Tax Reports
+            </h3>
+            <p className="text-sm text-muted mb-6 max-w-md mx-auto">
+              See your actual hourly rate, compare it to your target, track
+              donated quilts, and generate IRS-compliant tax summaries.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              {bocMode.isSubscribed && BOC_SUBSCRIBER_PRICE && (
+                <button
+                  onClick={() => handlePurchase(BOC_SUBSCRIBER_PRICE)}
+                  disabled={purchasing}
+                  className="bg-gold text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {purchasing ? "Redirecting..." : "Buy for $49 (subscriber)"}
+                </button>
+              )}
+              {BOC_STANDALONE_PRICE && (
+                <button
+                  onClick={() => handlePurchase(BOC_STANDALONE_PRICE)}
+                  disabled={purchasing}
+                  className="bg-plum text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {purchasing ? "Redirecting..." : "Buy for $79"}
+                </button>
+              )}
+            </div>
+            {bocMode.isSubscribed && (
+              <p className="text-xs text-muted mt-3">
+                Subscribers save $30 — one-time purchase, yours forever.
+              </p>
+            )}
           </div>
         )}
 
         {/* Save button — below everything */}
         <div className="bg-white border border-line rounded-xl p-4 sm:p-6 mt-6">
-
-          {/* Save button */}
           <div className="flex justify-end pt-2">
             <button
               onClick={handleSave}
