@@ -6,6 +6,7 @@ import Header from "./components/Header";
 import Toast from "./components/Toast";
 import { storage } from "./lib/storage";
 import { supabase } from "./lib/supabase";
+import type { User } from "@supabase/supabase-js";
 import { STAGES } from "./types";
 import type { Project, Settings } from "./types";
 
@@ -110,7 +111,7 @@ export default function HomePage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [quote, setQuote] = useState("");
   const [showWelcomeBackToast, setShowWelcomeBackToast] = useState(false);
 
