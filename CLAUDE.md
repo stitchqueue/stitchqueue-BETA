@@ -166,10 +166,10 @@ UPDATE projects SET stage =
 
 | Phase | Work | Effort | Status |
 |-------|------|--------|--------|
-| 1 | 3-stage Kanban + DB migration | 5-7 days | Not started |
-| 2 | UI/UX polish (checklist, colors) | 4-6 days | Not started |
-| 3 | Deprecate accounting features | 2-3 days | Not started |
-| 4 | Photo uploads (Supabase Storage) | 3-4 days | Not started |
+| 1 | 3-stage Kanban + DB migration | 5-7 days | Complete |
+| 2 | UI/UX polish (checklist, colors) | 4-6 days | Complete |
+| 3 | Deprecate accounting features | 2-3 days | Complete |
+| 4 | Photo uploads (Supabase Storage) | 3-4 days | Complete |
 | 5 | Trial + subscriptions (Stripe) | 5-6 days | Complete |
 | 6 | Business Overhead Calculator | 10-12 days | Not started |
 | 7 | Client intake form (embeddable) | 4-5 days | Not started |
