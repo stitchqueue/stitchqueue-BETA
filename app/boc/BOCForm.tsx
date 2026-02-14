@@ -16,6 +16,7 @@ import OverheadSection from "./components/OverheadSection";
 import IncidentalsSection from "./components/IncidentalsSection";
 import ResultsCard from "./components/ResultsCard";
 import PerformanceDashboard from "./components/PerformanceDashboard";
+import DonatedQuiltsSection from "./components/DonatedQuiltsSection";
 
 export default function BOCForm() {
   // ── Loading / saving state ──────────────────────────────────────────
@@ -233,7 +234,18 @@ export default function BOCForm() {
           </div>
         )}
 
-        {/* Save button — below dashboard */}
+        {/* Donated Quilts — below dashboard */}
+        {bocMode.isConnected && (
+          <div className="mt-6">
+            <DonatedQuiltsSection
+              sphRate={sphRate}
+              incidentalsMinutes={incidentalsTotal}
+              targetHourlyWage={parseFloat(targetHourlyWage) || 0}
+            />
+          </div>
+        )}
+
+        {/* Save button — below everything */}
         <div className="bg-white border border-line rounded-xl p-4 sm:p-6 mt-6">
 
           {/* Save button */}
