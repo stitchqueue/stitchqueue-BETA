@@ -26,7 +26,15 @@ export default function SignupTrialPage() {
   }, [user, authLoading, router]);
 
   const handleSelectPlan = async (priceId: string) => {
-    if (!user || !organizationId) return;
+    if (!user) return;
+    if (!organizationId) {
+      setError("Account setup incomplete — please contact support.");
+      return;
+    }
+    if (!priceId) {
+      setError("Plan configuration missing — please contact support.");
+      return;
+    }
 
     setLoading(priceId);
     setError("");
