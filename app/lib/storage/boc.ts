@@ -35,6 +35,7 @@ function mapBOCFromDb(row: Record<string, unknown>): BOCSettings {
     incidentalsItems,
     projectsPerMonth: (row.projects_per_month as number) ?? 10,
     avgProjectSize: (row.avg_project_size as number) ?? 6000,
+    forceStandaloneMode: (row.force_standalone_mode as boolean) ?? false,
   };
 }
 
@@ -49,6 +50,7 @@ function mapBOCToDb(settings: BOCSettings) {
     incidentals_items: settings.incidentalsItems,
     projects_per_month: settings.projectsPerMonth,
     avg_project_size: settings.avgProjectSize,
+    force_standalone_mode: settings.forceStandaloneMode,
   };
 }
 
