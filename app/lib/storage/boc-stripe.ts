@@ -15,10 +15,16 @@ export interface BOCPurchaseStatus {
 
 /**
  * Check if a user has purchased the BOC add-on.
+ * When NEXT_PUBLIC_ENABLE_BETA_MODE is "true", bypasses the purchase
+ * check and grants full access to all users.
  */
 export async function getBOCPurchaseStatus(
   userId: string
 ): Promise<BOCPurchaseStatus> {
+  if (process.env.NEXT_PUBLIC_ENABLE_BETA_MODE === "true") {
+    return { hasPurchased: true, purchaseDate: null };
+  }
+
   const { data, error } = await supabase
     .from("boc_purchases")
     .select("purchase_date")

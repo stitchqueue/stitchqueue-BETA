@@ -59,6 +59,9 @@ export async function POST(request: NextRequest) {
       customerId = customer.id;
     }
 
+    // Derive base URL from request (always includes scheme)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+
     // One-time payment checkout
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -70,8 +73,8 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/boc?purchase=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/boc?purchase=canceled`,
+      success_url: `${baseUrl}/boc?purchase=success`,
+      cancel_url: `${baseUrl}/boc?purchase=canceled`,
       metadata: {
         user_id: userId,
         purchase_type: 'boc',

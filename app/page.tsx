@@ -7,7 +7,6 @@ import Toast from "./components/Toast";
 import { storage } from "./lib/storage";
 import { supabase } from "./lib/supabase";
 import type { User } from "@supabase/supabase-js";
-import { STAGES } from "./types";
 import type { Project, Settings } from "./types";
 
 const QUOTES = [
@@ -24,11 +23,9 @@ const QUOTES = [
 ];
 
 const STAGE_CONFIG = [
-  { stage: "Intake", icon: "📥", color: "bg-blue-100 text-blue-700" },
-  { stage: "Estimate", icon: "📝", color: "bg-yellow-100 text-yellow-700" },
+  { stage: "Estimates", icon: "📥", color: "bg-blue-100 text-blue-700" },
   { stage: "In Progress", icon: "🧵", color: "bg-orange-100 text-orange-700" },
-  { stage: "Invoiced", icon: "📄", color: "bg-purple-100 text-purple-700" },
-  { stage: "Paid/Shipped", icon: "✅", color: "bg-green-100 text-green-700" },
+  { stage: "Completed", icon: "✅", color: "bg-green-100 text-green-700" },
 ];
 
 function getGreeting(): string {
@@ -217,25 +214,21 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* FIXED: Stage stat boxes - responsive grid that works on mobile */}
-        {/* Mobile: horizontal scroll with fixed-width cards */}
-        {/* Tablet+: 5-column grid */}
-        <div className="mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div className="flex gap-3 overflow-x-auto pb-2 sm:pb-0 sm:overflow-visible sm:grid sm:grid-cols-5">
-            {STAGE_CONFIG.map(({ stage, icon, color }) => (
-              <button
-                key={stage}
-                onClick={() =>
-                  router.push(`/board?stage=${encodeURIComponent(stage)}`)
-                }
-                className={`${color} rounded-xl p-3 sm:p-4 text-center hover:opacity-90 transition-opacity flex-shrink-0 w-[72px] sm:w-auto`}
-              >
-                <div className="text-xl sm:text-2xl mb-1">{icon}</div>
-                <div className="text-xl sm:text-2xl font-bold">{getStageCount(stage)}</div>
-                <div className="text-[10px] sm:text-xs font-medium leading-tight">{stage}</div>
-              </button>
-            ))}
-          </div>
+        {/* Stage stat boxes — 3-stage workflow */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {STAGE_CONFIG.map(({ stage, icon, color }) => (
+            <button
+              key={stage}
+              onClick={() =>
+                router.push(`/board?stage=${encodeURIComponent(stage)}`)
+              }
+              className={`${color} rounded-xl p-3 sm:p-4 text-center hover:opacity-90 transition-opacity min-w-0`}
+            >
+              <div className="text-xl sm:text-2xl mb-1">{icon}</div>
+              <div className="text-xl sm:text-2xl font-bold">{getStageCount(stage)}</div>
+              <div className="text-[10px] sm:text-xs font-medium leading-tight truncate">{stage}</div>
+            </button>
+          ))}
         </div>
 
         {/* FIXED: Action buttons - stack on mobile, 3-col on tablet+ */}

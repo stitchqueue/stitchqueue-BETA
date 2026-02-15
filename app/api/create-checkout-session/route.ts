@@ -36,6 +36,9 @@ export async function POST(request: NextRequest) {
       customerId = customer.id;
     }
 
+    // Derive base URL from request (always includes scheme)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+
     // Create checkout session with 14-day trial
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -54,8 +57,8 @@ export async function POST(request: NextRequest) {
           organization_id: organizationId,
         },
       },
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/onboarding?checkout=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/signup?checkout=canceled`,
+      success_url: `${baseUrl}/onboarding?checkout=success`,
+      cancel_url: `${baseUrl}/signup?checkout=canceled`,
       metadata: {
         user_id: userId,
         organization_id: organizationId,
