@@ -30,11 +30,12 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
 
-    const email = formData.get("email") as string;
-    const category = formData.get("category") as string;
-    const description = formData.get("description") as string;
-    const pageUrl = formData.get("pageUrl") as string;
-    const userAgent = formData.get("userAgent") as string;
+    // Truncate all text fields to prevent oversized payloads
+    const email = String(formData.get("email") || "").slice(0, 320);
+    const category = String(formData.get("category") || "");
+    const description = String(formData.get("description") || "").slice(0, 5000);
+    const pageUrl = String(formData.get("pageUrl") || "").slice(0, 2000);
+    const userAgent = String(formData.get("userAgent") || "").slice(0, 500);
     const screenshot = formData.get("screenshot") as File | null;
 
     // Validate required fields

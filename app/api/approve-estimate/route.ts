@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       .update({
         estimate_approval: approvalData,
         // Move to next stage if approved
-        stage: response === 'approve' ? 'In Progress' : 'Estimate',
+        stage: response === 'approve' ? 'in_progress' : 'estimates',
       })
       .eq('id', projectId);
 

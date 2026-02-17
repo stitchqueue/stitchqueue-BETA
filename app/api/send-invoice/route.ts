@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { mapProjectFromDb, mapSettingsFromDb } from '@/app/lib/storage/mappers';
 import { generateInvoiceEmail, generateInvoicePDF } from '@/app/lib/email';
 import { requireAuth, isAuthError } from '@/app/lib/auth-guard';
 import { createServiceRoleClient } from '@/app/lib/supabase-server';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,56 +16,62 @@ export async function POST(request: NextRequest) {
 
     const { projectId } = await request.json();
 
-    if (!projectId) {
-      return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
+    if (!projectId || typeof projectId !== 'string' || !UUID_RE.test(projectId)) {
+      return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 });
     }
 
-    // Use service role for data fetches
+    // Use service role for data fetches (needs org settings for email templates)
     const serviceClient = createServiceRoleClient();
 
     // Get project — scoped to the caller's organization
-    const { data: project, error: projectError } = await serviceClient
+    const { data: dbProject, error: projectError } = await serviceClient
       .from('projects')
-      .select('id, name, email, subscription_tier')
+      .select('*')
       .eq('id', projectId)
       .eq('organization_id', auth.organizationId)
       .single();
 
-    if (projectError || !project) {
+    if (projectError || !dbProject) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const { data: org, error: orgError } = await serviceClient
+    // Get organization settings
+    const { data: dbOrg, error: orgError } = await serviceClient
       .from('organizations')
-      .select('id, name, email, subscription_tier')
-      .eq('id', project.organization_id)
+      .select('*')
+      .eq('id', auth.organizationId)
       .single();
 
-    if (orgError || !org) {
+    if (orgError || !dbOrg) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
-    if (org.subscription_tier !== 'pro') {
+    // Check PRO tier
+    if (dbOrg.subscription_tier !== 'pro') {
       return NextResponse.json({ error: 'Email sending requires PRO tier' }, { status: 403 });
     }
 
-    const projectData = project.data as any;
-    const clientEmail = projectData.clientEmail;
+    // Map to TypeScript types
+    const project = mapProjectFromDb(dbProject);
+    const settings = mapSettingsFromDb(dbOrg);
 
-    if (!clientEmail) {
+    if (!project.clientEmail) {
       return NextResponse.json({ error: 'Client email address is required' }, { status: 400 });
     }
 
-    const emailHtml = generateInvoiceEmail(projectData, org);
-    const pdfBuffer = generateInvoicePDF(projectData, org);
+    const invoiceNumber = String(project.estimateNumber || 'TBD');
 
+    const emailHtml = generateInvoiceEmail({ project, settings, invoiceNumber });
+    const pdfBuffer = generateInvoicePDF(project, settings, invoiceNumber);
+
+    // Send via Resend
     const { data: emailData, error: emailError } = await resend.emails.send({
       from: 'noreply@stitchqueue.com',
-      to: clientEmail,
-      replyTo: org.email || 'noreply@stitchqueue.com',
-      subject: `Invoice #${projectData.estimateNumber || 'TBD'} from ${org.businessName || 'StitchQueue'}`,
+      to: project.clientEmail,
+      replyTo: settings.email || 'noreply@stitchqueue.com',
+      subject: `Invoice #${invoiceNumber} from ${settings.businessName || 'StitchQueue'}`,
       html: emailHtml,
-      attachments: [{ filename: `Invoice-${projectData.estimateNumber || 'TBD'}.pdf`, content: pdfBuffer }],
+      attachments: [{ filename: `Invoice-${invoiceNumber}.pdf`, content: pdfBuffer }],
     });
 
     if (emailError) {
@@ -71,10 +79,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to send email' }, { status: 500 });
     }
 
-    const updatedData = { ...projectData, invoiceEmailSent: { timestamp: new Date().toISOString(), recipientEmail: clientEmail, resendId: emailData?.id || null } };
+    // Update project with email tracking
     await serviceClient
       .from('projects')
-      .update({ data: updatedData })
+      .update({
+        invoice_email_sent: {
+          timestamp: new Date().toISOString(),
+          recipientEmail: project.clientEmail,
+          resendId: emailData?.id || null,
+        }
+      })
       .eq('id', projectId)
       .eq('organization_id', auth.organizationId);
 

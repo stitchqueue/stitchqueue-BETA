@@ -30,25 +30,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    const {
-      slug,
-      clientFirstName,
-      clientLastName,
-      clientEmail,
-      clientPhone,
-      clientStreet,
-      clientCity,
-      clientState,
-      clientPostalCode,
-      clientCountry,
-      quiltWidth,
-      quiltLength,
-      clientSuppliesBacking,
-      clientSuppliesBatting,
-      serviceType,
-      dueDate,
-      description,
-    } = body;
+    // Truncate all text fields to prevent oversized payloads
+    const slug = String(body.slug || "").slice(0, 200);
+    const clientFirstName = String(body.clientFirstName || "").slice(0, 100);
+    const clientLastName = String(body.clientLastName || "").slice(0, 100);
+    const clientEmail = String(body.clientEmail || "").slice(0, 320);
+    const clientPhone = body.clientPhone ? String(body.clientPhone).slice(0, 30) : null;
+    const clientStreet = body.clientStreet ? String(body.clientStreet).slice(0, 200) : null;
+    const clientCity = body.clientCity ? String(body.clientCity).slice(0, 100) : null;
+    const clientState = body.clientState ? String(body.clientState).slice(0, 100) : null;
+    const clientPostalCode = body.clientPostalCode ? String(body.clientPostalCode).slice(0, 20) : null;
+    const clientCountry = body.clientCountry ? String(body.clientCountry).slice(0, 100) : null;
+    const quiltWidth = body.quiltWidth;
+    const quiltLength = body.quiltLength;
+    const clientSuppliesBacking = body.clientSuppliesBacking;
+    const clientSuppliesBatting = body.clientSuppliesBatting;
+    const serviceType = body.serviceType ? String(body.serviceType).slice(0, 200) : null;
+    const dueDate = body.dueDate ? String(body.dueDate).slice(0, 20) : null;
+    const description = body.description ? String(body.description).slice(0, 5000) : null;
 
     // Validate required fields
     if (!slug || !clientFirstName || !clientLastName || !clientEmail) {
@@ -116,8 +115,8 @@ export async function POST(request: NextRequest) {
       quilt_length: safeLength,
       client_supplies_backing: clientSuppliesBacking === true,
       client_supplies_batting: clientSuppliesBatting === true,
-      service_type: serviceType || null,
-      due_date: dueDate || null,
+      service_type: serviceType?.trim() || null,
+      due_date: dueDate,
       description: description?.trim() || null,
       requested_date_type: dueDate ? "specific_date" : "no_date",
       source: "intake_form",

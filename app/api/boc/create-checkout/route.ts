@@ -56,7 +56,11 @@ export async function POST(request: NextRequest) {
       customerId = customer.id;
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!baseUrl) {
+      console.error('NEXT_PUBLIC_APP_URL is not configured');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -78,10 +82,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('BOC checkout error:', message);
+    console.error('BOC checkout error:', error);
     return NextResponse.json(
-      { error: `Failed to create checkout session: ${message}` },
+      { error: 'Failed to create checkout session' },
       { status: 500 }
     );
   }

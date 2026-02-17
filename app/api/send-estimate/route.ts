@@ -7,6 +7,7 @@ import { createServiceRoleClient } from '@/app/lib/supabase-server';
 import { generateApprovalToken } from '@/app/lib/hmac';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,8 +17,8 @@ export async function POST(request: NextRequest) {
 
     const { projectId } = await request.json();
 
-    if (!projectId) {
-      return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
+    if (!projectId || typeof projectId !== 'string' || !UUID_RE.test(projectId)) {
+      return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 });
     }
 
     // Use service role for data fetches (needs org settings for email templates)
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     if (emailError) {
       console.error('Resend error:', emailError);
-      return NextResponse.json({ error: 'Failed to send email: ' + emailError.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to send email' }, { status: 500 });
     }
 
     // Update project with email tracking
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Send estimate error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
