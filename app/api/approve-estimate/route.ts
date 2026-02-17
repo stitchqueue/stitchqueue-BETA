@@ -59,10 +59,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Truncate comment to prevent oversized payloads (max 2000 chars)
+    const safeComment = comment ? String(comment).slice(0, 2000) : null;
+
     // Prepare approval data
     const approvalData = {
       status: response,
-      comment: comment || null,
+      comment: safeComment,
       timestamp: new Date().toISOString(),
     };
 

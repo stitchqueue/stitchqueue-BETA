@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
+import { escapeHtml } from "@/app/lib/sanitize";
+import { checkRateLimit } from "@/app/lib/rate-limit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -12,6 +14,14 @@ const resend = process.env.RESEND_API_KEY
 
 export async function POST(request: NextRequest) {
   try {
+    // Server-side rate limiting: 10 submissions per IP per hour
+    const rateLimited = checkRateLimit(request, {
+      limit: 10,
+      windowMs: 60 * 60 * 1000,
+      prefix: 'intake',
+    });
+    if (rateLimited) return rateLimited;
+
     const body = await request.json();
 
     // Honeypot check — bots fill hidden fields
@@ -48,6 +58,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(clientEmail)) {
+      return NextResponse.json(
+        { error: "Invalid email address" },
+        { status: 400 }
+      );
+    }
+
     // Fetch organization by slug
     const { data: org, error: orgError } = await supabase
       .from("organizations")
@@ -69,6 +88,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Sanitize numeric inputs — reject NaN / Infinity
+    const parsedWidth = quiltWidth ? parseFloat(quiltWidth) : null;
+    const parsedLength = quiltLength ? parseFloat(quiltLength) : null;
+    const safeWidth = parsedWidth !== null && isFinite(parsedWidth) ? parsedWidth : null;
+    const safeLength = parsedLength !== null && isFinite(parsedLength) ? parsedLength : null;
+
     // Create project in estimates stage
     const projectId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -87,8 +112,8 @@ export async function POST(request: NextRequest) {
       client_state: clientState?.trim() || null,
       client_postal_code: clientPostalCode?.trim() || null,
       client_country: clientCountry?.trim() || null,
-      quilt_width: quiltWidth ? parseFloat(quiltWidth) : null,
-      quilt_length: quiltLength ? parseFloat(quiltLength) : null,
+      quilt_width: safeWidth,
+      quilt_length: safeLength,
       client_supplies_backing: clientSuppliesBacking === true,
       client_supplies_batting: clientSuppliesBatting === true,
       service_type: serviceType || null,
@@ -108,6 +133,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // HTML-escape all user input before embedding in email templates
+    const safeFirstName = escapeHtml(clientFirstName);
+    const safeLastName = escapeHtml(clientLastName);
+    const safeEmail = escapeHtml(clientEmail);
+    const safePhone = escapeHtml(clientPhone);
+    const safeServiceType = escapeHtml(serviceType);
+    const safeDueDate = escapeHtml(dueDate);
+    const safeDescription = escapeHtml(description);
+
     // Send notification to quilter
     const notifyEmail = org.intake_notification_email || org.email;
     if (resend && notifyEmail) {
@@ -115,20 +149,20 @@ export async function POST(request: NextRequest) {
         await resend.emails.send({
           from: "StitchQueue <notifications@stitchqueue.com>",
           to: [notifyEmail],
-          subject: `New Client Request from ${clientFirstName} ${clientLastName}`,
+          subject: `New Client Request from ${safeFirstName} ${safeLastName}`,
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
               <div style="background-color: #4e283a; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
                 <h1 style="margin: 0; font-size: 20px;">New Client Request</h1>
               </div>
               <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
-                <p><strong>Client:</strong> ${clientFirstName} ${clientLastName}</p>
-                <p><strong>Email:</strong> ${clientEmail}</p>
-                ${clientPhone ? `<p><strong>Phone:</strong> ${clientPhone}</p>` : ""}
-                ${quiltWidth && quiltLength ? `<p><strong>Quilt Size:</strong> ${quiltWidth}" × ${quiltLength}"</p>` : ""}
-                ${serviceType ? `<p><strong>Service:</strong> ${serviceType}</p>` : ""}
-                ${dueDate ? `<p><strong>Preferred Date:</strong> ${dueDate}</p>` : ""}
-                ${description ? `<p><strong>Notes:</strong> ${description}</p>` : ""}
+                <p><strong>Client:</strong> ${safeFirstName} ${safeLastName}</p>
+                <p><strong>Email:</strong> ${safeEmail}</p>
+                ${safePhone ? `<p><strong>Phone:</strong> ${safePhone}</p>` : ""}
+                ${safeWidth && safeLength ? `<p><strong>Quilt Size:</strong> ${safeWidth}" &times; ${safeLength}"</p>` : ""}
+                ${safeServiceType ? `<p><strong>Service:</strong> ${safeServiceType}</p>` : ""}
+                ${safeDueDate ? `<p><strong>Preferred Date:</strong> ${safeDueDate}</p>` : ""}
+                ${safeDescription ? `<p><strong>Notes:</strong> ${safeDescription}</p>` : ""}
                 <p style="margin-top: 20px;">
                   <a href="${process.env.NEXT_PUBLIC_APP_URL}/board" style="background: #4e283a; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
                     View in StitchQueue
@@ -146,18 +180,19 @@ export async function POST(request: NextRequest) {
     // Send auto-response to client
     if (resend && clientEmail && org.intake_auto_response) {
       try {
+        // Escape client name before injecting into auto-response template
         const autoBody = org.intake_auto_response
-          .replace(/\{client_name\}/g, clientFirstName)
-          .replace(/\{business_name\}/g, org.name || "our studio");
+          .replace(/\{client_name\}/g, safeFirstName)
+          .replace(/\{business_name\}/g, escapeHtml(org.name) || "our studio");
 
         await resend.emails.send({
           from: `${org.name || "StitchQueue"} <notifications@stitchqueue.com>`,
-          to: [clientEmail],
+          to: [clientEmail.trim()],
           subject: `Request received - ${org.name || "Quilting Studio"}`,
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
               <div style="background-color: #4e283a; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-                <h1 style="margin: 0; font-size: 20px;">${org.name || "Quilting Studio"}</h1>
+                <h1 style="margin: 0; font-size: 20px;">${escapeHtml(org.name) || "Quilting Studio"}</h1>
               </div>
               <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
                 <p>${autoBody.replace(/\n/g, "<br>")}</p>

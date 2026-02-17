@@ -9,9 +9,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-const BOC_SUBSCRIBER_PRICE = process.env.NEXT_PUBLIC_STRIPE_BOC_SUBSCRIBER_PRICE_ID;
-const BOC_STANDALONE_PRICE = process.env.NEXT_PUBLIC_STRIPE_BOC_STANDALONE_PRICE_ID;
-
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
@@ -55,8 +52,14 @@ export async function POST(request: NextRequest) {
         break;
     }
   } catch (err) {
-    // Log but return 200 so Stripe doesn't retry
+    // Return 500 so Stripe retries the event (up to ~3 days).
+    // This ensures subscription status changes aren't silently lost
+    // when handlers fail due to DB errors or network issues.
     console.error(`Error handling ${event.type}:`, err);
+    return NextResponse.json(
+      { error: `Failed to process ${event.type}` },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ received: true });
@@ -111,6 +114,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   if (error) {
     console.error('Error upserting subscription on checkout:', error);
+    throw error;
   }
 }
 
@@ -126,15 +130,21 @@ async function handleBOCPurchase(session: Stripe.Checkout.Session) {
 
   const amount = (session.amount_total || 0) / 100; // cents to dollars
 
-  const { error } = await supabase.from('boc_purchases').insert({
-    user_id: userId,
-    stripe_session_id: session.id,
-    stripe_payment_intent_id: session.payment_intent as string,
-    amount,
-  });
+  // Use upsert keyed on stripe_session_id to handle duplicate webhook deliveries.
+  // If Stripe sends checkout.session.completed twice, the second is a no-op.
+  const { error } = await supabase.from('boc_purchases').upsert(
+    {
+      user_id: userId,
+      stripe_session_id: session.id,
+      stripe_payment_intent_id: session.payment_intent as string,
+      amount,
+    },
+    { onConflict: 'stripe_session_id' }
+  );
 
   if (error) {
     console.error('Error recording BOC purchase:', error);
+    throw error; // Let the outer catch return 500 so Stripe retries
   }
 }
 
@@ -171,6 +181,7 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
 
   if (error) {
     console.error('Error updating subscription:', error);
+    throw error;
   }
 }
 
@@ -189,6 +200,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
   if (error) {
     console.error('Error marking subscription canceled:', error);
+    throw error;
   }
 }
 
@@ -209,5 +221,6 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 
   if (error) {
     console.error('Error marking subscription past_due:', error);
+    throw error;
   }
 }
