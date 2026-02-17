@@ -1,28 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { generateInvoiceEmail, generateInvoicePDF } from '@/app/lib/email';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { requireAuth, isAuthError } from '@/app/lib/auth-guard';
+import { createServiceRoleClient } from '@/app/lib/supabase-server';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate the caller
+    const auth = await requireAuth();
+    if (isAuthError(auth)) return auth;
+
     const { projectId } = await request.json();
 
     if (!projectId) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
     }
 
-    const { data: project, error: projectError } = await supabase.from('projects').select('id, name, email, subscription_tier').eq('id', projectId).single();
+    // Use service role for data fetches
+    const serviceClient = createServiceRoleClient();
+
+    // Get project — scoped to the caller's organization
+    const { data: project, error: projectError } = await serviceClient
+      .from('projects')
+      .select('id, name, email, subscription_tier')
+      .eq('id', projectId)
+      .eq('organization_id', auth.organizationId)
+      .single();
+
     if (projectError || !project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const { data: org, error: orgError } = await supabase.from('organizations').select('id, name, email, subscription_tier').eq('id', project.organization_id).single();
+    const { data: org, error: orgError } = await serviceClient
+      .from('organizations')
+      .select('id, name, email, subscription_tier')
+      .eq('id', project.organization_id)
+      .single();
+
     if (orgError || !org) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
@@ -56,7 +72,11 @@ export async function POST(request: NextRequest) {
     }
 
     const updatedData = { ...projectData, invoiceEmailSent: { timestamp: new Date().toISOString(), recipientEmail: clientEmail, resendId: emailData?.id || null } };
-    await supabase.from('projects').update({ data: updatedData }).eq('id', projectId);
+    await serviceClient
+      .from('projects')
+      .update({ data: updatedData })
+      .eq('id', projectId)
+      .eq('organization_id', auth.organizationId);
 
     return NextResponse.json({ success: true, message: 'Invoice sent successfully' });
   } catch (error) {

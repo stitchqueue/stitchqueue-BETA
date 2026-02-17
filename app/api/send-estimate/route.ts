@@ -1,28 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { mapProjectFromDb, mapSettingsFromDb } from '@/app/lib/storage/mappers';
 import { generateEstimateEmail, generateEstimatePDF } from '@/app/lib/email';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { requireAuth, isAuthError } from '@/app/lib/auth-guard';
+import { createServiceRoleClient } from '@/app/lib/supabase-server';
+import { generateApprovalToken } from '@/app/lib/hmac';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate the caller
+    const auth = await requireAuth();
+    if (isAuthError(auth)) return auth;
+
     const { projectId } = await request.json();
 
     if (!projectId) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
     }
 
-    // Get project from database
-    const { data: dbProject, error: projectError } = await supabase
+    // Use service role for data fetches (needs org settings for email templates)
+    const serviceClient = createServiceRoleClient();
+
+    // Get project — scoped to the caller's organization
+    const { data: dbProject, error: projectError } = await serviceClient
       .from('projects')
       .select('*')
       .eq('id', projectId)
+      .eq('organization_id', auth.organizationId)
       .single();
 
     if (projectError || !dbProject) {
@@ -30,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get organization settings
-    const { data: dbOrg, error: orgError } = await supabase
+    const { data: dbOrg, error: orgError } = await serviceClient
       .from('organizations')
       .select('*')
       .eq('id', dbProject.organization_id)
@@ -53,10 +59,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Client email address is required' }, { status: 400 });
     }
 
-    // Generate email content
+    // Generate HMAC token for the approval URL
+    const token = generateApprovalToken(projectId);
     const estimateNumber = String(project.estimateNumber || 'TBD');
-    const approvalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://beta.stitchqueue.com'}/approve/${project.id}`;
-    
+    const approvalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://beta.stitchqueue.com'}/approve/${project.id}?token=${token}`;
+
     const emailData = {
       project,
       settings,
@@ -86,7 +93,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update project with email tracking
-    await supabase
+    await serviceClient
       .from('projects')
       .update({
         estimate_email_sent: {
@@ -95,7 +102,8 @@ export async function POST(request: NextRequest) {
           resendId: emailResult?.id || null,
         }
       })
-      .eq('id', projectId);
+      .eq('id', projectId)
+      .eq('organization_id', auth.organizationId);
 
     return NextResponse.json({
       success: true,

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
-import { getOrganizationId } from "../lib/storage/auth";
 
 const MONTHLY_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_MONTHLY_PRICE_ID!;
 const ANNUAL_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_ANNUAL_PRICE_ID!;
@@ -11,26 +10,17 @@ const ANNUAL_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_ANNUAL_PRICE_ID!;
 export default function SignupTrialPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/signup");
-      return;
-    }
-    if (user) {
-      getOrganizationId().then(setOrganizationId);
     }
   }, [user, authLoading, router]);
 
   const handleSelectPlan = async (priceId: string) => {
     if (!user) return;
-    if (!organizationId) {
-      setError("Account setup incomplete — please contact support.");
-      return;
-    }
     if (!priceId) {
       setError("Plan configuration missing — please contact support.");
       return;
@@ -43,11 +33,7 @@ export default function SignupTrialPage() {
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          priceId,
-          userId: user.id,
-          organizationId,
-        }),
+        body: JSON.stringify({ priceId }),
       });
 
       const data = await res.json();

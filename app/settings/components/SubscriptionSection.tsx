@@ -93,16 +93,12 @@ export default function SubscriptionSection({
   }, [user]);
 
   const handleManageSubscription = async () => {
-    if (!subscription?.stripe_customer_id) return;
-
     setPortalLoading(true);
     try {
       const res = await fetch("/api/create-portal-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: subscription.stripe_customer_id,
-        }),
+        body: JSON.stringify({}),
       });
 
       const data = await res.json();
@@ -225,7 +221,7 @@ export default function SubscriptionSection({
             )}
 
             {/* Manage button */}
-            {subscription.stripe_customer_id && (
+            {subscription && (
               <button
                 onClick={handleManageSubscription}
                 disabled={portalLoading}

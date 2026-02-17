@@ -12,6 +12,7 @@ export default function ApprovalPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const projectId = params.projectId as string;
+  const token = searchParams.get('token') || '';
   const preselectedResponse = searchParams.get('response') as ResponseType;
 
   const [response, setResponse] = useState<ResponseType>(preselectedResponse);
@@ -54,6 +55,7 @@ export default function ApprovalPage() {
           projectId,
           response,
           comment: comment.trim() || null,
+          token,
         }),
       });
 

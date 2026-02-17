@@ -1,38 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { stripe } from '@/app/lib/stripe';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { requireAuth, isAuthError } from '@/app/lib/auth-guard';
+import { createServiceRoleClient } from '@/app/lib/supabase-server';
 
 const BOC_SUBSCRIBER_PRICE = process.env.NEXT_PUBLIC_STRIPE_BOC_SUBSCRIBER_PRICE_ID;
 const BOC_STANDALONE_PRICE = process.env.NEXT_PUBLIC_STRIPE_BOC_STANDALONE_PRICE_ID;
 
 export async function POST(request: NextRequest) {
   try {
-    const { priceId, userId } = await request.json();
+    // Authenticate the caller — userId comes from session, not the body
+    const auth = await requireAuth();
+    if (isAuthError(auth)) return auth;
 
-    if (!priceId || !userId) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    const { priceId } = await request.json();
 
     // Validate the price ID is a BOC price
-    if (priceId !== BOC_SUBSCRIBER_PRICE && priceId !== BOC_STANDALONE_PRICE) {
+    if (!priceId || (priceId !== BOC_SUBSCRIBER_PRICE && priceId !== BOC_STANDALONE_PRICE)) {
       return NextResponse.json(
         { error: 'Invalid price ID' },
         { status: 400 }
       );
     }
 
+    // Use service role for boc_purchases and subscriptions lookups
+    const serviceClient = createServiceRoleClient();
+
     // Check if already purchased
-    const { data: existing } = await supabase
+    const { data: existing } = await serviceClient
       .from('boc_purchases')
       .select('id')
-      .eq('user_id', userId)
+      .eq('user_id', auth.userId)
       .limit(1)
       .single();
 
@@ -44,25 +41,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Get or create Stripe customer
-    const { data: existingSub } = await supabase
+    const { data: existingSub } = await serviceClient
       .from('subscriptions')
       .select('stripe_customer_id')
-      .eq('user_id', userId)
+      .eq('user_id', auth.userId)
       .single();
 
     let customerId = existingSub?.stripe_customer_id;
 
     if (!customerId) {
       const customer = await stripe.customers.create({
-        metadata: { user_id: userId },
+        metadata: { user_id: auth.userId },
       });
       customerId = customer.id;
     }
 
-    // Derive base URL from request (always includes scheme)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
 
-    // One-time payment checkout
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'payment',
@@ -76,7 +71,7 @@ export async function POST(request: NextRequest) {
       success_url: `${baseUrl}/boc?purchase=success`,
       cancel_url: `${baseUrl}/boc?purchase=canceled`,
       metadata: {
-        user_id: userId,
+        user_id: auth.userId,
         purchase_type: 'boc',
       },
     });

@@ -1,17 +1,15 @@
 // app/api/approve-estimate/route.ts
 // API route to handle client estimate approval responses
+// Public endpoint — protected by HMAC token (not user session)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { createServiceRoleClient } from '@/app/lib/supabase-server';
+import { verifyApprovalToken } from '@/app/lib/hmac';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, response, comment } = body;
+    const { projectId, response, comment, token } = body;
 
     // Validate inputs
     if (!projectId) {
@@ -27,6 +25,17 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Verify HMAC token — prevents unauthenticated access by UUID guessing
+    if (!token || !verifyApprovalToken(projectId, token)) {
+      return NextResponse.json(
+        { error: 'Invalid or missing approval token' },
+        { status: 403 }
+      );
+    }
+
+    // Service role is appropriate here — this is a public endpoint verified by HMAC
+    const supabase = createServiceRoleClient();
 
     // Get project from database
     const { data: project, error: projectError } = await supabase
@@ -60,7 +69,7 @@ export async function POST(request: NextRequest) {
     // Update project with approval response
     const { error: updateError } = await supabase
       .from('projects')
-      .update({ 
+      .update({
         estimate_approval: approvalData,
         // Move to next stage if approved
         stage: response === 'approve' ? 'In Progress' : 'Estimate',
@@ -74,9 +83,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    // TODO: Send notification email to quilter
-    // This would use Resend to notify the quilter of the client's response
 
     // Return success with appropriate message
     let message = '';
