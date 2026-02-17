@@ -8,6 +8,7 @@ import { useAuth } from "../lib/auth-context";
 import { getBOCSettings, saveBOCSettings } from "../lib/storage/boc";
 import { getBOCMode, type BOCMode } from "../lib/storage/boc-mode";
 import { getBOCPurchaseStatus, type BOCPurchaseStatus } from "../lib/storage/boc-stripe";
+import { BETA_TESTER_EMAILS } from "../lib/server-subscription";
 import type { BOCSettings, ExperienceLevel, OverheadItem, IncidentalItem } from "../types";
 import { DEFAULT_BOC_SETTINGS, DEFAULT_OVERHEAD_ITEMS, DEFAULT_INCIDENTAL_ITEMS, SPH_RATES } from "../types";
 import {
@@ -220,7 +221,8 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
 
   // ── Derived: should show dashboards ─────────────────────────────────
   // Server-side check is authoritative; client-side is a fallback for UX
-  const showDashboards = serverPurchased || purchaseStatus.hasPurchased;
+  const isBetaTester = user?.email ? BETA_TESTER_EMAILS.includes(user.email) : false;
+  const showDashboards = serverPurchased || purchaseStatus.hasPurchased || isBetaTester;
 
   // ── Force-standalone toggle handler (saves immediately) ────────────
   const isBetaMode = process.env.NEXT_PUBLIC_ENABLE_BETA_MODE === "true";

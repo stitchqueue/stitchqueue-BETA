@@ -26,7 +26,7 @@ export default function SubscriptionGate({ children }: SubscriptionGateProps) {
   useEffect(() => {
     if (authLoading || !user) return;
 
-    getSubscriptionInfo(user.id).then((info) => {
+    getSubscriptionInfo(user.id, user.email ?? undefined).then((info) => {
       if (!info.hasAccess) {
         router.push("/signup-trial?reason=expired");
       } else {
@@ -64,7 +64,7 @@ export function useSubscriptionInfo() {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    getSubscriptionInfo(user.id).then(setInfo);
+    getSubscriptionInfo(user.id, user.email ?? undefined).then(setInfo);
   }, [user, authLoading]);
 
   return info;

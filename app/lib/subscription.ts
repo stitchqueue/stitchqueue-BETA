@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { BETA_TESTER_EMAILS } from "./server-subscription";
 
 const GRACE_PERIOD_DAYS = 3;
 
@@ -14,7 +15,18 @@ export interface SubscriptionInfo {
  * Get full subscription info for a user.
  * Returns access status, trial info, and grace period state.
  */
-export async function getSubscriptionInfo(userId: string): Promise<SubscriptionInfo> {
+export async function getSubscriptionInfo(userId: string, email?: string): Promise<SubscriptionInfo> {
+  // Beta tester whitelist — full access without a subscription record
+  if (email && BETA_TESTER_EMAILS.includes(email)) {
+    return {
+      status: "active",
+      trialDaysRemaining: null,
+      hasAccess: true,
+      isGracePeriod: false,
+      graceDaysRemaining: null,
+    };
+  }
+
   const { data, error } = await supabase
     .from("subscriptions")
     .select("status, trial_end, current_period_end")
