@@ -451,8 +451,8 @@ export function mapSettingsToDb(settings: Partial<Settings>): any {
     dbSettings.thread_options = settings.threadOptions;
   if (settings.battingOptions !== undefined)
     dbSettings.batting_options = settings.battingOptions;
-  if (settings.isPaidTier !== undefined)
-    dbSettings.subscription_tier = settings.isPaidTier ? "pro" : "free";
+  // SECURITY: subscription_tier is set by Stripe webhooks only, not user-editable.
+  // Do NOT map isPaidTier to subscription_tier here.
 
   return dbSettings;
 }

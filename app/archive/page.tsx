@@ -4,10 +4,19 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import EmptyState from "../components/EmptyState";
+import SubscriptionGate from "../components/SubscriptionGate";
 import { storage } from "../lib/storage";
 import type { Project } from "../types";
 
 export default function ArchivePage() {
+  return (
+    <SubscriptionGate>
+      <ArchiveContent />
+    </SubscriptionGate>
+  );
+}
+
+function ArchiveContent() {
   const router = useRouter();
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [searchQuery, setSearchQuery] = useState("");

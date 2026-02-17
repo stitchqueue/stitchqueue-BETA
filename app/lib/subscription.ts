@@ -22,14 +22,13 @@ export async function getSubscriptionInfo(userId: string): Promise<SubscriptionI
     .single();
 
   if (error || !data) {
-    // No subscription record = beta user or new user who hasn't
-    // gone through Stripe yet.  Grant access so existing beta
-    // users aren't locked out.  Once every user has a subscription
-    // row (post-launch), change hasAccess back to false.
+    // No subscription record = no access.
+    // Beta testers bypass via the server-side middleware whitelist
+    // (BETA_TESTER_EMAILS in server-subscription.ts), not here.
     return {
       status: "none",
       trialDaysRemaining: null,
-      hasAccess: true,
+      hasAccess: false,
       isGracePeriod: false,
       graceDaysRemaining: null,
     };

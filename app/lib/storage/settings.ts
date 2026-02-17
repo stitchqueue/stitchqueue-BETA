@@ -45,6 +45,10 @@ export async function saveSettings(
 
   const dbSettings = mapSettingsToDb(settings);
 
+  // SECURITY: subscription_tier is managed by Stripe webhooks only.
+  // Never allow client-side settings saves to modify it.
+  delete dbSettings.subscription_tier;
+
   const { error } = await supabase
     .from("organizations")
     .update(dbSettings)
@@ -70,6 +74,9 @@ export async function updateSettings(
   }
 
   const dbUpdates = mapSettingsToDb(updates);
+
+  // SECURITY: subscription_tier is managed by Stripe webhooks only.
+  delete dbUpdates.subscription_tier;
 
   const { error } = await supabase
     .from("organizations")

@@ -1,5 +1,30 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { checkSubscriptionAccess } from '@/app/lib/server-subscription';
+
+/**
+ * Routes that authenticated users can access WITHOUT a subscription.
+ * Everything else requires an active/trialing subscription or grace period.
+ */
+const SUBSCRIPTION_EXEMPT_PATHS = [
+  '/signup',
+  '/signup-trial',
+  '/login',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+  '/onboarding',
+  '/privacy',
+  '/terms',
+  '/approve',
+  '/test-supabase',
+];
+
+function isSubscriptionExempt(pathname: string): boolean {
+  return SUBSCRIPTION_EXEMPT_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + '/')
+  );
+}
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -26,7 +51,39 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh the session — this keeps JWTs alive
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+
+  // No user = not authenticated. Let the page/route handle its own auth redirect.
+  // Don't block public pages or auth pages.
+  if (!user) {
+    return supabaseResponse;
+  }
+
+  // Skip subscription check for exempt paths (signup, legal, etc.)
+  if (isSubscriptionExempt(pathname)) {
+    return supabaseResponse;
+  }
+
+  // Skip subscription check for API routes — they handle their own auth
+  if (pathname.startsWith('/api/')) {
+    return supabaseResponse;
+  }
+
+  // Skip subscription check for the home page (marketing/landing)
+  if (pathname === '/') {
+    return supabaseResponse;
+  }
+
+  // Server-side subscription enforcement
+  const access = await checkSubscriptionAccess(supabase, user.id, user.email);
+
+  if (!access.hasAccess) {
+    const redirectUrl = new URL('/signup-trial', request.url);
+    redirectUrl.searchParams.set('reason', 'expired');
+    return NextResponse.redirect(redirectUrl);
+  }
 
   return supabaseResponse;
 }

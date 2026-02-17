@@ -24,7 +24,11 @@ import DonatedQuiltsSection from "./components/DonatedQuiltsSection";
 const BOC_SUBSCRIBER_PRICE = process.env.NEXT_PUBLIC_STRIPE_BOC_SUBSCRIBER_PRICE_ID;
 const BOC_STANDALONE_PRICE = process.env.NEXT_PUBLIC_STRIPE_BOC_STANDALONE_PRICE_ID;
 
-export default function BOCForm() {
+interface BOCFormProps {
+  serverPurchased?: boolean;
+}
+
+export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
   const { user } = useAuth();
   const searchParams = useSearchParams();
 
@@ -215,7 +219,8 @@ export default function BOCForm() {
     : bocMode;
 
   // ── Derived: should show dashboards ─────────────────────────────────
-  const showDashboards = purchaseStatus.hasPurchased;
+  // Server-side check is authoritative; client-side is a fallback for UX
+  const showDashboards = serverPurchased || purchaseStatus.hasPurchased;
 
   // ── Force-standalone toggle handler (saves immediately) ────────────
   const isBetaMode = process.env.NEXT_PUBLIC_ENABLE_BETA_MODE === "true";

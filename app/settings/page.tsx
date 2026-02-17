@@ -14,6 +14,7 @@
 import { Suspense } from "react";
 import SettingsForm from "./SettingsForm";
 import ErrorBoundary from "../components/ErrorBoundary";
+import SubscriptionGate from "../components/SubscriptionGate";
 
 /**
  * Loading fallback shown while SettingsForm loads
@@ -39,7 +40,9 @@ export default function SettingsPage() {
   return (
     <ErrorBoundary fallbackTitle="Settings error">
       <Suspense fallback={<SettingsLoading />}>
-        <SettingsForm />
+        <SubscriptionGate>
+          <SettingsForm />
+        </SubscriptionGate>
       </Suspense>
     </ErrorBoundary>
   );

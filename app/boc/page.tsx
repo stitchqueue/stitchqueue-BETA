@@ -1,9 +1,7 @@
-"use client";
-
 import { Suspense } from "react";
-import BOCForm from "./BOCForm";
-import SubscriptionGate from "../components/SubscriptionGate";
-import ErrorBoundary from "../components/ErrorBoundary";
+import { createAuthenticatedClient } from "../lib/supabase-server";
+import { checkBOCAccess } from "../lib/server-boc";
+import BOCPageClient from "./BOCPageClient";
 
 function BOCLoading() {
   return (
@@ -16,14 +14,25 @@ function BOCLoading() {
   );
 }
 
-export default function BOCPage() {
+export default async function BOCPage() {
+  // Server-side BOC purchase check
+  let serverPurchased = false;
+
+  try {
+    const supabase = await createAuthenticatedClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      const access = await checkBOCAccess(user.id, user.email);
+      serverPurchased = access.hasPurchased;
+    }
+  } catch {
+    // If auth fails, let the client-side SubscriptionGate handle redirect
+  }
+
   return (
-    <ErrorBoundary fallbackTitle="BOC error">
-      <Suspense fallback={<BOCLoading />}>
-        <SubscriptionGate>
-          <BOCForm />
-        </SubscriptionGate>
-      </Suspense>
-    </ErrorBoundary>
+    <Suspense fallback={<BOCLoading />}>
+      <BOCPageClient serverPurchased={serverPurchased} />
+    </Suspense>
   );
 }
