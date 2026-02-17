@@ -25,7 +25,7 @@ export async function getMaterialsAnalytics(
   const projects = await getProjectsByDateRange(
     startDate,
     endDate,
-    ["Paid/Shipped", "Archived"]
+    ["completed", "archived"]
   );
 
   let bobbinsSold = 0;

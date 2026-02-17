@@ -248,7 +248,7 @@ function ArchiveContent() {
                             </span>
                           </div>
                         )}
-                        {project.estimateData && (
+                        {project.estimateData?.total != null && (
                           <div>
                             <span className="text-muted">Total:</span>{" "}
                             <span className="font-medium font-bold text-plum">

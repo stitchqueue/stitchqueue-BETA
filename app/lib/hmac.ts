@@ -1,6 +1,13 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 
-const SECRET = process.env.ESTIMATE_APPROVAL_SECRET || '';
+const SECRET = process.env.ESTIMATE_APPROVAL_SECRET;
+
+if (!SECRET) {
+  console.error(
+    'WARNING: ESTIMATE_APPROVAL_SECRET is not set. ' +
+    'Estimate approval links will not work.'
+  );
+}
 
 /**
  * Generate an HMAC-SHA256 token for a project ID.

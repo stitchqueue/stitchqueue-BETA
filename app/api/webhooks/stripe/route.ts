@@ -91,6 +91,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
+  // In Stripe SDK v20+, current_period fields are on the subscription item
+  const firstItem = subscription.items.data[0];
+
   const { error } = await supabase.from('subscriptions').upsert(
     {
       user_id: userId,
@@ -104,9 +107,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         : null,
       stripe_customer_id: subscription.customer as string,
       stripe_subscription_id: subscription.id,
-      stripe_price_id: subscription.items.data[0]?.price?.id || null,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      stripe_price_id: firstItem?.price?.id || null,
+      current_period_start: firstItem
+        ? new Date(firstItem.current_period_start * 1000).toISOString()
+        : null,
+      current_period_end: firstItem
+        ? new Date(firstItem.current_period_end * 1000).toISOString()
+        : null,
       cancel_at_period_end: subscription.cancel_at_period_end,
     },
     { onConflict: 'user_id,organization_id' }
@@ -161,13 +168,20 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
     return;
   }
 
+  // In Stripe SDK v20+, current_period fields are on the subscription item
+  const firstItem = subscription.items.data[0];
+
   const { error } = await supabase
     .from('subscriptions')
     .update({
       status: subscription.status,
-      stripe_price_id: subscription.items.data[0]?.price?.id || null,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      stripe_price_id: firstItem?.price?.id || null,
+      current_period_start: firstItem
+        ? new Date(firstItem.current_period_start * 1000).toISOString()
+        : null,
+      current_period_end: firstItem
+        ? new Date(firstItem.current_period_end * 1000).toISOString()
+        : null,
       cancel_at_period_end: subscription.cancel_at_period_end,
       trial_start: subscription.trial_start
         ? new Date(subscription.trial_start * 1000).toISOString()
@@ -208,7 +222,11 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
  * invoice.payment_failed — payment issue on renewal or trial end.
  */
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  const subscriptionId = invoice.subscription as string;
+  // In Stripe SDK v20+, subscription moved to invoice.parent.subscription_details
+  const subDetails = invoice.parent?.subscription_details;
+  const subscriptionId = typeof subDetails?.subscription === 'string'
+    ? subDetails.subscription
+    : subDetails?.subscription?.id;
   if (!subscriptionId) return;
 
   const { error } = await supabase

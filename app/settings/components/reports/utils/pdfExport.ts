@@ -7,7 +7,7 @@
  */
 
 import { jsPDF } from "jspdf";
-import type { Settings } from "../../../types";
+import type { Settings } from "@/app/types";
 import type { DateRange } from "./dateHelpers";
 
 /**

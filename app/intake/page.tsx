@@ -107,7 +107,7 @@ export default function IntakePage() {
 
   // Check if we have thread/batting options
   const hasThreadOptions =
-    settings.threadOptions && settings.threadOptions.length > 0;
+    settings.bobbinOptions && settings.bobbinOptions.length > 0;
   const hasBattingOptions =
     settings.battingOptions && settings.battingOptions.length > 0;
 
@@ -216,7 +216,7 @@ export default function IntakePage() {
 
     const newProject: Project = {
       id,
-      stage: "Intake",
+      stage: "Estimates",
       clientFirstName: formData.clientFirstName,
       clientLastName: formData.clientLastName,
       clientEmail: formData.clientEmail || undefined,
@@ -698,7 +698,7 @@ export default function IntakePage() {
                     }
                   >
                     <option value="">Select thread...</option>
-                    {settings.threadOptions.map((thread) => (
+                    {settings.bobbinOptions.map((thread) => (
                       <option key={thread.name} value={thread.name}>
                         {thread.name}
                       </option>

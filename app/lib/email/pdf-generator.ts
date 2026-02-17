@@ -12,7 +12,7 @@ export function generateEstimatePDF(
   project: Project,
   settings: Settings,
   estimateNumber: string
-): Promise<Buffer> {
+): Buffer {
   const estimate = project.estimateData || {};
   const clientName = `${project.clientFirstName} ${project.clientLastName}`;
   
@@ -106,7 +106,7 @@ export function generateInvoicePDF(
   project: Project,
   settings: Settings,
   invoiceNumber: string
-): Promise<Buffer> {
+): Buffer {
   console.warn('generateInvoicePDF is deprecated - invoices are not sent via email');
   return Buffer.from('Invoice PDFs are not generated for email');
 }

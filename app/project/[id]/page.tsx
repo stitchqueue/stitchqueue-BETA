@@ -299,7 +299,7 @@ function ProjectDetailContent() {
   const currentStageIndex = STAGES.indexOf(project.stage as Stage);
 
   // Check if project has estimate data
-  const hasEstimate = project.estimateData && project.estimateData.total > 0;
+  const hasEstimate = project.estimateData && (project.estimateData.total ?? 0) > 0;
   const estimate = project.estimateData;
 
 
@@ -402,10 +402,6 @@ function ProjectDetailContent() {
         finalPaymentDate: paymentDate,
         finalPaymentMethod: paymentMethod,
         paidInFull: isPaidInFull,
-        // Automatically advance to Paid/Shipped if paid in full
-        ...(isPaidInFull && project.stage === "Invoiced"
-          ? { stage: "Paid/Shipped" as Stage }
-          : {}),
       });
       setProject({
         ...project,
@@ -413,9 +409,6 @@ function ProjectDetailContent() {
         finalPaymentDate: paymentDate,
         finalPaymentMethod: paymentMethod,
         paidInFull: isPaidInFull,
-        ...(isPaidInFull && project.stage === "Invoiced"
-          ? { stage: "Paid/Shipped" as Stage }
-          : {}),
       });
       setShowPaymentForm(false);
       alert(
@@ -529,7 +522,7 @@ function ProjectDetailContent() {
     if (item === 'invoiced' && checked && estimate?.total) {
       setChecklistInputs(prev => ({
         ...prev,
-        invoicedAmount: estimate.total.toFixed(2),
+        invoicedAmount: estimate.total!.toFixed(2),
       }));
     }
 
@@ -1347,7 +1340,7 @@ function ProjectDetailContent() {
             </div>
 
             <div className="space-y-0 text-sm">
-              {estimate.quiltingTotal > 0 && (
+              {(estimate.quiltingTotal ?? 0) > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>
                     Quilting ({(estimate.quiltArea || 0).toLocaleString()} sq in × ${estimate.quiltingRate}/sq in)
@@ -1355,13 +1348,13 @@ function ProjectDetailContent() {
                   <span>{formatCurrency(estimate.quiltingTotal)}</span>
                 </div>
               )}
-              {estimate.threadCost > 0 && (
+              {(estimate.threadCost ?? 0) > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>Thread</span>
                   <span>{formatCurrency(estimate.threadCost)}</span>
                 </div>
               )}
-              {estimate.battingTotal > 0 && (
+              {(estimate.battingTotal ?? 0) > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>
                     Batting ({Math.round(estimate.battingLengthNeeded || 0)}" length)
@@ -1375,7 +1368,7 @@ function ProjectDetailContent() {
                   <span>$0.00</span>
                 </div>
               )}
-              {estimate.bindingTotal > 0 && (
+              {(estimate.bindingTotal ?? 0) > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>
                     Binding ({Math.round(estimate.bindingPerimeter || 0)}" × ${estimate.bindingRatePerInch}/in)
@@ -1383,7 +1376,7 @@ function ProjectDetailContent() {
                   <span>{formatCurrency(estimate.bindingTotal)}</span>
                 </div>
               )}
-              {estimate.bobbinTotal > 0 && (
+              {(estimate.bobbinTotal ?? 0) > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>
                     Bobbins ({estimate.bobbinCount} × ${estimate.bobbinPrice})
@@ -1400,7 +1393,7 @@ function ProjectDetailContent() {
               </div>
               {/* v4.0 DEPRECATED - Tax display hidden by ENABLE_TAX_SYSTEM flag */}
               <FeatureGate flag="ENABLE_TAX_SYSTEM">
-                {estimate.taxAmount > 0 && (
+                {(estimate.taxAmount ?? 0) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted">Tax ({estimate.taxRate}%)</span>
                     <span className="font-medium">{formatCurrency(estimate.taxAmount)}</span>
@@ -1882,11 +1875,11 @@ function ProjectDetailContent() {
               projectId={projectId}
               organizationId={organizationId}
               onPhotoCountChange={setPhotoCount}
-              editable={project.stage !== 'archived'}
+              editable={project.stage !== 'Archived'}
             />
 
             {/* Photo Upload (hidden for archived projects) */}
-            {project.stage !== 'archived' && (
+            {project.stage !== 'Archived' && (
               <div className={photoCount > 0 ? "mt-4" : ""}>
                 <PhotoUpload
                   projectId={projectId}

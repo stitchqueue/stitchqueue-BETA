@@ -71,6 +71,7 @@ export interface Project {
   bindingType?: string;
   // Bobbin fields
   bobbinChoice?: string;
+  threadChoice?: string;
   // Extra charges (shipping, rush, custom fees)
   extraCharges?: ExtraCharge[];
   // Discount fields
@@ -142,6 +143,7 @@ export interface Project {
     bobbinCount?: number;
     bobbinPrice?: number;
     bobbinTotal?: number;
+    threadCost?: number;
     extraCharges?: ExtraCharge[];
     extraChargesTotal?: number;
     extraChargesTaxable?: number;
@@ -149,6 +151,10 @@ export interface Project {
     discountValue?: number;
     discountAmount?: number;
     isDonation?: boolean;
+    mileage?: number;
+    mileageTotal?: number;
+    taxAmount?: number;
+    taxRate?: number;
     subtotal?: number;
     // Tax snapshot at estimate time
     taxExempt?: boolean;
@@ -254,6 +260,7 @@ export interface Settings {
 
   // Bobbin & Batting Options (PAID tier only)
   bobbinOptions: BobbinOption[];
+  threadOptions?: BobbinOption[];
   battingOptions: BattingOption[];
 
   // Tier

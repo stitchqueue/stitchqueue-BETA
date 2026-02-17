@@ -506,7 +506,7 @@ export default function CalculatorForm() {
 
       // Build project object with all form values
       const projectData = {
-        stage: "Estimate" as const,
+        stage: "Estimates" as const,
         estimateNumber,
         clientFirstName,
         clientLastName,

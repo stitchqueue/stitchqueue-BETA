@@ -242,10 +242,6 @@ export default function InvoicePage() {
         finalPaymentDate: paymentDate,
         finalPaymentMethod: paymentMethod,
         paidInFull: isPaidInFull,
-        // Automatically advance to Paid/Shipped if paid in full and currently Invoiced
-        ...(isPaidInFull && project.stage === "Invoiced"
-          ? { stage: "Paid/Shipped" }
-          : {}),
       });
 
       setProject({
@@ -254,9 +250,6 @@ export default function InvoicePage() {
         finalPaymentDate: paymentDate,
         finalPaymentMethod: paymentMethod,
         paidInFull: isPaidInFull,
-        ...(isPaidInFull && project.stage === "Invoiced"
-          ? { stage: "Paid/Shipped" }
-          : {}),
       });
 
       setShowPaymentForm(false);

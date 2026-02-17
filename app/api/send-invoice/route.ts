@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     const invoiceNumber = String(project.estimateNumber || 'TBD');
 
     const emailHtml = generateInvoiceEmail({ project, settings, invoiceNumber });
-    const pdfBuffer = generateInvoicePDF(project, settings, invoiceNumber);
+    const pdfBuffer = await generateInvoicePDF(project, settings, invoiceNumber);
 
     // Send via Resend
     const { data: emailData, error: emailError } = await resend.emails.send({

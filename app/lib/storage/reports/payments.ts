@@ -206,7 +206,7 @@ export async function getPaymentAnalytics(
     }
 
     // Calculate outstanding balance for active projects
-    if (project.stage !== "Archived" && project.stage !== "Paid/Shipped" && total > 0) {
+    if (project.stage !== "Archived" && project.stage !== "Completed" && total > 0) {
       const depositPaid = project.depositPaidAmount || 0;
       const finalPaid = project.finalPaymentAmount || 0;
       const balance = total - depositPaid - finalPaid;

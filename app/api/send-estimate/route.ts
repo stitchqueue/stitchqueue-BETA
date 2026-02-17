@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     };
 
     const emailHtml = generateEstimateEmail(emailData);
-    const pdfBuffer = generateEstimatePDF(project, settings, estimateNumber);
+    const pdfBuffer = await generateEstimatePDF(project, settings, estimateNumber);
 
     // Send via Resend
     const { data: emailResult, error: emailError } = await resend.emails.send({

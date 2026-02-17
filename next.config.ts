@@ -5,13 +5,12 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   experimental: {
     serverActions: {
       allowedOrigins: [
         "localhost:3000",
-        "humble-fishstick-5g6qw4xpp4jxhv56j-3000.app.github.dev",
       ],
     },
   },

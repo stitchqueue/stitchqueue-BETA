@@ -17,7 +17,6 @@ const SUBSCRIPTION_EXEMPT_PATHS = [
   '/privacy',
   '/terms',
   '/approve',
-  '/test-supabase',
 ];
 
 function isSubscriptionExempt(pathname: string): boolean {
