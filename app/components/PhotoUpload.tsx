@@ -269,6 +269,37 @@ export default function PhotoUpload({
     if (pending.length === 0) return;
 
     setIsUploading(true);
+
+    // Server-side count check — fail fast before uploading to storage
+    const { count: serverCount, error: countError } = await supabase
+      .from("project_photos")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId);
+
+    if (countError) {
+      setToast({ message: "Failed to verify photo limit. Please try again.", type: "error" });
+      setIsUploading(false);
+      return;
+    }
+
+    const currentServerCount = serverCount || 0;
+    const slotsAvailable = maxPhotos - currentServerCount;
+
+    if (slotsAvailable <= 0) {
+      setToast({ message: `This project already has ${maxPhotos} photos (limit reached).`, type: "error" });
+      setIsUploading(false);
+      return;
+    }
+
+    if (pending.length > slotsAvailable) {
+      setToast({
+        message: `Can only upload ${slotsAvailable} more photo${slotsAvailable === 1 ? "" : "s"} (${currentServerCount} of ${maxPhotos} used).`,
+        type: "error",
+      });
+      setIsUploading(false);
+      return;
+    }
+
     let successCount = 0;
     let errorCount = 0;
 
