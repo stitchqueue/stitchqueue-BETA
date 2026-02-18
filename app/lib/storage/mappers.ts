@@ -115,12 +115,8 @@ export function mapProjectFromDb(row: any): Project {
 
     // ============================================================================
     // DEPRECATED FIELDS (v4.0) - kept for backward compatibility
+    // Tax fields removed — columns no longer exist in DB
     // ============================================================================
-    taxPrimaryRate: row.tax_primary_rate,
-    taxPrimaryAmount: row.tax_primary_amount,
-    taxSecondaryRate: row.tax_secondary_rate,
-    taxSecondaryAmount: row.tax_secondary_amount,
-    taxTotalAmount: row.tax_total_amount,
     finalPaymentAmount: row.final_payment_amount,
     finalPaymentDate: row.final_payment_date,
     finalPaymentMethod: row.final_payment_method,
@@ -201,12 +197,8 @@ export function mapProjectToDb(project: Project, orgId: string): any {
 
     // ============================================================================
     // DEPRECATED FIELDS (v4.0) - kept for backward compatibility
+    // Tax fields removed — columns no longer exist in DB
     // ============================================================================
-    tax_primary_rate: project.taxPrimaryRate,
-    tax_primary_amount: project.taxPrimaryAmount,
-    tax_secondary_rate: project.taxSecondaryRate,
-    tax_secondary_amount: project.taxSecondaryAmount,
-    tax_total_amount: project.taxTotalAmount,
     final_payment_amount: project.finalPaymentAmount,
     final_payment_date: project.finalPaymentDate,
     final_payment_method: project.finalPaymentMethod,
@@ -340,17 +332,8 @@ export function mapUpdatesToDb(updates: Partial<Project>): any {
 
   // ============================================================================
   // DEPRECATED FIELDS (v4.0) - kept for backward compatibility
+  // Tax fields removed — columns no longer exist in DB
   // ============================================================================
-  if (updates.taxPrimaryRate !== undefined)
-    dbUpdates.tax_primary_rate = updates.taxPrimaryRate;
-  if (updates.taxPrimaryAmount !== undefined)
-    dbUpdates.tax_primary_amount = updates.taxPrimaryAmount;
-  if (updates.taxSecondaryRate !== undefined)
-    dbUpdates.tax_secondary_rate = updates.taxSecondaryRate;
-  if (updates.taxSecondaryAmount !== undefined)
-    dbUpdates.tax_secondary_amount = updates.taxSecondaryAmount;
-  if (updates.taxTotalAmount !== undefined)
-    dbUpdates.tax_total_amount = updates.taxTotalAmount;
   if (updates.finalPaymentAmount !== undefined)
     dbUpdates.final_payment_amount = updates.finalPaymentAmount;
   if (updates.finalPaymentDate !== undefined)
