@@ -325,8 +325,21 @@ function ProjectDetailContent() {
     if (updating) return;
     setUpdating(true);
     try {
-      await storage.updateProject(project.id, { stage: newStage });
-      setProject({ ...project, stage: newStage });
+      // Auto-approve when moving from Estimates to In Progress
+      const autoApprove =
+        project.stage === "Estimates" && newStage === "In Progress";
+      const today = new Date().toISOString().split("T")[0];
+
+      const updates: Partial<Project> = {
+        stage: newStage,
+        ...(autoApprove && {
+          approvalStatus: true,
+          approvalDate: today,
+        }),
+      };
+
+      await storage.updateProject(project.id, updates);
+      setProject({ ...project, ...updates });
     } catch (error) {
       console.error("Error updating stage:", error);
       alert("Failed to update stage. Please try again.");
@@ -478,8 +491,8 @@ function ProjectDetailContent() {
         updates.stage = "In Progress" as Stage;
       }
 
-      // Move back to Estimates when removing approval
-      if (!pendingApprovalValue && project.stage === "In Progress" && project.approvalStatus) {
+      // Move back to Estimates when removing approval from any stage
+      if (!pendingApprovalValue && project.stage !== "Estimates" && project.approvalStatus) {
         updates.stage = "Estimates" as Stage;
       }
 
@@ -1565,10 +1578,10 @@ function ProjectDetailContent() {
           </div>
         )}
 
-        {/* Approval Section - Only for Estimates Stage */}
-        {project.stage === "Estimates" && (
+        {/* Approval Section - Visible in all stages (except Archived) */}
+        {project.stage !== "Archived" && (
           <div className="bg-white border border-line rounded-xl p-6 mb-6 print:hidden">
-            <h2 className="font-bold text-plum mb-4">Approval</h2>
+            <h2 className="font-bold text-plum mb-4">Estimate Approval</h2>
 
             <div className="space-y-4">
               {/* Approval Checkbox */}
@@ -1602,16 +1615,18 @@ function ProjectDetailContent() {
                       <div className="font-medium text-green-700">
                         Approved on {formatDate(project.approvalDate)}
                       </div>
-                      <div className="text-xs text-green-600 mt-1">
-                        Project will auto-advance to &quot;In Progress&quot; stage
-                      </div>
+                      {project.stage !== "Estimates" && (
+                        <div className="text-xs text-green-600 mt-1">
+                          Uncheck to move back to Estimates for re-approval
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
 
               {/* Info Box - When Not Approved */}
-              {!project.approvalStatus && (
+              {!project.approvalStatus && project.stage === "Estimates" && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <div className="flex items-start gap-2">
                     <span className="text-blue-600 text-xl">ℹ️</span>

@@ -373,6 +373,20 @@ export default function BoardContent() {
           return newProjects;
         });
 
+        // Auto-approve when dragging from Estimates to In Progress
+        const autoApprove =
+          project.stage === "Estimates" && targetStage === "In Progress";
+
+        if (autoApprove) {
+          setProjects((prev) =>
+            prev.map((p) =>
+              p.id === projectId
+                ? { ...p, approvalStatus: true, approvalDate: new Date().toISOString().split("T")[0] }
+                : p
+            )
+          );
+        }
+
         // Persist to database
         for (let i = 0; i < stageProjects.length; i++) {
           const p = stageProjects[i];
@@ -380,6 +394,10 @@ export default function BoardContent() {
             await storage.updateProject(p.id, {
               orderIndex: i,
               stage: targetStage !== project.stage ? targetStage : undefined,
+              ...(autoApprove && {
+                approvalStatus: true,
+                approvalDate: new Date().toISOString().split("T")[0],
+              }),
             });
           } else {
             await storage.updateProject(p.id, { orderIndex: i });
@@ -391,11 +409,23 @@ export default function BoardContent() {
 
         if (project.stage === newStage) return;
 
+        // Auto-approve when dragging from Estimates to In Progress
+        const autoApprove =
+          project.stage === "Estimates" && newStage === "In Progress";
+
         // Update UI immediately
         setProjects((prev) =>
           prev.map((p) =>
             p.id === projectId
-              ? { ...p, stage: newStage, orderIndex: undefined }
+              ? {
+                  ...p,
+                  stage: newStage,
+                  orderIndex: undefined,
+                  ...(autoApprove && {
+                    approvalStatus: true,
+                    approvalDate: new Date().toISOString().split("T")[0],
+                  }),
+                }
               : p
           )
         );
@@ -404,6 +434,10 @@ export default function BoardContent() {
         await storage.updateProject(projectId, {
           stage: newStage,
           orderIndex: undefined,
+          ...(autoApprove && {
+            approvalStatus: true,
+            approvalDate: new Date().toISOString().split("T")[0],
+          }),
         });
       }
     } catch (err) {
