@@ -539,6 +539,17 @@ function ProjectDetailContent() {
       }));
     }
 
+    // Pre-fill paid amount from invoiced amount when checking paid
+    if (item === 'paid' && checked) {
+      const invoicedAmt = project.invoicedAmount || estimate?.total || 0;
+      if (invoicedAmt > 0) {
+        setChecklistInputs(prev => ({
+          ...prev,
+          paidAmount: invoicedAmt.toFixed(2),
+        }));
+      }
+    }
+
     setShowChecklistConfirm(true);
   };
 
@@ -1212,16 +1223,18 @@ function ProjectDetailContent() {
                 {project.stage}
               </span>
             </div>
-            <button
-              onClick={() =>
-                router.push(
-                  `/calculator?projectId=${encodeURIComponent(project.id)}`
-                )
-              }
-              className="px-4 py-2 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors"
-            >
-              Estimate →
-            </button>
+            {project.stage !== "Completed" && project.stage !== "Archived" && (
+              <button
+                onClick={() =>
+                  router.push(
+                    `/calculator?projectId=${encodeURIComponent(project.id)}`
+                  )
+                }
+                className="px-4 py-2 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors"
+              >
+                Estimate →
+              </button>
+            )}
           </div>
 
           {/* Print-only stage display */}
@@ -1421,7 +1434,9 @@ function ProjectDetailContent() {
           </div>
         )}
 
-        {/* Payment Summary Card */}
+        {/* v5.1 DEPRECATED - Payment Summary hidden by ENABLE_DETAILED_PAYMENTS flag */}
+        {/* Payment tracking is now handled by the Completion Checklist */}
+        <FeatureGate flag="ENABLE_DETAILED_PAYMENTS">
         {hasEstimate && estimate && (
           <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-3 print:mb-2">
             <h2 className="font-bold text-plum mb-3 print:mb-2 print:text-sm">Payment Summary</h2>
@@ -1577,6 +1592,7 @@ function ProjectDetailContent() {
             </div>
           </div>
         )}
+        </FeatureGate>
 
         {/* Approval Section - Visible in all stages (except Archived) */}
         {project.stage !== "Archived" && (
