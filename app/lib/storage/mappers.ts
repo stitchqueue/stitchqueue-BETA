@@ -116,7 +116,6 @@ export function mapProjectFromDb(row: any): Project {
     // ============================================================================
     // DEPRECATED FIELDS (v4.0) - kept for backward compatibility
     // ============================================================================
-    taxExempt: row.tax_exempt,
     taxPrimaryRate: row.tax_primary_rate,
     taxPrimaryAmount: row.tax_primary_amount,
     taxSecondaryRate: row.tax_secondary_rate,
@@ -203,7 +202,6 @@ export function mapProjectToDb(project: Project, orgId: string): any {
     // ============================================================================
     // DEPRECATED FIELDS (v4.0) - kept for backward compatibility
     // ============================================================================
-    tax_exempt: project.taxExempt,
     tax_primary_rate: project.taxPrimaryRate,
     tax_primary_amount: project.taxPrimaryAmount,
     tax_secondary_rate: project.taxSecondaryRate,
@@ -343,8 +341,6 @@ export function mapUpdatesToDb(updates: Partial<Project>): any {
   // ============================================================================
   // DEPRECATED FIELDS (v4.0) - kept for backward compatibility
   // ============================================================================
-  if (updates.taxExempt !== undefined)
-    dbUpdates.tax_exempt = updates.taxExempt;
   if (updates.taxPrimaryRate !== undefined)
     dbUpdates.tax_primary_rate = updates.taxPrimaryRate;
   if (updates.taxPrimaryAmount !== undefined)
