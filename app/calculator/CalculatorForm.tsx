@@ -411,15 +411,16 @@ export default function CalculatorForm() {
   ]);
 
   // ─────────────────────────────────────────────────────────────────────
-  // BOC RATE CHECK (fetch once on mount)
+  // BOC RATE CHECK (fetch after auth is confirmed — settings loaded)
   // ─────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!settings) return; // Wait until user is authenticated and settings are loaded
     fetch("/api/boc-rate-check")
       .then((res) => res.ok ? res.json() : null)
       .then((data) => { if (data) setBocData(data); })
       .catch(() => {}); // Silently fail — don't break the calculator
-  }, []);
+  }, [settings]);
 
   // ─────────────────────────────────────────────────────────────────────
   // BOC WARNING CALCULATION
