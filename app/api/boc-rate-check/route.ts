@@ -1,0 +1,80 @@
+import { NextResponse } from 'next/server';
+import { requireAuth, isAuthError } from '@/app/lib/auth-guard';
+import { checkBOCAccess } from '@/app/lib/server-boc';
+import { createServiceRoleClient } from '@/app/lib/supabase-server';
+import { calculateMinimumRate } from '@/app/boc/utils/calculations';
+
+const NULL_RESPONSE = {
+  hasBOC: false,
+  targetRatePerSqIn: null,
+  sphRate: null,
+  targetHourlyWage: null,
+  monthlyOverhead: null,
+  projectsPerMonth: null,
+  incidentalsMinutes: null,
+};
+
+export async function GET() {
+  try {
+    const auth = await requireAuth();
+    if (isAuthError(auth)) return auth;
+
+    // Get user email for beta tester check
+    const { data: { user } } = await auth.supabase.auth.getUser();
+    const email = user?.email;
+
+    const access = await checkBOCAccess(auth.userId, email);
+    if (!access.hasPurchased) {
+      return NextResponse.json(NULL_RESPONSE);
+    }
+
+    // Load saved BOC settings
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+      .from('boc_settings')
+      .select('target_hourly_wage, sph_rate, monthly_overhead, projects_per_month, incidentals_minutes, avg_project_size')
+      .eq('user_id', auth.userId)
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json(NULL_RESPONSE);
+    }
+
+    const targetHourlyWage = (data.target_hourly_wage as number) ?? 0;
+    const sphRate = (data.sph_rate as number) ?? 2000;
+    const monthlyOverhead = (data.monthly_overhead as number) ?? 0;
+    const projectsPerMonth = (data.projects_per_month as number) ?? 10;
+    const incidentalsMinutes = (data.incidentals_minutes as number) ?? 0;
+    const avgProjectSize = (data.avg_project_size as number) ?? 6000;
+
+    // Run the same calculation engine the BOC page uses
+    const result = calculateMinimumRate({
+      targetHourlyWage,
+      sphRate,
+      monthlyOverhead,
+      projectsPerMonth,
+      incidentalsMinutes,
+      avgProjectSize,
+    });
+
+    if (!result.isValid || result.minimumRatePerSqIn <= 0) {
+      return NextResponse.json(NULL_RESPONSE);
+    }
+
+    return NextResponse.json({
+      hasBOC: true,
+      targetRatePerSqIn: result.minimumRatePerSqIn,
+      sphRate,
+      targetHourlyWage,
+      monthlyOverhead,
+      projectsPerMonth,
+      incidentalsMinutes,
+    });
+  } catch (error) {
+    console.error('BOC rate check error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

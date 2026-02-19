@@ -12,12 +12,22 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import { storage } from "../lib/storage";
 import { isFeatureEnabled } from "../lib/featureFlags";
 import type { Settings, Project, ExtraCharge } from "../types";
+
+interface BOCRateData {
+  hasBOC: boolean;
+  targetRatePerSqIn: number | null;
+  sphRate: number | null;
+  targetHourlyWage: number | null;
+  monthlyOverhead: number | null;
+  projectsPerMonth: number | null;
+  incidentalsMinutes: number | null;
+}
 
 // Import child components
 import {
@@ -142,6 +152,11 @@ export default function CalculatorForm() {
   const [taxSecondaryRate, setTaxSecondaryRate] = useState("");
   const [taxPrimaryAmount, setTaxPrimaryAmount] = useState(0);
   const [taxSecondaryAmount, setTaxSecondaryAmount] = useState(0);
+  // ─────────────────────────────────────────────────────────────────────
+  // BOC RATE WARNING STATE
+  // ─────────────────────────────────────────────────────────────────────
+  const [bocData, setBocData] = useState<BOCRateData | null>(null);
+
   // ─────────────────────────────────────────────────────────────────────
   // DERIVED FLAGS (computed from settings)
   // ─────────────────────────────────────────────────────────────────────
@@ -394,6 +409,45 @@ export default function CalculatorForm() {
     depositValue,
     settings,
   ]);
+
+  // ─────────────────────────────────────────────────────────────────────
+  // BOC RATE CHECK (fetch once on mount)
+  // ─────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    fetch("/api/boc-rate-check")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => { if (data) setBocData(data); })
+      .catch(() => {}); // Silently fail — don't break the calculator
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────
+  // BOC WARNING CALCULATION
+  // ─────────────────────────────────────────────────────────────────────
+
+  const bocWarning = useMemo(() => {
+    if (!bocData?.hasBOC || !bocData.targetRatePerSqIn || !bocData.sphRate || !bocData.targetHourlyWage) {
+      return null;
+    }
+
+    const width = parseFloat(quiltWidth) || 0;
+    const length = parseFloat(quiltLength) || 0;
+    const area = width * length;
+    if (area <= 0 || total <= 0) return null;
+
+    const currentRatePerSqIn = total / area;
+    if (currentRatePerSqIn >= bocData.targetRatePerSqIn) return null;
+
+    // Reverse-engineer implied hourly wage using the BOC formula
+    const overheadPerProject = (bocData.monthlyOverhead || 0) / (bocData.projectsPerMonth || 10);
+    const quiltingTimeMinutes = (area / bocData.sphRate) * 60;
+    const totalTimeMinutes = quiltingTimeMinutes + (bocData.incidentalsMinutes || 0);
+    const totalTimeHours = totalTimeMinutes / 60;
+    const impliedHourly = totalTimeHours > 0 ? (total - overheadPerProject) / totalTimeHours : 0;
+    const suggestedMinimum = bocData.targetRatePerSqIn * area;
+
+    return { impliedHourly, targetHourly: bocData.targetHourlyWage, suggestedMinimum };
+  }, [quiltWidth, quiltLength, total, bocData]);
 
   // ─────────────────────────────────────────────────────────────────────
   // SAVE HANDLER
@@ -807,6 +861,21 @@ export default function CalculatorForm() {
               depositPaymentMethod={depositPaymentMethod}
               formatCurrency={formatCurrency}
             />
+          )}
+
+          {/* BOC Rate Warning — only shown when user owns BOC, has saved settings, and is undercharging */}
+          {bocWarning && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mt-4">
+              <p className="text-sm text-amber-800">
+                <span className="font-bold">Heads up:</span> At this price you&apos;re
+                earning approximately{" "}
+                <span className="font-bold">{formatCurrency(bocWarning.impliedHourly)}/hr</span>
+                {" "}&mdash; your BOC target is{" "}
+                <span className="font-bold">{formatCurrency(bocWarning.targetHourly)}/hr</span>.
+                Consider charging at least{" "}
+                <span className="font-bold">{formatCurrency(bocWarning.suggestedMinimum)}</span>.
+              </p>
+            </div>
           )}
 
           {/* Deposit Configuration Section - hidden for donations (no payment to collect deposit on) */}
