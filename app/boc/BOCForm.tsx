@@ -19,6 +19,8 @@ import RateCalculatorSection from "./components/RateCalculatorSection";
 import OverheadSection from "./components/OverheadSection";
 import IncidentalsSection from "./components/IncidentalsSection";
 import ResultsCard from "./components/ResultsCard";
+import RevenueSection from "./components/RevenueSection";
+import MoneyLeftOnTableSection from "./components/MoneyLeftOnTableSection";
 import PerformanceDashboard from "./components/PerformanceDashboard";
 import DonatedQuiltsSection from "./components/DonatedQuiltsSection";
 
@@ -347,9 +349,25 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
           <ResultsCard results={results} />
         </div>
 
-        {/* Performance Dashboard + Donations — paywall gated */}
+        {/* Revenue, Rate Check, Performance, Donations — paywall gated */}
         {showDashboards ? (
           <>
+            {/* Revenue Section */}
+            {effectiveMode.isConnected && effectiveMode.hasProjects && (
+              <div className="mt-6">
+                <RevenueSection />
+              </div>
+            )}
+
+            {/* Money Left On Table */}
+            {effectiveMode.isConnected && effectiveMode.hasProjects && (
+              <div className="mt-6">
+                <MoneyLeftOnTableSection
+                  minimumRatePerSqIn={results?.isValid ? results.minimumRatePerSqIn : 0}
+                />
+              </div>
+            )}
+
             {/* Performance Dashboard */}
             {effectiveMode.isConnected && effectiveMode.hasProjects ? (
               <div className="mt-6">
