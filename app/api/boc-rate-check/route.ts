@@ -14,7 +14,7 @@ const NULL_RESPONSE = {
   incidentalsMinutes: null,
 };
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth();
     if (isAuthError(auth)) return auth;

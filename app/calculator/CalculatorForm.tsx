@@ -416,7 +416,7 @@ export default function CalculatorForm() {
 
   useEffect(() => {
     if (!settings) return; // Wait until user is authenticated and settings are loaded
-    fetch("/api/boc-rate-check")
+    fetch("/api/boc-rate-check", { method: "POST" })
       .then((res) => res.ok ? res.json() : null)
       .then((data) => { if (data) setBocData(data); })
       .catch(() => {}); // Silently fail — don't break the calculator
