@@ -427,6 +427,7 @@ export default function CalculatorForm() {
   // ─────────────────────────────────────────────────────────────────────
 
   const bocWarning = useMemo(() => {
+    console.log("BOC DEBUG:", { bocData, quiltWidth, quiltLength, total });
     if (!bocData?.hasBOC || !bocData.targetRatePerSqIn || !bocData.sphRate || !bocData.targetHourlyWage) {
       return null;
     }
