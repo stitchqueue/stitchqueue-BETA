@@ -6,6 +6,7 @@ import Header from "./components/Header";
 import Toast from "./components/Toast";
 import { storage } from "./lib/storage";
 import { supabase } from "./lib/supabase";
+import { getRevenueData, type RevenueData } from "./lib/storage/boc-performance";
 import type { User } from "@supabase/supabase-js";
 import type { Project, Settings } from "./types";
 
@@ -26,6 +27,15 @@ const STAGE_CONFIG = [
   { stage: "Estimates", icon: "📥", color: "bg-blue-100 text-blue-700" },
   { stage: "In Progress", icon: "🧵", color: "bg-orange-100 text-orange-700" },
   { stage: "Completed", icon: "✅", color: "bg-green-100 text-green-700" },
+];
+
+const ZERO_REVENUE_MESSAGES = [
+  "No revenue yet this month — maybe your clients are paying in fabric?",
+  "Zero dollars in — you must be on a well-deserved vacation!",
+  "Looks like you're giving it all away this month. Your clients love you.",
+  "No paid projects yet — go make yourself a coffee, it'll pick up!",
+  "All your quilts must be gifts this month. So generous!",
+  "Your invoices are probably just lost in the mail. Obviously.",
 ];
 
 function getGreeting(): string {
@@ -111,10 +121,14 @@ export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
   const [quote, setQuote] = useState("");
   const [showWelcomeBackToast, setShowWelcomeBackToast] = useState(false);
+  const [revenueData, setRevenueData] = useState<RevenueData | null>(null);
 
-  // Handle random quote client-side to avoid hydration mismatch (Bug #9 fix)
+  const [zeroRevenueMsg, setZeroRevenueMsg] = useState("");
+
+  // Handle random messages client-side to avoid hydration mismatch (Bug #9 fix)
   useEffect(() => {
     setQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
+    setZeroRevenueMsg(ZERO_REVENUE_MESSAGES[Math.floor(Math.random() * ZERO_REVENUE_MESSAGES.length)]);
   }, []);
 
   // Check if user came from 404 page
@@ -139,13 +153,15 @@ export default function HomePage() {
 
       setUser(user);
 
-      const [savedProjects, savedSettings] = await Promise.all([
+      const [savedProjects, savedSettings, revenue] = await Promise.all([
         storage.getProjects(),
         storage.getSettings(),
+        getRevenueData().catch(() => null),
       ]);
 
       setProjects(savedProjects);
       setSettings(savedSettings);
+      setRevenueData(revenue);
       setLoading(false);
     }
 
@@ -213,6 +229,58 @@ export default function HomePage() {
             {asapCount > 0 && ` • ${asapCount} high priority`}
           </p>
         </div>
+
+        {/* Revenue summary — always visible */}
+        {revenueData ? (() => {
+          const diff = revenueData.thisMonthRevenue - revenueData.lastMonthRevenue;
+          const diffAbs = Math.abs(diff);
+          const fmtCurrency = (n: number) =>
+            "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          return (
+            <div className="bg-white border-l-4 border-plum/40 rounded-xl p-4 mb-6 shadow-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Earned this month */}
+                <div>
+                  <p className="text-xs font-bold text-muted uppercase tracking-wide mb-1">
+                    Earned This Month
+                  </p>
+                  <p className="text-2xl font-bold" style={{ color: "#98823a" }}>
+                    {fmtCurrency(revenueData.thisMonthRevenue)}
+                  </p>
+                  <div className="mt-1">
+                    {diff > 0 ? (
+                      <p className="text-sm text-green-700">
+                        &uarr; {fmtCurrency(diffAbs)} more than last month
+                      </p>
+                    ) : diff < 0 ? (
+                      <p className="text-sm text-red-600">
+                        &darr; {fmtCurrency(diffAbs)} less than last month
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted">Same as last month</p>
+                    )}
+                  </div>
+                </div>
+                {/* In pipeline */}
+                <div>
+                  <p className="text-xs font-bold text-muted uppercase tracking-wide mb-1">
+                    In Pipeline
+                  </p>
+                  <p className="text-2xl font-bold text-plum/60">
+                    {fmtCurrency(revenueData.pipelineRevenue)}
+                  </p>
+                  <p className="text-sm text-muted mt-1">
+                    estimates + in progress + awaiting payment
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })() : (
+          <div className="bg-white border-l-4 border-plum/40 rounded-xl p-4 mb-6 shadow-sm">
+            <p className="text-sm text-muted italic">{zeroRevenueMsg}</p>
+          </div>
+        )}
 
         {/* Stage stat boxes — 3-stage workflow */}
         <div className="grid grid-cols-3 gap-3 mb-6">
