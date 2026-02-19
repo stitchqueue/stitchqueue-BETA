@@ -302,6 +302,8 @@ function ProjectDetailContent() {
   const hasEstimate = project.estimateData && (project.estimateData.total ?? 0) > 0;
   const estimate = project.estimateData;
 
+  // Effective project type: prefer projectType, fall back to invoiceType, default to regular
+  const effectiveProjectType = project.projectType || project.invoiceType || 'regular';
 
   // Check if user is PRO tier
   const isPro = settings?.isPaidTier || false;
@@ -531,16 +533,16 @@ function ProjectDetailContent() {
       deliveryDate: '',
     });
 
-    // Pre-fill amounts from estimate if checking invoiced
-    if (item === 'invoiced' && checked && estimate?.total) {
+    // Pre-fill amounts from estimate if checking invoiced (regular projects only)
+    if (item === 'invoiced' && checked && estimate?.total && effectiveProjectType === 'regular') {
       setChecklistInputs(prev => ({
         ...prev,
         invoicedAmount: estimate.total!.toFixed(2),
       }));
     }
 
-    // Pre-fill paid amount from invoiced amount when checking paid
-    if (item === 'paid' && checked) {
+    // Pre-fill paid amount from invoiced amount when checking paid (regular projects only)
+    if (item === 'paid' && checked && effectiveProjectType === 'regular') {
       const invoicedAmt = project.invoicedAmount || estimate?.total || 0;
       if (invoicedAmt > 0) {
         setChecklistInputs(prev => ({
@@ -571,7 +573,10 @@ function ProjectDetailContent() {
       if (pendingChecklistItem === 'invoiced') {
         updates.invoiced = pendingChecklistValue;
         if (pendingChecklistValue) {
-          updates.invoicedAmount = parseFloat(checklistInputs.invoicedAmount);
+          // Only save amount for regular projects; gift/charitable just need date
+          if (effectiveProjectType === 'regular') {
+            updates.invoicedAmount = parseFloat(checklistInputs.invoicedAmount);
+          }
           updates.invoicedDate = checklistInputs.invoicedDate;
         } else {
           updates.invoicedAmount = undefined;
@@ -589,7 +594,10 @@ function ProjectDetailContent() {
       } else if (pendingChecklistItem === 'delivered') {
         updates.delivered = pendingChecklistValue;
         if (pendingChecklistValue) {
-          updates.deliveryMethod = checklistInputs.deliveryMethod;
+          // Charitable projects only need date; regular and gift include delivery method
+          if (effectiveProjectType !== 'charitable') {
+            updates.deliveryMethod = checklistInputs.deliveryMethod;
+          }
           updates.deliveryDate = checklistInputs.deliveryDate;
         } else {
           updates.deliveryMethod = undefined;
@@ -597,8 +605,8 @@ function ProjectDetailContent() {
         }
       }
 
-      // Calculate balance remaining for regular projects
-      if (project.projectType === 'regular' || !project.projectType) {
+      // Calculate balance remaining for regular projects only
+      if (effectiveProjectType === 'regular') {
         const invoicedAmt = pendingChecklistItem === 'invoiced' && pendingChecklistValue
           ? parseFloat(checklistInputs.invoicedAmount)
           : project.invoicedAmount || 0;
@@ -653,13 +661,11 @@ function ProjectDetailContent() {
   const isChecklistComplete = (): boolean => {
     if (project.stage !== "Completed") return false;
 
-    const projectType = project.projectType || 'regular';
-
-    if (projectType === 'regular') {
+    if (effectiveProjectType === 'regular') {
       return !!(project.invoiced && project.paid && project.delivered);
-    } else if (projectType === 'gift') {
+    } else if (effectiveProjectType === 'gift') {
       return !!(project.invoiced && project.delivered);
-    } else if (projectType === 'charitable') {
+    } else if (effectiveProjectType === 'charitable') {
       return !!(project.invoiced && project.delivered);
     }
 
@@ -719,7 +725,10 @@ function ProjectDetailContent() {
     let hasErrors = false;
 
     if (pendingChecklistItem === 'invoiced') {
-      errors.invoicedAmount = validateAmount(checklistInputs.invoicedAmount, 'invoicedAmount');
+      // Only validate amount for regular projects; gift/charitable just need date
+      if (effectiveProjectType === 'regular') {
+        errors.invoicedAmount = validateAmount(checklistInputs.invoicedAmount, 'invoicedAmount');
+      }
       errors.invoicedDate = validateDate(checklistInputs.invoicedDate);
       hasErrors = !!(errors.invoicedAmount || errors.invoicedDate);
     } else if (pendingChecklistItem === 'paid') {
@@ -727,7 +736,10 @@ function ProjectDetailContent() {
       errors.paidDate = validateDate(checklistInputs.paidDate);
       hasErrors = !!(errors.paidAmount || errors.paidDate);
     } else if (pendingChecklistItem === 'delivered') {
-      errors.deliveryMethod = validateDeliveryMethod(checklistInputs.deliveryMethod);
+      // Only validate delivery method for regular and gift; charitable just needs date
+      if (effectiveProjectType !== 'charitable') {
+        errors.deliveryMethod = validateDeliveryMethod(checklistInputs.deliveryMethod);
+      }
       errors.deliveryDate = validateDate(checklistInputs.deliveryDate);
       hasErrors = !!(errors.deliveryMethod || errors.deliveryDate);
     }
@@ -870,9 +882,16 @@ function ProjectDetailContent() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-plum mb-3">
-              {pendingChecklistValue
-                ? `Mark as ${pendingChecklistItem.charAt(0).toUpperCase() + pendingChecklistItem.slice(1)}?`
-                : `Remove ${pendingChecklistItem.charAt(0).toUpperCase() + pendingChecklistItem.slice(1)} status?`}
+              {(() => {
+                const itemLabel = pendingChecklistItem === 'invoiced'
+                  ? effectiveProjectType === 'gift' ? 'Gift Invoice Generated'
+                    : effectiveProjectType === 'charitable' ? 'Donation Receipt Generated'
+                    : 'Invoiced'
+                  : pendingChecklistItem!.charAt(0).toUpperCase() + pendingChecklistItem!.slice(1);
+                return pendingChecklistValue
+                  ? `Mark as ${itemLabel}?`
+                  : `Remove ${itemLabel} status?`;
+              })()}
             </h3>
             <p className="text-sm text-gray-600 mb-4">
               {pendingChecklistValue
@@ -885,31 +904,34 @@ function ProjectDetailContent() {
               <div className="space-y-3 mb-4">
                 {pendingChecklistItem === 'invoiced' && (
                   <>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Amount *</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={checklistInputs.invoicedAmount}
-                        onChange={(e) => {
-                          setChecklistInputs(prev => ({ ...prev, invoicedAmount: e.target.value }));
-                          setValidationErrors(prev => ({ ...prev, invoicedAmount: '' }));
-                        }}
-                        onBlur={(e) => {
-                          const error = validateAmount(e.target.value, 'invoicedAmount');
-                          setValidationErrors(prev => ({ ...prev, invoicedAmount: error }));
-                        }}
-                        className={`w-full px-3 py-2 border rounded-lg text-sm ${
-                          validationErrors.invoicedAmount
-                            ? 'border-red-500 focus:ring-red-500'
-                            : 'border-line focus:ring-plum'
-                        }`}
-                        placeholder="0.00"
-                      />
-                      {validationErrors.invoicedAmount && (
-                        <p className="text-xs text-red-600 mt-1">{validationErrors.invoicedAmount}</p>
-                      )}
-                    </div>
+                    {/* Amount field only for regular projects */}
+                    {effectiveProjectType === 'regular' && (
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Amount *</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={checklistInputs.invoicedAmount}
+                          onChange={(e) => {
+                            setChecklistInputs(prev => ({ ...prev, invoicedAmount: e.target.value }));
+                            setValidationErrors(prev => ({ ...prev, invoicedAmount: '' }));
+                          }}
+                          onBlur={(e) => {
+                            const error = validateAmount(e.target.value, 'invoicedAmount');
+                            setValidationErrors(prev => ({ ...prev, invoicedAmount: error }));
+                          }}
+                          className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                            validationErrors.invoicedAmount
+                              ? 'border-red-500 focus:ring-red-500'
+                              : 'border-line focus:ring-plum'
+                          }`}
+                          placeholder="0.00"
+                        />
+                        {validationErrors.invoicedAmount && (
+                          <p className="text-xs text-red-600 mt-1">{validationErrors.invoicedAmount}</p>
+                        )}
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Date *</label>
                       <input
@@ -993,31 +1015,34 @@ function ProjectDetailContent() {
 
                 {pendingChecklistItem === 'delivered' && (
                   <>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Delivery Method *</label>
-                      <select
-                        value={checklistInputs.deliveryMethod}
-                        onChange={(e) => {
-                          setChecklistInputs(prev => ({
-                            ...prev,
-                            deliveryMethod: e.target.value as 'pickup' | 'shipped' | 'mailed'
-                          }));
-                          setValidationErrors(prev => ({ ...prev, deliveryMethod: '' }));
-                        }}
-                        className={`w-full px-3 py-2 border rounded-lg text-sm ${
-                          validationErrors.deliveryMethod
-                            ? 'border-red-500 focus:ring-red-500'
-                            : 'border-line focus:ring-plum'
-                        }`}
-                      >
-                        <option value="pickup">Pickup</option>
-                        <option value="shipped">Shipped</option>
-                        <option value="mailed">Mailed</option>
-                      </select>
-                      {validationErrors.deliveryMethod && (
-                        <p className="text-xs text-red-600 mt-1">{validationErrors.deliveryMethod}</p>
-                      )}
-                    </div>
+                    {/* Delivery method for regular and gift projects only */}
+                    {effectiveProjectType !== 'charitable' && (
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Delivery Method *</label>
+                        <select
+                          value={checklistInputs.deliveryMethod}
+                          onChange={(e) => {
+                            setChecklistInputs(prev => ({
+                              ...prev,
+                              deliveryMethod: e.target.value as 'pickup' | 'shipped' | 'mailed'
+                            }));
+                            setValidationErrors(prev => ({ ...prev, deliveryMethod: '' }));
+                          }}
+                          className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                            validationErrors.deliveryMethod
+                              ? 'border-red-500 focus:ring-red-500'
+                              : 'border-line focus:ring-plum'
+                          }`}
+                        >
+                          <option value="pickup">Pickup</option>
+                          <option value="shipped">Shipped</option>
+                          <option value="mailed">Mailed</option>
+                        </select>
+                        {validationErrors.deliveryMethod && (
+                          <p className="text-xs text-red-600 mt-1">{validationErrors.deliveryMethod}</p>
+                        )}
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Date *</label>
                       <input
@@ -1688,7 +1713,7 @@ function ProjectDetailContent() {
 
             <div className="space-y-4">
               {/* REGULAR PROJECT CHECKLIST */}
-              {(!project.projectType || project.projectType === 'regular') && (
+              {effectiveProjectType === 'regular' && (
                 <>
                   {/* Invoiced */}
                   <div className="border border-line rounded-lg p-4">
@@ -1789,7 +1814,7 @@ function ProjectDetailContent() {
               )}
 
               {/* GIFT PROJECT CHECKLIST */}
-              {project.projectType === 'gift' && (
+              {effectiveProjectType === 'gift' && (
                 <>
                   {/* Gift Invoice */}
                   <div className="border border-line rounded-lg p-4">
@@ -1840,7 +1865,7 @@ function ProjectDetailContent() {
               )}
 
               {/* CHARITABLE PROJECT CHECKLIST */}
-              {project.projectType === 'charitable' && (
+              {effectiveProjectType === 'charitable' && (
                 <>
                   {/* Donation Invoice */}
                   <div className="border border-line rounded-lg p-4">
@@ -1854,7 +1879,7 @@ function ProjectDetailContent() {
                       />
                       <div className="flex-1">
                         <div className="font-medium text-gray-900 group-hover:text-plum transition-colors">
-                          Donation Invoice Generated
+                          Donation Receipt Generated
                         </div>
                         {project.invoiced && (
                           <div className="text-sm text-green-700 mt-1">

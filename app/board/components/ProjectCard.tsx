@@ -244,7 +244,7 @@ function CompletedStageContent({ project }: { project: Project }) {
             {project.invoiced ? "✓" : "○"}
           </span>
           <span className={project.invoiced ? "text-gray-700" : "text-gray-500"}>
-            Donation Invoice
+            Donation Receipt
             {project.invoiced && project.invoicedDate
               ? ` • ${formatDate(project.invoicedDate)}`
               : ""}

@@ -493,13 +493,13 @@ export default function CalculatorForm() {
         taxSecondaryAmount: settings.taxSecondaryEnabled ? taxSecondaryAmount : undefined,
         taxTotalAmount: taxAmount,
         total,
-        depositType: depositAmount > 0 ? depositType : undefined,
+        depositType: !isDonation && depositAmount > 0 ? depositType : undefined,
         depositPercentage:
-          depositType === "percentage" ? parseFloat(depositValue) || 0 : undefined,
+          !isDonation && depositType === "percentage" ? parseFloat(depositValue) || 0 : undefined,
         depositFlat:
-          depositType === "flat" ? parseFloat(depositValue) || 0 : undefined,
-        depositAmount,
-        balanceDue,
+          !isDonation && depositType === "flat" ? parseFloat(depositValue) || 0 : undefined,
+        depositAmount: isDonation ? 0 : depositAmount,
+        balanceDue: isDonation ? total : balanceDue,
         createdAt:
           existingProject?.estimateData?.createdAt || new Date().toISOString(),
       };
@@ -558,19 +558,19 @@ export default function CalculatorForm() {
         taxSecondaryRate: settings.taxSecondaryEnabled ? (parseFloat(taxSecondaryRate) || 0) : undefined,
         taxSecondaryAmount: settings.taxSecondaryEnabled ? taxSecondaryAmount : undefined,
         taxTotalAmount: taxAmount,
-        depositType: depositAmount > 0 ? depositType : undefined,
+        depositType: !isDonation && depositAmount > 0 ? depositType : undefined,
         depositPercentage:
-          depositType === "percentage" ? parseFloat(depositValue) || 0 : undefined,
-        depositAmount,
-        depositPaid: depositReceivedToday && depositAmount > 0,
+          !isDonation && depositType === "percentage" ? parseFloat(depositValue) || 0 : undefined,
+        depositAmount: isDonation ? 0 : depositAmount,
+        depositPaid: !isDonation && depositReceivedToday && depositAmount > 0,
         depositPaidDate:
-          depositReceivedToday && depositAmount > 0 ? today : undefined,
+          !isDonation && depositReceivedToday && depositAmount > 0 ? today : undefined,
         depositPaidMethod:
-          depositReceivedToday && depositAmount > 0
+          !isDonation && depositReceivedToday && depositAmount > 0
             ? depositPaymentMethod
             : undefined,
         depositPaidAmount:
-          depositReceivedToday && depositAmount > 0 ? depositAmount : undefined,
+          !isDonation && depositReceivedToday && depositAmount > 0 ? depositAmount : undefined,
         estimateData,
         updatedAt: new Date().toISOString(),
       };
@@ -809,20 +809,22 @@ export default function CalculatorForm() {
             />
           )}
 
-          {/* Deposit Configuration Section */}
-          <DepositSection
-            depositType={depositType}
-            setDepositType={setDepositType}
-            depositValue={depositValue}
-            setDepositValue={setDepositValue}
-            depositReceivedToday={depositReceivedToday}
-            setDepositReceivedToday={setDepositReceivedToday}
-            depositPaymentMethod={depositPaymentMethod}
-            setDepositPaymentMethod={setDepositPaymentMethod}
-            depositAmount={depositAmount}
-            balanceDue={balanceDue}
-            formatCurrency={formatCurrency}
-          />
+          {/* Deposit Configuration Section - hidden for donations (no payment to collect deposit on) */}
+          {!isDonation && (
+            <DepositSection
+              depositType={depositType}
+              setDepositType={setDepositType}
+              depositValue={depositValue}
+              setDepositValue={setDepositValue}
+              depositReceivedToday={depositReceivedToday}
+              setDepositReceivedToday={setDepositReceivedToday}
+              depositPaymentMethod={depositPaymentMethod}
+              setDepositPaymentMethod={setDepositPaymentMethod}
+              depositAmount={depositAmount}
+              balanceDue={balanceDue}
+              formatCurrency={formatCurrency}
+            />
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 mt-6">

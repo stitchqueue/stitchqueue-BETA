@@ -380,9 +380,9 @@ export default function EstimateSummary({
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────
-          DEPOSIT SUMMARY (shown in total section when deposit > 0)
+          DEPOSIT SUMMARY (shown in total section when deposit > 0, hidden for donations)
           ───────────────────────────────────────────────────────────────── */}
-      {depositAmount > 0 && (
+      {!isDonation && depositAmount > 0 && (
         <div className="mt-4 p-3 bg-gold/10 rounded-xl space-y-2">
           <div className="flex justify-between text-sm">
             <span className="font-bold text-gold">
