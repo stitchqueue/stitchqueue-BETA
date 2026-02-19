@@ -14,13 +14,11 @@ interface AuthResult {
  * Returns a NextResponse error (401/403) on failure — caller should return it immediately.
  */
 export async function requireAuth(): Promise<AuthResult | NextResponse> {
-  console.log('[auth-guard] requireAuth called');
   const supabase = await createAuthenticatedClient();
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    console.log('[auth-guard] Auth failed — userError:', userError?.message || 'no error', '| user:', user ? 'exists' : 'null');
     return NextResponse.json(
       { error: 'Authentication required' },
       { status: 401 }

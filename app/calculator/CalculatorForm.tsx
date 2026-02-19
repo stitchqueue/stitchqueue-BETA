@@ -16,6 +16,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import { storage } from "../lib/storage";
+import { supabase } from "../lib/supabase";
 import { isFeatureEnabled } from "../lib/featureFlags";
 import type { Settings, Project, ExtraCharge } from "../types";
 
@@ -416,10 +417,23 @@ export default function CalculatorForm() {
 
   useEffect(() => {
     if (!settings) return; // Wait until user is authenticated and settings are loaded
-    fetch("/api/boc-rate-check", { method: "POST" })
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => { if (data) setBocData(data); })
-      .catch(() => {}); // Silently fail — don't break the calculator
+    async function fetchBocRate() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      try {
+        const res = await fetch("/api/boc-rate-check", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data) setBocData(data);
+        }
+      } catch {
+        // Silently fail — don't break the calculator
+      }
+    }
+    fetchBocRate();
   }, [settings]);
 
   // ─────────────────────────────────────────────────────────────────────
@@ -427,7 +441,6 @@ export default function CalculatorForm() {
   // ─────────────────────────────────────────────────────────────────────
 
   const bocWarning = useMemo(() => {
-    console.log("BOC DEBUG:", { bocData, quiltWidth, quiltLength, total });
     if (!bocData?.hasBOC || !bocData.targetRatePerSqIn || !bocData.sphRate || !bocData.targetHourlyWage) {
       return null;
     }

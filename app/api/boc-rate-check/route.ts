@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, isAuthError } from '@/app/lib/auth-guard';
 import { checkBOCAccess } from '@/app/lib/server-boc';
 import { createServiceRoleClient } from '@/app/lib/supabase-server';
 import { calculateMinimumRate } from '@/app/boc/utils/calculations';
@@ -16,26 +15,38 @@ const NULL_RESPONSE = {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('[boc-rate-check] Request received');
-    console.log('[boc-rate-check] Headers:', JSON.stringify(Object.fromEntries(request.headers.entries())));
-    const auth = await requireAuth();
-    if (isAuthError(auth)) return auth;
+    // Authenticate via Authorization header (client passes its session token)
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+    const token = authHeader.slice(7);
 
-    // Get user email for beta tester check
-    const { data: { user } } = await auth.supabase.auth.getUser();
-    const email = user?.email;
+    const supabase = createServiceRoleClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
-    const access = await checkBOCAccess(auth.userId, email);
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const email = user.email;
+
+    const access = await checkBOCAccess(user.id, email);
     if (!access.hasPurchased) {
       return NextResponse.json(NULL_RESPONSE);
     }
 
     // Load saved BOC settings
-    const supabase = createServiceRoleClient();
     const { data, error } = await supabase
       .from('boc_settings')
       .select('target_hourly_wage, sph_rate, monthly_overhead, projects_per_month, incidentals_minutes, avg_project_size')
-      .eq('user_id', auth.userId)
+      .eq('user_id', user.id)
       .single();
 
     if (error || !data) {
