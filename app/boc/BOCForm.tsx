@@ -56,8 +56,7 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
 
   // ── Form state ─────────────────────────────────────────────────────
   const [targetHourlyWage, setTargetHourlyWage] = useState("");
-  const [experienceLevel, setExperienceLevel] =
-    useState<ExperienceLevel>("experienced");
+  const [sphRate, setSphRate] = useState(SPH_RATES.experienced);
   const [projectsPerMonth, setProjectsPerMonth] = useState("10");
   const [avgProjectSize, setAvgProjectSize] = useState("6000");
 
@@ -69,7 +68,9 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
   const [results, setResults] = useState<BOCCalculationResults | null>(null);
 
   // ── Derived values ──────────────────────────────────────────────────
-  const sphRate = SPH_RATES[experienceLevel];
+  // Derive nearest experience level from SPH for saving to settings
+  const experienceLevel: ExperienceLevel =
+    sphRate <= 1800 ? "novice" : sphRate <= 2200 ? "experienced" : "expert";
 
   const overheadTotal = useMemo(
     () => overheadItems.reduce((sum, item) => sum + (item.amount || 0), 0),
@@ -113,7 +114,7 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
 
   function applySettings(s: BOCSettings) {
     setTargetHourlyWage(s.targetHourlyWage ? String(s.targetHourlyWage) : "");
-    setExperienceLevel(s.experienceLevel);
+    setSphRate(s.sphRate || SPH_RATES[s.experienceLevel] || SPH_RATES.experienced);
     setProjectsPerMonth(s.projectsPerMonth ? String(s.projectsPerMonth) : "10");
     setAvgProjectSize(s.avgProjectSize ? String(s.avgProjectSize) : "6000");
     setOverheadItems(s.overheadItems.length > 0 ? s.overheadItems : DEFAULT_OVERHEAD_ITEMS);
@@ -316,9 +317,8 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
           <RateCalculatorSection
             targetHourlyWage={targetHourlyWage}
             onTargetHourlyWageChange={setTargetHourlyWage}
-            experienceLevel={experienceLevel}
-            onExperienceLevelChange={setExperienceLevel}
             sphRate={sphRate}
+            onSphRateChange={setSphRate}
             projectsPerMonth={projectsPerMonth}
             onProjectsPerMonthChange={setProjectsPerMonth}
             avgProjectSize={avgProjectSize}

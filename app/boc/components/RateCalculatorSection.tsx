@@ -1,33 +1,33 @@
 "use client";
 
-import type { ExperienceLevel } from "../../types";
-import { SPH_RATES } from "../../types";
 import Tooltip from "../../components/Tooltip";
+
+// ── SPH Slider Snap Points ──────────────────────────────────────────────────
+// Beta feedback may require adjusting these values
+const SPH_MIN = 1500;
+const SPH_MAX = 3500;
+const SPH_SNAP_POINTS = [
+  { value: 1600, label: "Beginner" },
+  { value: 2000, label: "Intermediate" },
+  { value: 2400, label: "Advanced" },
+] as const;
 
 interface Props {
   targetHourlyWage: string;
   onTargetHourlyWageChange: (v: string) => void;
-  experienceLevel: ExperienceLevel;
-  onExperienceLevelChange: (v: ExperienceLevel) => void;
   sphRate: number;
+  onSphRateChange: (v: number) => void;
   projectsPerMonth: string;
   onProjectsPerMonthChange: (v: string) => void;
   avgProjectSize: string;
   onAvgProjectSizeChange: (v: string) => void;
 }
 
-const LEVELS: { value: ExperienceLevel; label: string }[] = [
-  { value: "novice", label: "Novice" },
-  { value: "experienced", label: "Experienced" },
-  { value: "expert", label: "Expert" },
-];
-
 export default function RateCalculatorSection({
   targetHourlyWage,
   onTargetHourlyWageChange,
-  experienceLevel,
-  onExperienceLevelChange,
   sphRate,
+  onSphRateChange,
   projectsPerMonth,
   onProjectsPerMonthChange,
   avgProjectSize,
@@ -91,34 +91,49 @@ export default function RateCalculatorSection({
         </div>
       </div>
 
-      {/* Experience level radio buttons */}
+      {/* SPH Slider */}
       <div className="mt-4">
         <label className="block text-sm font-bold text-muted mb-2">
-          Experience Level
+          Quilting Speed (Stitches Per Hour)
         </label>
-        <div className="flex flex-wrap gap-4">
-          {LEVELS.map((level) => (
-            <label key={level.value} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="experienceLevel"
-                value={level.value}
-                checked={experienceLevel === level.value}
-                onChange={() => onExperienceLevelChange(level.value)}
-                className="accent-plum"
-              />
-              <span className="text-sm">
-                {level.label}{" "}
-                <span className="text-muted">
-                  ({SPH_RATES[level.value].toLocaleString()} SPH)
-                </span>
-              </span>
-            </label>
-          ))}
+
+        <div className="px-1">
+          <input
+            type="range"
+            min={SPH_MIN}
+            max={SPH_MAX}
+            step={1}
+            value={sphRate}
+            onChange={(e) => onSphRateChange(parseInt(e.target.value, 10))}
+            className="w-full h-2 rounded-lg cursor-pointer accent-[#4e283a]"
+          />
+
+          {/* Snap point markers below the slider track */}
+          <div className="relative w-full mt-1" style={{ height: 32 }}>
+            {SPH_SNAP_POINTS.map((point) => {
+              const pct =
+                ((point.value - SPH_MIN) / (SPH_MAX - SPH_MIN)) * 100;
+              return (
+                <button
+                  key={point.value}
+                  type="button"
+                  onClick={() => onSphRateChange(point.value)}
+                  className="absolute -translate-x-1/2 text-center cursor-pointer hover:text-plum transition-colors"
+                  style={{ left: `${pct}%` }}
+                >
+                  <div className="w-1.5 h-1.5 rounded-full bg-plum/40 mx-auto mb-0.5" />
+                  <span className="text-xs text-muted whitespace-nowrap">
+                    {point.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
+
         <p className="text-xs text-muted mt-1">
-          SPH = Stitches Per Hour — your effective quilting speed at this level.
           Currently: <strong>{sphRate.toLocaleString()} SPH</strong>
+          {" · "}Drag to adjust, or click a label to snap.
         </p>
       </div>
     </div>
