@@ -16,6 +16,8 @@ const NULL_RESPONSE = {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[boc-rate-check] Request received');
+    console.log('[boc-rate-check] Headers:', JSON.stringify(Object.fromEntries(request.headers.entries())));
     const auth = await requireAuth();
     if (isAuthError(auth)) return auth;
 
