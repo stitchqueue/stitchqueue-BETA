@@ -110,6 +110,7 @@ export function mapProjectFromDb(row: any): Project {
     depositPaidAmount: row.deposit_paid_amount,
     estimateData: row.estimate_data,
     notes: row.notes || [],
+    projectNotes: row.project_notes || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
 
@@ -192,6 +193,7 @@ export function mapProjectToDb(project: Project, orgId: string): any {
     deposit_paid_amount: project.depositPaidAmount,
     estimate_data: project.estimateData,
     notes: project.notes,
+    project_notes: project.projectNotes,
     created_at: project.createdAt,
     updated_at: project.updatedAt,
 
@@ -329,6 +331,7 @@ export function mapUpdatesToDb(updates: Partial<Project>): any {
   if (updates.estimateData !== undefined)
     dbUpdates.estimate_data = updates.estimateData;
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+  if (updates.projectNotes !== undefined) dbUpdates.project_notes = updates.projectNotes;
 
   // ============================================================================
   // DEPRECATED FIELDS (v4.0) - kept for backward compatibility

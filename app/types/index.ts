@@ -174,6 +174,7 @@ export interface Project {
     createdAt?: string;
   };
   notes?: Note[];
+  projectNotes?: string;
   attachments?: Attachment[];
   createdAt: string;
   updatedAt: string;

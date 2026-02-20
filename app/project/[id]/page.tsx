@@ -97,6 +97,10 @@ function ProjectDetailContent() {
     deliveryDate: '',
   });
 
+  // Notes state
+  const [notesValue, setNotesValue] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
+
   // Photo state
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [photoCount, setPhotoCount] = useState(0);
@@ -135,6 +139,7 @@ function ProjectDetailContent() {
         setProject(savedProject || null);
         setSettings(savedSettings);
         setOrganizationId(orgId);
+        setNotesValue(savedProject?.projectNotes || "");
 
         // Pre-fill payment amount with balance due
         if (savedProject?.estimateData?.total) {
@@ -654,6 +659,21 @@ function ProjectDetailContent() {
       console.error("Error archiving project:", error);
       showToast("Failed to archive project. Please try again.", "error");
       setUpdating(false);
+    }
+  };
+
+  const handleNotesSave = async () => {
+    if (notesValue === (project.projectNotes || "")) return;
+    setSavingNotes(true);
+    try {
+      await storage.updateProject(project.id, { projectNotes: notesValue });
+      setProject({ ...project, projectNotes: notesValue });
+      showToast("Notes saved", "success");
+    } catch (error) {
+      console.error("Error saving notes:", error);
+      showToast("Failed to save notes. Please try again.", "error");
+    } finally {
+      setSavingNotes(false);
     }
   };
 
@@ -1355,6 +1375,19 @@ function ProjectDetailContent() {
               </p>
             </div>
           )}
+        </div>
+
+        {/* Notes Section */}
+        <div className="bg-white border border-line rounded-xl p-6 mb-6 print:border-gray-300 print:p-3 print:mb-3">
+          <h2 className="font-bold text-plum mb-3">Notes</h2>
+          <textarea
+            value={notesValue}
+            onChange={(e) => setNotesValue(e.target.value)}
+            onBlur={handleNotesSave}
+            disabled={savingNotes}
+            placeholder="Add internal notes, client preferences, or project updates..."
+            className="w-full min-h-[150px] px-4 py-3 border border-line rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-plum focus:border-plum disabled:opacity-50 print:border-gray-300"
+          />
         </div>
 
         {/* Estimate Summary (if estimate exists) */}
