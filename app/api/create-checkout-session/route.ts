@@ -43,11 +43,7 @@ export async function POST(request: NextRequest) {
       customerId = customer.id;
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-    if (!baseUrl) {
-      console.error('NEXT_PUBLIC_APP_URL is not configured');
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
-    }
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://beta.stitchqueue.com';
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,

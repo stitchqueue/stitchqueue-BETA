@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
                 ${safeDueDate ? `<p><strong>Preferred Date:</strong> ${safeDueDate}</p>` : ""}
                 ${safeDescription ? `<p><strong>Notes:</strong> ${safeDescription}</p>` : ""}
                 <p style="margin-top: 20px;">
-                  <a href="${process.env.NEXT_PUBLIC_APP_URL}/board" style="background: #4e283a; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                  <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://beta.stitchqueue.com'}/board" style="background: #4e283a; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
                     View in StitchQueue
                   </a>
                 </p>
