@@ -25,6 +25,7 @@ export const BETA_TESTER_EMAILS: string[] = [
   'meganandchad2012@gmail.com',
   'reimerem@gmail.com',
   'capellerk@gmail.com',
+  'matt@churchfinancepros.com',
 ];
 
 export interface ServerSubscriptionResult {
