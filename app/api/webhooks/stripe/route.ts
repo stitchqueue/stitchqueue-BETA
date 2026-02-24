@@ -28,6 +28,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
+  // Idempotency: skip already-processed events (Stripe can retry deliveries)
+  const { data: existing } = await supabase
+    .from('stripe_events')
+    .select('event_id')
+    .eq('event_id', event.id)
+    .single();
+
+  if (existing) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
+  // Record the event before processing so retries during handling are also caught
+  const { error: insertError } = await supabase
+    .from('stripe_events')
+    .insert({ event_id: event.id, event_type: event.type });
+
+  if (insertError) {
+    // If insert fails due to unique constraint, another request is handling it
+    if (insertError.code === '23505') {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+    console.error('Error recording stripe event:', insertError);
+    return NextResponse.json({ error: 'Failed to record event' }, { status: 500 });
+  }
+
   try {
     switch (event.type) {
       case 'checkout.session.completed':
