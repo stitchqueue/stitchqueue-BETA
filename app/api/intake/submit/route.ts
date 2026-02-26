@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       client_supplies_backing: clientSuppliesBacking === true,
       client_supplies_batting: clientSuppliesBatting === true,
       service_type: serviceType?.trim() || null,
-      due_date: dueDate,
+      requested_completion_date: dueDate,
       description: description?.trim() || null,
       requested_date_type: dueDate ? "specific_date" : "no_date",
       source: "intake_form",
