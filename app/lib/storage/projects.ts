@@ -156,8 +156,8 @@ export async function updateProject(
     .select();
 
   if (error) {
-    console.error("Error updating project:", error.message, error.details, error.hint);
-    throw new Error(error.message);
+    console.error("Error updating project:", JSON.stringify(error, null, 2));
+    throw new Error(`DB Error: ${error.message} | Code: ${error.code} | Details: ${error.details} | Hint: ${error.hint}`);
   }
 
   if (!data || data.length === 0) {
