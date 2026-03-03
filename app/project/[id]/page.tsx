@@ -311,12 +311,6 @@ function ProjectDetailContent() {
   // Effective project type: prefer projectType, fall back to invoiceType, default to regular
   const effectiveProjectType = project.projectType || project.invoiceType || 'regular';
 
-  // Check if user is PRO tier
-  const isPro = settings?.isPaidTier || false;
-
-  // Determine if send buttons should be shown
-  const canSendEstimate = hasEstimate;
-  const canSendInvoice = hasEstimate;
   // Calculate balance due
   const getBalanceDue = (): number => {
     if (!estimate?.total) return 0;
@@ -1176,61 +1170,45 @@ function ProjectDetailContent() {
             </button>
             {/* Send Estimate Button */}
             {hasEstimate && (
-              <div className="relative group">
-                <button
-                  onClick={() => {
-                    if (!isPro) return;
-                    if (!project.clientEmail) {
-                      showToast("Please add client email address first", "error");
-                      return;
-                    }
-                    setShowEstimateConfirm(true);
-                  }}
-                  disabled={sendingEmail || !project.clientEmail}
-                  className={`px-4 py-2 border rounded-xl font-bold transition-colors ${
-                    isPro && project.clientEmail
-                      ? 'border-gold bg-gold text-white hover:bg-gold/90'
-                      : 'border-line bg-gray-200 text-gray-400 cursor-not-allowed'
-                  }`}
-                  title={!isPro ? "Upgrade to PRO to send emails" : !project.clientEmail ? "Add client email first" : "Send estimate email"}
-                >
-                  📧 Estimate
-                </button>
-                {!isPro && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                    Upgrade to PRO
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => {
+                  if (!project.clientEmail) {
+                    showToast("Please add a client email address before sending", "error");
+                    return;
+                  }
+                  setShowEstimateConfirm(true);
+                }}
+                disabled={sendingEmail}
+                className={`px-4 py-2 border rounded-xl font-bold transition-colors ${
+                  project.clientEmail
+                    ? 'border-gold bg-gold text-white hover:bg-gold/90'
+                    : 'border-gold/50 bg-gold/20 text-gold hover:bg-gold/30'
+                }`}
+                title={!project.clientEmail ? "Add client email first" : "Send estimate email"}
+              >
+                📧 Estimate
+              </button>
             )}
             {/* Send Invoice Button */}
             {hasEstimate && (
-              <div className="relative group">
-                <button
-                  onClick={() => {
-                    if (!isPro) return;
-                    if (!project.clientEmail) {
-                      showToast("Please add client email address first", "error");
-                      return;
-                    }
-                    setShowInvoiceConfirm(true);
-                  }}
-                  disabled={sendingEmail || !project.clientEmail}
-                  className={`px-4 py-2 border rounded-xl font-bold transition-colors ${
-                    isPro && project.clientEmail
-                      ? 'border-gold bg-gold text-white hover:bg-gold/90'
-                      : 'border-line bg-gray-200 text-gray-400 cursor-not-allowed'
-                  }`}
-                  title={!isPro ? "Upgrade to PRO to send emails" : !project.clientEmail ? "Add client email first" : "Send invoice email"}
-                >
-                  📧 Invoice
-                </button>
-                {!isPro && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                    Upgrade to PRO
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => {
+                  if (!project.clientEmail) {
+                    showToast("Please add a client email address before sending", "error");
+                    return;
+                  }
+                  setShowInvoiceConfirm(true);
+                }}
+                disabled={sendingEmail}
+                className={`px-4 py-2 border rounded-xl font-bold transition-colors ${
+                  project.clientEmail
+                    ? 'border-gold bg-gold text-white hover:bg-gold/90'
+                    : 'border-gold/50 bg-gold/20 text-gold hover:bg-gold/30'
+                }`}
+                title={!project.clientEmail ? "Add client email first" : "Send invoice email"}
+              >
+                📧 Invoice
+              </button>
             )}
             <button
               onClick={() => router.push("/board")}
