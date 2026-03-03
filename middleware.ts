@@ -17,6 +17,7 @@ const SUBSCRIPTION_EXEMPT_PATHS = [
   '/privacy',
   '/terms',
   '/approve',
+  '/intake',
 ];
 
 function isSubscriptionExempt(pathname: string): boolean {
@@ -98,6 +99,6 @@ export const config = {
      * - /api/approve-estimate (public HMAC-protected endpoint)
      * - /api/feedback (public feedback endpoint)
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|icon\\.|apple-icon\\.|api/webhooks|api/intake|api/approve-estimate|api/feedback).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|icon\\.|apple-icon\\.|api/webhooks|api/intake|api/approve-estimate|api/feedback|intake).*)',
   ],
 };
