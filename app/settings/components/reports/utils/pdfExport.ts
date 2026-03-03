@@ -9,6 +9,7 @@
 import { jsPDF } from "jspdf";
 import type { Settings } from "@/app/types";
 import type { DateRange } from "./dateHelpers";
+import { getTodayDate } from "../../../../lib/utils";
 
 /**
  * PDF Generation Configuration
@@ -420,7 +421,7 @@ export function exportClientsPDF(
   }
 
   addFooters(doc, config.pageWidth, config.pageHeight);
-  doc.save(`client-analysis-${new Date().toISOString().split("T")[0]}.pdf`);
+  doc.save(`client-analysis-${getTodayDate()}.pdf`);
 }
 
 /**

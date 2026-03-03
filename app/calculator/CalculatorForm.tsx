@@ -46,6 +46,7 @@ import {
   calculateTotals,
   getNextEstimateNumberAtomic,
 } from "./utils";
+import { getTodayDate } from "../lib/utils";
 
 /**
  * Main calculator form component.
@@ -488,7 +489,7 @@ export default function CalculatorForm() {
     setSaving(true);
 
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = getTodayDate();
 
       // Use existing estimate number if editing, otherwise get next atomically
       let estimateNumber: number;

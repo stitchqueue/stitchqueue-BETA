@@ -14,7 +14,7 @@ export function formatDate(dateString: string): string {
 }
 
 export function getTodayDate(): string {
-  return new Date().toISOString().split("T")[0];
+  return new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0];
 }
 
 export function getClientFullName(project: Project): string {

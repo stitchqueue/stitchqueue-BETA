@@ -7,6 +7,7 @@
  */
 
 import type { DateRange } from "./dateHelpers";
+import { getTodayDate } from "../../../../lib/utils";
 
 /**
  * Download CSV file
@@ -129,7 +130,7 @@ export function exportMaterialsCSV(
  * Export client analysis to CSV
  */
 export function exportClientsCSV(reportData: any): void {
-  const filename = `client-report-${new Date().toISOString().split("T")[0]}.csv`;
+  const filename = `client-report-${getTodayDate()}.csv`;
 
   const clientRows = (reportData.topClientsByRevenue || []).map(
     (client: any) => [
@@ -233,7 +234,7 @@ export function exportAllProjectsCSV(projects: any[]): void {
   ]);
 
   const csv = arrayToCSV([headers, ...rows]);
-  const filename = `stitchqueue-export-${new Date().toISOString().split("T")[0]}.csv`;
+  const filename = `stitchqueue-export-${getTodayDate()}.csv`;
 
   downloadCSV(csv, filename);
 }
