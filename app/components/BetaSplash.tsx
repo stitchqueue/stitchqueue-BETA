@@ -167,7 +167,7 @@ export default function BetaSplash({
               © 2026 Stitched By Susan. All rights reserved.
             </p>
             <p className="text-[#98823a] text-xs mt-1">
-              Questions? Contact David Smith at beta@stitchqueue.com
+              Questions? Contact David Smith at <a href="mailto:beta@stitchqueue.com" className="text-[#98823a] hover:underline">beta@stitchqueue.com</a>
             </p>
           </div>
         </div>

@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabase";
+import { validators } from "../lib/validation";
 
 export default function SignupPage() {
   const [businessName, setBusinessName] = useState("");
@@ -16,6 +17,13 @@ export default function SignupPage() {
   async function handleSignup(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+
+    // Validate email format
+    const emailError = validators.email(email, "Email");
+    if (emailError) {
+      setError(emailError.message);
+      return;
+    }
 
     // Validate passwords match
     if (password !== confirmPassword) {

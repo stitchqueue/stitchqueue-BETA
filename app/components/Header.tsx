@@ -137,6 +137,18 @@ export default function Header() {
                 {/* Divider */}
                 <div className="border-t border-line" />
 
+                {/* Contact Support */}
+                <a
+                  href="mailto:support@stitchqueue.com"
+                  className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-plum/5 hover:text-plum transition-colors flex items-center gap-3"
+                >
+                  <span className="text-base">📧</span>
+                  <span className="font-medium">Contact Support</span>
+                </a>
+
+                {/* Divider */}
+                <div className="border-t border-line" />
+
                 {/* Sign Out */}
                 <button
                   onClick={handleLogout}

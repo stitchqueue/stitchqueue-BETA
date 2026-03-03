@@ -130,6 +130,15 @@ export default function BoardContent() {
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [stageError, setStageError] = useState<string | null>(null);
 
+  // Confirmation dialog for moving back to Estimates
+  const [pendingEstimatesMove, setPendingEstimatesMove] = useState<{
+    projectId: string;
+    previousProjects: Project[];
+    targetStage: Stage;
+    // For card-drop: the reordered stage projects list
+    stageProjects?: Project[];
+  } | null>(null);
+
   // ─────────────────────────────────────────────────────────────────────
   // DRAG SENSORS
   // ─────────────────────────────────────────────────────────────────────
@@ -356,6 +365,20 @@ export default function BoardContent() {
 
         stageProjects.splice(targetIndex, 0, { ...project, stage: targetStage });
 
+        // Check if moving TO Estimates from another stage (needs confirmation)
+        const movingToEstimates =
+          targetStage === "Estimates" && project.stage !== "Estimates";
+
+        if (movingToEstimates) {
+          setPendingEstimatesMove({
+            projectId,
+            previousProjects,
+            targetStage,
+            stageProjects,
+          });
+          return;
+        }
+
         // Update UI immediately so the card moves before the DB call
         setProjects((prev) => {
           const newProjects = [...prev];
@@ -410,6 +433,19 @@ export default function BoardContent() {
 
         if (project.stage === newStage) return;
 
+        // Check if moving TO Estimates from another stage (needs confirmation)
+        const movingToEstimates =
+          newStage === "Estimates" && project.stage !== "Estimates";
+
+        if (movingToEstimates) {
+          setPendingEstimatesMove({
+            projectId,
+            previousProjects,
+            targetStage: newStage,
+          });
+          return;
+        }
+
         // Auto-approve when dragging from Estimates to In Progress
         const autoApprove =
           project.stage === "Estimates" && newStage === "In Progress";
@@ -454,6 +490,81 @@ export default function BoardContent() {
 
   const handleDragCancel = () => {
     setActiveProject(null);
+  };
+
+  // Confirm moving project back to Estimates (resets approval)
+  const handleConfirmEstimatesMove = async () => {
+    if (!pendingEstimatesMove) return;
+    const { projectId, previousProjects, targetStage, stageProjects } = pendingEstimatesMove;
+    setPendingEstimatesMove(null);
+
+    try {
+      if (stageProjects) {
+        // Card-drop path: reorder within the target column
+        setProjects((prev) => {
+          const newProjects = [...prev];
+          stageProjects.forEach((p, index) => {
+            const idx = newProjects.findIndex((np) => np.id === p.id);
+            if (idx !== -1) {
+              newProjects[idx] = {
+                ...newProjects[idx],
+                orderIndex: index,
+                ...(p.id === projectId
+                  ? { stage: targetStage, approvalStatus: false, approvalDate: undefined }
+                  : {}),
+              };
+            }
+          });
+          return newProjects;
+        });
+
+        for (let i = 0; i < stageProjects.length; i++) {
+          const p = stageProjects[i];
+          if (p.id === projectId) {
+            await storage.updateProject(p.id, {
+              orderIndex: i,
+              stage: targetStage,
+              approvalStatus: false,
+              approvalDate: undefined,
+            });
+          } else {
+            await storage.updateProject(p.id, { orderIndex: i });
+          }
+        }
+      } else {
+        // Empty-column-drop path
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === projectId
+              ? {
+                  ...p,
+                  stage: targetStage,
+                  orderIndex: undefined,
+                  approvalStatus: false,
+                  approvalDate: undefined,
+                }
+              : p
+          )
+        );
+
+        await storage.updateProject(projectId, {
+          stage: targetStage,
+          orderIndex: undefined,
+          approvalStatus: false,
+          approvalDate: undefined,
+        });
+      }
+    } catch (err) {
+      console.error("Error moving project to Estimates:", err);
+      setProjects(previousProjects);
+      const message = err instanceof Error ? err.message : "Failed to move project";
+      setStageError(message);
+      setTimeout(() => setStageError(null), 8000);
+    }
+  };
+
+  const handleCancelEstimatesMove = () => {
+    setPendingEstimatesMove(null);
   };
 
   // ─────────────────────────────────────────────────────────────────────
@@ -503,6 +614,40 @@ export default function BoardContent() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+
+      {/* Confirmation Modal - Move back to Estimates */}
+      {pendingEstimatesMove && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-plum mb-3">Move Back to Estimates?</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Moving this project back to Estimates will remove its approval status.
+            </p>
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+              <div className="flex items-start gap-2">
+                <span className="text-orange-600 text-lg">⚠️</span>
+                <div className="text-sm text-orange-700">
+                  The project will return to &quot;Pending Approval&quot; and will need to be re-approved before moving back to In Progress.
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmEstimatesMove}
+                className="flex-1 px-4 py-3 bg-plum text-white rounded-xl font-bold hover:bg-plum/90 transition-colors"
+              >
+                Move to Estimates
+              </button>
+              <button
+                onClick={handleCancelEstimatesMove}
+                className="px-4 py-3 border border-line rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         <TrialBanner />

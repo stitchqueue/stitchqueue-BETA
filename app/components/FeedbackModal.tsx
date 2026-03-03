@@ -30,7 +30,9 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  const userEmail = user?.email || "";
+  const hasAuthEmail = !!user?.email;
+  const [manualEmail, setManualEmail] = useState("");
+  const userEmail = user?.email || manualEmail;
 
   useEffect(() => {
     if (isOpen) {
@@ -155,12 +157,23 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Your Email</label>
-              <input
-                type="email"
-                value={userEmail}
-                readOnly
-                className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 cursor-not-allowed"
-              />
+              {hasAuthEmail ? (
+                <input
+                  type="email"
+                  value={userEmail}
+                  readOnly
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 cursor-not-allowed"
+                />
+              ) : (
+                <input
+                  type="email"
+                  value={manualEmail}
+                  onChange={(e) => setManualEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-plum/20 focus:border-plum transition-colors"
+                />
+              )}
             </div>
 
             <div>
