@@ -148,6 +148,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     console.error('Error upserting subscription on checkout:', error);
     throw error;
   }
+
+  // Also update organization subscription_tier to 'pro'
+  await supabase
+    .from('organizations')
+    .update({ subscription_tier: 'pro' })
+    .eq('id', organizationId);
 }
 
 /**
@@ -222,12 +228,26 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
     console.error('Error updating subscription:', error);
     throw error;
   }
+
+  // Sync subscription_tier to organizations table
+  const tier = ['active', 'trialing'].includes(subscription.status) ? 'pro' : 'free';
+  await supabase
+    .from('organizations')
+    .update({ subscription_tier: tier })
+    .eq('id', organizationId);
 }
 
 /**
  * customer.subscription.deleted — subscription canceled or expired.
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  // Look up organization_id before updating, so we can sync subscription_tier
+  const { data: subRecord } = await supabase
+    .from('subscriptions')
+    .select('organization_id')
+    .eq('stripe_subscription_id', subscription.id)
+    .single();
+
   const { error } = await supabase
     .from('subscriptions')
     .update({
@@ -240,6 +260,14 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   if (error) {
     console.error('Error marking subscription canceled:', error);
     throw error;
+  }
+
+  // Downgrade organization to free tier
+  if (subRecord?.organization_id) {
+    await supabase
+      .from('organizations')
+      .update({ subscription_tier: 'free' })
+      .eq('id', subRecord.organization_id);
   }
 }
 
