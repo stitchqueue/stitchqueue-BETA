@@ -5,7 +5,7 @@ import { Project, Settings } from '@/app/types';
 
 /**
  * Generate estimate PDF content as Buffer
- * Note: Invoice PDFs are not generated via email - invoices are reference documents
+ * Note: Job summary PDFs are not generated via email - job summaries are reference documents
  * for quilters to use in their accounting software (QuickBooks/Xero)
  */
 export function generateEstimatePDF(
@@ -98,8 +98,8 @@ ${settings?.businessName || 'StitchQueue'}
 }
 
 /**
- * @deprecated Invoice PDFs are not sent via email
- * Invoices serve as reference documents for accounting software only
+ * @deprecated Job summary PDFs are not sent via email
+ * Job summaries serve as reference documents for accounting software only
  * This function is kept for backwards compatibility but should not be called
  */
 export function generateInvoicePDF(
@@ -107,6 +107,6 @@ export function generateInvoicePDF(
   settings: Settings,
   invoiceNumber: string
 ): Buffer {
-  console.warn('generateInvoicePDF is deprecated - invoices are not sent via email');
-  return Buffer.from('Invoice PDFs are not generated for email');
+  console.warn('generateInvoicePDF is deprecated - job summaries are not sent via email');
+  return Buffer.from('Job summary PDFs are not generated for email');
 }

@@ -162,7 +162,7 @@ function CompletedStageContent({ project }: { project: Project }) {
             {project.invoiced ? "✓" : "○"}
           </span>
           <span className={project.invoiced ? "text-gray-700" : "text-gray-500"}>
-            Invoiced
+            Job Summary
             {project.invoiced && project.invoicedAmount
               ? ` ${formatCurrency(project.invoicedAmount)}`
               : ""}
@@ -214,7 +214,7 @@ function CompletedStageContent({ project }: { project: Project }) {
             {project.invoiced ? "✓" : "○"}
           </span>
           <span className={project.invoiced ? "text-gray-700" : "text-gray-500"}>
-            Gift Invoice
+            Gift Summary
             {project.invoiced && project.invoicedDate
               ? ` • ${formatDate(project.invoicedDate)}`
               : ""}

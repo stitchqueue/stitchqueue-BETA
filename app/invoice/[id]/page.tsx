@@ -40,11 +40,11 @@ export default function InvoicePage() {
   // Set document title for PDF naming
   useEffect(() => {
     if (project?.estimateNumber) {
-      const docType = invoiceType === "charitable" 
-        ? "Donation" 
-        : invoiceType === "gift" 
-        ? "Gift" 
-        : "Invoice";
+      const docType = invoiceType === "charitable"
+        ? "Donation"
+        : invoiceType === "gift"
+        ? "Gift"
+        : "Job Summary";
       document.title = `StitchQueue ${docType} #${project.estimateNumber}`;
     }
     return () => {
@@ -95,7 +95,7 @@ export default function InvoicePage() {
           setPaymentAmount(balanceDue.toFixed(2));
         }
       } catch (error) {
-        console.error("Error loading invoice data:", error);
+        console.error("Error loading job summary data:", error);
       } finally {
         setLoading(false);
       }
@@ -207,14 +207,14 @@ export default function InvoicePage() {
       });
 
       const messages = {
-        regular: "Invoice type set to regular.",
-        gift: "Invoice marked as gift - no payment due.",
-        charitable: "Invoice marked as charitable donation.",
+        regular: "Document type set to regular job summary.",
+        gift: "Document marked as gift - no payment due.",
+        charitable: "Document marked as charitable donation.",
       };
       alert(messages[invoiceType]);
     } catch (error) {
-      console.error("Error updating invoice type:", error);
-      alert("Failed to update invoice type. Please try again.");
+      console.error("Error updating document type:", error);
+      alert("Failed to update document type. Please try again.");
     } finally {
       setUpdating(false);
     }
@@ -310,7 +310,7 @@ export default function InvoicePage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-plum mx-auto mb-4"></div>
-          <p className="text-muted">Loading invoice...</p>
+          <p className="text-muted">Loading job summary...</p>
         </div>
       </div>
     );
@@ -328,7 +328,7 @@ export default function InvoicePage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <p className="text-muted mb-4">Invoice not found.</p>
+          <p className="text-muted mb-4">Job summary not found.</p>
           <button
             onClick={() => router.back()}
             className="px-4 py-2 border border-line rounded-xl hover:bg-white"
@@ -500,7 +500,7 @@ export default function InvoicePage() {
               onClick={handlePrint}
               className="px-6 py-2 bg-plum text-white rounded-xl font-bold hover:bg-plum/90"
             >
-              🖨️ Print Invoice
+              🖨️ Print Job Summary
             </button>
           </div>
         </div>
@@ -511,9 +511,9 @@ export default function InvoicePage() {
         <div className="print:hidden bg-white border border-line rounded-xl p-4 mb-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h3 className="font-bold text-plum">Invoice Type</h3>
+              <h3 className="font-bold text-plum">Document Type</h3>
               <p className="text-sm text-muted">
-                Set whether this is a regular invoice, gift, or charitable donation
+                Set whether this is a regular job summary, gift, or charitable donation
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -522,7 +522,7 @@ export default function InvoicePage() {
                 onChange={(e) => setInvoiceType(e.target.value as "regular" | "gift" | "charitable")}
                 className="px-4 py-2 border border-line rounded-xl font-medium min-w-[200px]"
               >
-                <option value="regular">Regular Invoice</option>
+                <option value="regular">Regular Job Summary</option>
                 <option value="gift">🎁 Gift (no payment due)</option>
                 <option value="charitable">💜 Charitable Donation</option>
               </select>
@@ -587,9 +587,9 @@ export default function InvoicePage() {
           {isGift && (
             <div className="border-t border-line pt-4 mt-4">
               <div className="bg-pink-50 p-3 rounded-xl text-sm">
-                <p className="font-bold text-pink-700 mb-1">Gift Invoice</p>
+                <p className="font-bold text-pink-700 mb-1">Gift Summary</p>
                 <p className="text-pink-600">
-                  This invoice shows the value of work donated to a friend or family member. 
+                  This summary shows the value of work donated to a friend or family member.
                   No payment is expected and no tax deduction applies.
                 </p>
               </div>
@@ -755,12 +755,12 @@ export default function InvoicePage() {
                 className="text-2xl font-bold print:text-xl"
                 style={{ color: settings.brandPrimaryColor || "#4e283a" }}
               >
-                {isCharitable ? "DONATION RECEIPT" : isGift ? "GIFT RECEIPT" : "INVOICE"}
+                {isCharitable ? "DONATION RECEIPT" : isGift ? "GIFT RECEIPT" : "Job Summary"}
               </h2>
               <div className="text-xs mt-1 space-y-0.5">
                 <div>
                   <span className="text-gray-500">
-                    {isGiftOrDonation ? "Receipt" : "Invoice"} #:
+                    {isGiftOrDonation ? "Receipt" : "Job Summary"} #:
                   </span>{" "}
                   <span className="font-bold">
                     {isCharitable ? `💜 ${invoiceNumber}` : isGift ? `🎁 ${invoiceNumber}` : invoiceNumber}
@@ -1047,7 +1047,7 @@ export default function InvoicePage() {
                 ? "This receipt is for your tax records."
                 : isGift
                 ? "This receipt shows the value of the gifted quilting work."
-                : "Payment is due upon receipt unless otherwise arranged."
+                : "Payment details are managed through your accounting software."
               }
               {settings.email && ` Questions? Contact us at ${settings.email}`}
             </p>

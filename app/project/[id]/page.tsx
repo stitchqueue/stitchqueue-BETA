@@ -65,7 +65,6 @@ function ProjectDetailContent() {
 
   // Email sending state
   const [showEstimateConfirm, setShowEstimateConfirm] = useState(false);
-  const [showInvoiceConfirm, setShowInvoiceConfirm] = useState(false);
 
   // Toast notification state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -205,48 +204,6 @@ function ProjectDetailContent() {
       setSendingEmail(false);
     }
   };
-
-  const handleSendInvoice = async () => {
-    if (!project?.clientEmail) {
-      showToast("Client email address is required to send invoice", "error");
-      return;
-    }
-
-    setSendingEmail(true);
-    setShowInvoiceConfirm(false);
-
-    try {
-      const response = await fetch('/api/send-invoice', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projectId: project.id,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send invoice');
-      }
-
-      const updatedProject = await storage.getProjectById(projectId);
-      setProject(updatedProject || null);
-
-      showToast(`Invoice sent to ${project.clientEmail}!`, "success");
-    } catch (error) {
-      console.error('Error sending invoice:', error);
-      showToast(
-        error instanceof Error ? error.message : 'Failed to send invoice',
-        "error"
-      );
-    } finally {
-      setSendingEmail(false);
-    }
-  };
-
 
   const handlePrint = () => {
     window.print();
@@ -541,13 +498,15 @@ function ProjectDetailContent() {
       }));
     }
 
-    // Pre-fill paid amount from invoiced amount when checking paid (regular projects only)
+    // Pre-fill paid amount with remaining balance when checking paid (regular projects only)
     if (item === 'paid' && checked && effectiveProjectType === 'regular') {
       const invoicedAmt = project.invoicedAmount || estimate?.total || 0;
-      if (invoicedAmt > 0) {
+      const depositAmt = project.depositPaidAmount || 0;
+      const remainingBalance = invoicedAmt - depositAmt;
+      if (remainingBalance > 0) {
         setChecklistInputs(prev => ({
           ...prev,
-          paidAmount: invoicedAmt.toFixed(2),
+          paidAmount: remainingBalance.toFixed(2),
         }));
       }
     }
@@ -573,9 +532,9 @@ function ProjectDetailContent() {
       if (pendingChecklistItem === 'invoiced') {
         updates.invoiced = pendingChecklistValue;
         if (pendingChecklistValue) {
-          // Only save amount for regular projects; gift/charitable just need date
+          // Use estimate total as source of truth for regular projects
           if (effectiveProjectType === 'regular') {
-            updates.invoicedAmount = parseFloat(checklistInputs.invoicedAmount);
+            updates.invoicedAmount = estimate?.total || 0;
           }
           updates.invoicedDate = checklistInputs.invoicedDate;
         } else {
@@ -607,11 +566,11 @@ function ProjectDetailContent() {
 
       // Calculate balance remaining for regular projects only
       if (effectiveProjectType === 'regular') {
-        const invoicedAmt = pendingChecklistItem === 'invoiced' && pendingChecklistValue
-          ? parseFloat(checklistInputs.invoicedAmount)
+        const invoicedAmt = pendingChecklistItem === 'invoiced'
+          ? (pendingChecklistValue ? (estimate?.total || 0) : 0)
           : project.invoicedAmount || 0;
-        const paidAmt = pendingChecklistItem === 'paid' && pendingChecklistValue
-          ? parseFloat(checklistInputs.paidAmount)
+        const paidAmt = pendingChecklistItem === 'paid'
+          ? (pendingChecklistValue ? parseFloat(checklistInputs.paidAmount) : 0)
           : project.paidAmount || 0;
         const depositAmt = project.depositPaidAmount || 0;
 
@@ -625,7 +584,7 @@ function ProjectDetailContent() {
         ...updates,
       });
 
-      const itemName = pendingChecklistItem.charAt(0).toUpperCase() + pendingChecklistItem.slice(1);
+      const itemName = pendingChecklistItem === 'invoiced' ? 'Job Summary' : pendingChecklistItem.charAt(0).toUpperCase() + pendingChecklistItem.slice(1);
       if (pendingChecklistValue) {
         showToast(`${itemName} status updated!`, "success");
       } else {
@@ -740,12 +699,9 @@ function ProjectDetailContent() {
     let hasErrors = false;
 
     if (pendingChecklistItem === 'invoiced') {
-      // Only validate amount for regular projects; gift/charitable just need date
-      if (effectiveProjectType === 'regular') {
-        errors.invoicedAmount = validateAmount(checklistInputs.invoicedAmount, 'invoicedAmount');
-      }
+      // Amount is auto-set from estimate total, only validate date
       errors.invoicedDate = validateDate(checklistInputs.invoicedDate);
-      hasErrors = !!(errors.invoicedAmount || errors.invoicedDate);
+      hasErrors = !!(errors.invoicedDate);
     } else if (pendingChecklistItem === 'paid') {
       errors.paidAmount = validateAmount(checklistInputs.paidAmount, 'paidAmount');
       errors.paidDate = validateDate(checklistInputs.paidDate);
@@ -818,37 +774,6 @@ function ProjectDetailContent() {
         </div>
       )}
 
-      {/* Confirmation Modal - Send Invoice */}
-      {showInvoiceConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-plum mb-3">Send Invoice Email</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Send invoice #{project.estimateNumber} to <strong>{project.clientEmail}</strong>?
-            </p>
-            <p className="text-xs text-gray-500 mb-6">
-              The client will receive a professional email with payment details and a PDF attachment.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleSendInvoice}
-                disabled={sendingEmail}
-                className="flex-1 px-4 py-3 bg-gold text-white rounded-xl font-bold hover:bg-gold/90 transition-colors disabled:opacity-50"
-              >
-                {sendingEmail ? "Sending..." : "Send Invoice"}
-              </button>
-              <button
-                onClick={() => setShowInvoiceConfirm(false)}
-                disabled={sendingEmail}
-                className="px-4 py-3 border border-line rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Confirmation Modal - Approval Status */}
       {showApprovalConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -899,9 +824,9 @@ function ProjectDetailContent() {
             <h3 className="text-lg font-bold text-plum mb-3">
               {(() => {
                 const itemLabel = pendingChecklistItem === 'invoiced'
-                  ? effectiveProjectType === 'gift' ? 'Gift Invoice Generated'
+                  ? effectiveProjectType === 'gift' ? 'Gift Summary Created'
                     : effectiveProjectType === 'charitable' ? 'Donation Receipt Generated'
-                    : 'Invoiced'
+                    : 'Job Summary Created'
                   : pendingChecklistItem!.charAt(0).toUpperCase() + pendingChecklistItem!.slice(1);
                 return pendingChecklistValue
                   ? `Mark as ${itemLabel}?`
@@ -919,32 +844,14 @@ function ProjectDetailContent() {
               <div className="space-y-3 mb-4">
                 {pendingChecklistItem === 'invoiced' && (
                   <>
-                    {/* Amount field only for regular projects */}
+                    {/* Read-only amount display for regular projects */}
                     {effectiveProjectType === 'regular' && (
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">Amount *</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={checklistInputs.invoicedAmount}
-                          onChange={(e) => {
-                            setChecklistInputs(prev => ({ ...prev, invoicedAmount: e.target.value }));
-                            setValidationErrors(prev => ({ ...prev, invoicedAmount: '' }));
-                          }}
-                          onBlur={(e) => {
-                            const error = validateAmount(e.target.value, 'invoicedAmount');
-                            setValidationErrors(prev => ({ ...prev, invoicedAmount: error }));
-                          }}
-                          className={`w-full px-3 py-2 border rounded-lg text-sm ${
-                            validationErrors.invoicedAmount
-                              ? 'border-red-500 focus:ring-red-500'
-                              : 'border-line focus:ring-plum'
-                          }`}
-                          placeholder="0.00"
-                        />
-                        {validationErrors.invoicedAmount && (
-                          <p className="text-xs text-red-600 mt-1">{validationErrors.invoicedAmount}</p>
-                        )}
+                        <label className="block text-xs text-gray-600 mb-1">Job Summary Amount</label>
+                        <div className="w-full px-3 py-2 border border-line rounded-lg text-sm bg-gray-50 font-medium text-gray-700">
+                          {formatCurrency(estimate?.total || 0)}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Auto-calculated from estimate total</p>
                       </div>
                     )}
                     <div>
@@ -1189,25 +1096,14 @@ function ProjectDetailContent() {
                 📧 Estimate
               </button>
             )}
-            {/* Send Invoice Button */}
+            {/* View Job Summary Button */}
             {hasEstimate && (
               <button
-                onClick={() => {
-                  if (!project.clientEmail) {
-                    showToast("Please add a client email address before sending", "error");
-                    return;
-                  }
-                  setShowInvoiceConfirm(true);
-                }}
-                disabled={sendingEmail}
-                className={`px-4 py-2 border rounded-xl font-bold transition-colors ${
-                  project.clientEmail
-                    ? 'border-gold bg-gold text-white hover:bg-gold/90'
-                    : 'border-gold/50 bg-gold/20 text-gold hover:bg-gold/30'
-                }`}
-                title={!project.clientEmail ? "Add client email first" : "Send invoice email"}
+                onClick={() => router.push(`/invoice/${encodeURIComponent(project.id)}`)}
+                className="px-4 py-2 border border-plum bg-plum/10 text-plum rounded-xl font-bold hover:bg-plum/20 transition-colors"
+                title="View job summary"
               >
-                📧 Invoice
+                📄 Job Summary
               </button>
             )}
             <button
@@ -1727,7 +1623,7 @@ function ProjectDetailContent() {
               {/* REGULAR PROJECT CHECKLIST */}
               {effectiveProjectType === 'regular' && (
                 <>
-                  {/* Invoiced */}
+                  {/* Job Summary Created */}
                   <div className="border border-line rounded-lg p-4">
                     <label className="flex items-start gap-3 cursor-pointer group">
                       <input
@@ -1739,7 +1635,7 @@ function ProjectDetailContent() {
                       />
                       <div className="flex-1">
                         <div className="font-medium text-gray-900 group-hover:text-plum transition-colors">
-                          Invoiced
+                          Job Summary Created
                         </div>
                         {project.invoiced && (
                           <div className="text-sm text-green-700 mt-1">
@@ -1817,7 +1713,7 @@ function ProjectDetailContent() {
                       </div>
                       {(project.balanceRemaining || 0) > 0 && (
                         <div className="text-xs text-orange-600 mt-1">
-                          Invoiced: {formatCurrency(project.invoicedAmount)} - Deposit: {formatCurrency(project.depositPaidAmount || 0)} - Paid: {formatCurrency(project.paidAmount || 0)}
+                          Job Summary: {formatCurrency(project.invoicedAmount)} - Deposit: {formatCurrency(project.depositPaidAmount || 0)} - Paid: {formatCurrency(project.paidAmount || 0)}
                         </div>
                       )}
                     </div>
@@ -1828,7 +1724,7 @@ function ProjectDetailContent() {
               {/* GIFT PROJECT CHECKLIST */}
               {effectiveProjectType === 'gift' && (
                 <>
-                  {/* Gift Invoice */}
+                  {/* Gift Summary */}
                   <div className="border border-line rounded-lg p-4">
                     <label className="flex items-start gap-3 cursor-pointer group">
                       <input
@@ -1840,7 +1736,7 @@ function ProjectDetailContent() {
                       />
                       <div className="flex-1">
                         <div className="font-medium text-gray-900 group-hover:text-plum transition-colors">
-                          Gift Invoice Generated
+                          Gift Summary Created
                         </div>
                         {project.invoiced && (
                           <div className="text-sm text-green-700 mt-1">
