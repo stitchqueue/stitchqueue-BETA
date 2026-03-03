@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { storage } from "../../lib/storage";
 import { FeatureGate } from "../../lib/featureFlags";
 import type { Project, Settings } from "../../types";
+import { getTodayDate } from "../../lib/utils";
 
 export default function InvoicePage() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function InvoicePage() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [paymentDate, setPaymentDate] = useState(
-    new Date().toISOString().split("T")[0]
+    getTodayDate()
   );
 
   // Invoice type state (replaces simple isDonation boolean)
@@ -359,7 +360,7 @@ export default function InvoicePage() {
 
   const estimate = project.estimateData;
   const invoiceNumber = project.estimateNumber || "—";
-  const invoiceDate = new Date().toISOString().split("T")[0];
+  const invoiceDate = getTodayDate();
 
   // Invoice type helpers
   const isGift = invoiceType === "gift";

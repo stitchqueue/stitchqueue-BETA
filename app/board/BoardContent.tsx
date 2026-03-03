@@ -49,6 +49,7 @@ import type { SortField, SortDirection } from "./components";
 
 // Utilities
 import { isDueThisWeek } from "./utils";
+import { getTodayDate } from "../lib/utils";
 
 type ViewMode = "board" | "list" | "calendar";
 
@@ -381,7 +382,7 @@ export default function BoardContent() {
           setProjects((prev) =>
             prev.map((p) =>
               p.id === projectId
-                ? { ...p, approvalStatus: true, approvalDate: new Date().toISOString().split("T")[0] }
+                ? { ...p, approvalStatus: true, approvalDate: getTodayDate() }
                 : p
             )
           );
@@ -396,7 +397,7 @@ export default function BoardContent() {
               stage: targetStage !== project.stage ? targetStage : undefined,
               ...(autoApprove && {
                 approvalStatus: true,
-                approvalDate: new Date().toISOString().split("T")[0],
+                approvalDate: getTodayDate(),
               }),
             });
           } else {
@@ -423,7 +424,7 @@ export default function BoardContent() {
                   orderIndex: undefined,
                   ...(autoApprove && {
                     approvalStatus: true,
-                    approvalDate: new Date().toISOString().split("T")[0],
+                    approvalDate: getTodayDate(),
                   }),
                 }
               : p
@@ -436,7 +437,7 @@ export default function BoardContent() {
           orderIndex: undefined,
           ...(autoApprove && {
             approvalStatus: true,
-            approvalDate: new Date().toISOString().split("T")[0],
+            approvalDate: getTodayDate(),
           }),
         });
       }

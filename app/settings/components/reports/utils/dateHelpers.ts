@@ -7,6 +7,8 @@
  * @module settings/components/reports/utils/dateHelpers
  */
 
+import { getTodayDate } from "../../../../lib/utils";
+
 export type DateRangeType = "month" | "quarter" | "year" | "custom";
 
 export interface DateRange {
@@ -61,14 +63,14 @@ export function getDateRange(
         new Date(now.getFullYear(), now.getMonth(), 1)
           .toISOString()
           .split("T")[0];
-      endDate = customEndDate || new Date().toISOString().split("T")[0];
+      endDate = customEndDate || getTodayDate();
       break;
 
     default:
       startDate = new Date(now.getFullYear(), now.getMonth(), 1)
         .toISOString()
         .split("T")[0];
-      endDate = new Date().toISOString().split("T")[0];
+      endDate = getTodayDate();
   }
 
   return { startDate, endDate };

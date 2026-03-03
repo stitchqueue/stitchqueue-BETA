@@ -12,6 +12,7 @@ import { FeatureGate } from "../../lib/featureFlags";
 import SubscriptionGate from "../../components/SubscriptionGate";
 import { STAGES } from "../../types";
 import type { Project, Stage, Settings } from "../../types";
+import { getTodayDate } from "../../lib/utils";
 
 function formatDate(dateStr: string | undefined): string {
   if (!dateStr) return "—";
@@ -59,7 +60,7 @@ function ProjectDetailContent() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [paymentDate, setPaymentDate] = useState(
-    new Date().toISOString().split("T")[0]
+    getTodayDate()
   );
 
   // Email sending state
@@ -82,11 +83,11 @@ function ProjectDetailContent() {
   const [updatingChecklist, setUpdatingChecklist] = useState(false);
   const [checklistInputs, setChecklistInputs] = useState({
     invoicedAmount: '',
-    invoicedDate: new Date().toISOString().split('T')[0],
+    invoicedDate: getTodayDate(),
     paidAmount: '',
-    paidDate: new Date().toISOString().split('T')[0],
+    paidDate: getTodayDate(),
     deliveryMethod: 'pickup' as 'pickup' | 'shipped' | 'mailed',
-    deliveryDate: new Date().toISOString().split('T')[0],
+    deliveryDate: getTodayDate(),
   });
   const [validationErrors, setValidationErrors] = useState({
     invoicedAmount: '',
@@ -335,7 +336,7 @@ function ProjectDetailContent() {
       // Auto-approve when moving from Estimates to In Progress
       const autoApprove =
         project.stage === "Estimates" && newStage === "In Progress";
-      const today = new Date().toISOString().split("T")[0];
+      const today = getTodayDate();
 
       const updates: Partial<Project> = {
         stage: newStage,
@@ -384,7 +385,7 @@ function ProjectDetailContent() {
 
     setUpdating(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = getTodayDate();
       await storage.updateProject(project.id, {
         depositPaid: true,
         depositPaidDate: today,
@@ -487,7 +488,7 @@ function ProjectDetailContent() {
     setApprovingProject(true);
 
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = getTodayDate();
       const updates: Partial<Project> = {
         approvalStatus: pendingApprovalValue,
         approvalDate: pendingApprovalValue ? today : undefined,
@@ -957,7 +958,7 @@ function ProjectDetailContent() {
                       <input
                         type="date"
                         value={checklistInputs.invoicedDate}
-                        max={new Date().toISOString().split('T')[0]}
+                        max={getTodayDate()}
                         onChange={(e) => {
                           setChecklistInputs(prev => ({ ...prev, invoicedDate: e.target.value }));
                           setValidationErrors(prev => ({ ...prev, invoicedDate: '' }));
@@ -1011,7 +1012,7 @@ function ProjectDetailContent() {
                       <input
                         type="date"
                         value={checklistInputs.paidDate}
-                        max={new Date().toISOString().split('T')[0]}
+                        max={getTodayDate()}
                         onChange={(e) => {
                           setChecklistInputs(prev => ({ ...prev, paidDate: e.target.value }));
                           setValidationErrors(prev => ({ ...prev, paidDate: '' }));
@@ -1068,7 +1069,7 @@ function ProjectDetailContent() {
                       <input
                         type="date"
                         value={checklistInputs.deliveryDate}
-                        max={new Date().toISOString().split('T')[0]}
+                        max={getTodayDate()}
                         onChange={(e) => {
                           setChecklistInputs(prev => ({ ...prev, deliveryDate: e.target.value }));
                           setValidationErrors(prev => ({ ...prev, deliveryDate: '' }));
