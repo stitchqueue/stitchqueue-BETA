@@ -1,5 +1,5 @@
 // app/lib/email/invoice-template.ts
-// HTML email template for sending invoices to clients
+// HTML email template for sending job summaries to clients
 
 import { emailStyles, formatCurrency, formatDate } from './shared-styles';
 import { Project, Settings } from '@/app/types';
@@ -51,7 +51,7 @@ export function generateInvoiceEmail(data: InvoiceEmailData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invoice ${invoiceNumber}</title>
+  <title>Job Summary ${invoiceNumber}</title>
 </head>
 <body style="margin: 0; padding: 20px; background-color: #f5f5f5;">
   <div style="${emailStyles.container}">
@@ -70,15 +70,15 @@ export function generateInvoiceEmail(data: InvoiceEmailData): string {
       
       ${isGift ? `
         <p style="${emailStyles.paragraph}">
-          Your beautiful quilt is complete! This invoice shows the work performed as a gift.
+          Your beautiful quilt is complete! This job summary shows the work performed as a gift.
         </p>
       ` : isCharitable ? `
         <p style="${emailStyles.paragraph}">
-          Your quilt is ready for pickup! This invoice includes information for your charitable donation records.
+          Your quilt is ready for pickup! This job summary includes information for your charitable donation records.
         </p>
       ` : `
         <p style="${emailStyles.paragraph}">
-          Great news! Your quilt is ready for pickup. Below is invoice <strong>#${invoiceNumber}</strong> for your project.
+          Great news! Your quilt is ready for pickup. Below is job summary <strong>#${invoiceNumber}</strong> for your project.
         </p>
       `}
 
@@ -175,13 +175,13 @@ export function generateInvoiceEmail(data: InvoiceEmailData): string {
       <!-- Charitable Donation Note -->
       <div style="${emailStyles.note}">
         <strong>📋 Charitable Donation Record:</strong><br>
-        This invoice serves as a record of your charitable contribution. Please consult with your tax advisor regarding deductibility of materials and services.
+        This job summary serves as a record of your charitable contribution. Please consult with your tax advisor regarding deductibility of materials and services.
       </div>
       ` : ''}
 
       <!-- PDF Attachment Note -->
       <div style="${emailStyles.note}">
-        <strong>📎 PDF Attached:</strong> A detailed PDF copy of this invoice is attached for your records.
+        <strong>📎 PDF Attached:</strong> A detailed PDF copy of this job summary is attached for your records.
       </div>
 
       ${!isGift ? `
@@ -198,7 +198,7 @@ export function generateInvoiceEmail(data: InvoiceEmailData): string {
       <p style="${emailStyles.paragraph}">
         ${isGift ? 
           "Thank you for allowing me to contribute to this special gift! If you have any questions, please don't hesitate to contact me:" :
-          "If you have any questions about this invoice, please don't hesitate to reply to this email or contact me:"
+          "If you have any questions about this job summary, please don't hesitate to reply to this email or contact me:"
         }
       </p>
 
@@ -222,7 +222,7 @@ export function generateInvoiceEmail(data: InvoiceEmailData): string {
     <!-- Footer -->
     <div style="${emailStyles.footer}">
       <p style="${emailStyles.footerText}">
-        This invoice was sent via <strong>StitchQueue</strong>
+        This job summary was sent via <strong>StitchQueue</strong>
       </p>
       <p style="${emailStyles.footerText}">
         Professional business management for longarm quilters
