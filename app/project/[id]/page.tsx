@@ -722,7 +722,7 @@ function ProjectDetailContent() {
     if (!value || value.trim() === '') {
       return 'Date is required';
     }
-    const selectedDate = new Date(value);
+    const selectedDate = new Date(value + 'T00:00:00');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (selectedDate > today) {
