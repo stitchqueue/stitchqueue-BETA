@@ -53,6 +53,15 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (modalRef.current && !modalRef.current.contains(e.target as Node)) onClose();
   };
