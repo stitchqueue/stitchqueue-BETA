@@ -128,17 +128,17 @@ export default function PerformanceDashboard({
 
       {/* Big hourly rate comparison */}
       <div className="bg-white border border-line rounded-xl p-4 mb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-around gap-4 text-center">
+        <div className="flex flex-col items-center gap-4 text-center">
           <div>
             <div className="text-sm font-bold text-muted mb-1">Your Actual Hourly Rate</div>
-            <div className={`text-3xl font-bold ${isUndercharging ? "text-red-600" : "text-green-600"}`}>
+            <div className={`text-2xl sm:text-3xl font-bold ${isUndercharging ? "text-red-600" : "text-green-600"}`}>
               ${actualHourlyRate.toFixed(2)}/hr
             </div>
           </div>
-          <div className="text-2xl text-muted hidden sm:block">vs</div>
+          <div className="text-2xl text-muted">vs</div>
           <div>
             <div className="text-sm font-bold text-muted mb-1">Target Rate</div>
-            <div className="text-3xl font-bold text-plum">
+            <div className="text-2xl sm:text-3xl font-bold text-plum">
               ${targetHourlyWage.toFixed(2)}/hr
             </div>
           </div>

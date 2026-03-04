@@ -11,6 +11,8 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
@@ -230,22 +232,44 @@ export default function ResetPasswordPage() {
             >
               New Password
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              placeholder="At least 8 characters"
-              style={{
-                width: "100%",
-                padding: "12px",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                fontSize: "16px",
-                boxSizing: "border-box",
-              }}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                type={showNewPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                placeholder="At least 8 characters"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  paddingRight: "44px",
+                  border: "1px solid #ddd",
+                  borderRadius: "8px",
+                  fontSize: "16px",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                aria-label={showNewPassword ? "Hide password" : "Show password"}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "18px",
+                  padding: "0",
+                  lineHeight: "1",
+                }}
+              >
+                {showNewPassword ? "\u{1F648}" : "\u{1F441}\uFE0F"}
+              </button>
+            </div>
           </div>
 
           <div style={{ marginBottom: "24px" }}>
@@ -260,22 +284,44 @@ export default function ResetPasswordPage() {
             >
               Confirm New Password
             </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={8}
-              placeholder="Re-enter your password"
-              style={{
-                width: "100%",
-                padding: "12px",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                fontSize: "16px",
-                boxSizing: "border-box",
-              }}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={8}
+                placeholder="Re-enter your password"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  paddingRight: "44px",
+                  border: "1px solid #ddd",
+                  borderRadius: "8px",
+                  fontSize: "16px",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "18px",
+                  padding: "0",
+                  lineHeight: "1",
+                }}
+              >
+                {showConfirmPassword ? "\u{1F648}" : "\u{1F441}\uFE0F"}
+              </button>
+            </div>
           </div>
 
           <button

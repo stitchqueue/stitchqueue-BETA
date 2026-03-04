@@ -367,7 +367,7 @@ export function DraggableProjectCard({
       ref={setNodeRef}
       style={style}
       className={`w-full bg-white border rounded-xl p-3 text-left hover:shadow-md transition-shadow cursor-pointer overflow-hidden ${cardStyle} ${leftBorderClass} ${
-        isDragging ? "shadow-lg ring-2 ring-plum/30 cursor-grabbing" : ""
+        isDragging ? "shadow-lg ring-2 ring-plum/60 cursor-grabbing" : ""
       } ${isOver ? "ring-2 ring-plum/50 border-plum" : ""}`}
       onClick={handleClick}
       {...attributes}
