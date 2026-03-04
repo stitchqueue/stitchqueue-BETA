@@ -67,7 +67,7 @@ export default function BusinessInfoSection({
               maxLength={100}
               value={settings.businessName || ""}
               onChange={(e) => onFieldChange("businessName", e.target.value.trimStart())}
-              placeholder="Stitched By Susan"
+              placeholder="Your Business Name"
               className="w-full px-4 py-2 border border-line rounded-xl"
             />
           </div>
@@ -96,7 +96,7 @@ export default function BusinessInfoSection({
                 type="text"
                 value={settings.city || ""}
                 onChange={(e) => onFieldChange("city", e.target.value)}
-                placeholder="Spokane"
+                placeholder="Your City"
                 className="w-full px-4 py-2 border border-line rounded-xl"
               />
             </div>
@@ -108,7 +108,7 @@ export default function BusinessInfoSection({
                 type="text"
                 value={settings.state || ""}
                 onChange={(e) => onFieldChange("state", e.target.value)}
-                placeholder="WA"
+                placeholder="State"
                 className="w-full px-4 py-2 border border-line rounded-xl"
               />
             </div>
@@ -120,7 +120,7 @@ export default function BusinessInfoSection({
                 type="text"
                 value={settings.postalCode || ""}
                 onChange={(e) => onFieldChange("postalCode", e.target.value)}
-                placeholder="99201"
+                placeholder="12345"
                 className="w-full px-4 py-2 border border-line rounded-xl"
               />
             </div>
@@ -152,7 +152,7 @@ export default function BusinessInfoSection({
                 type="email"
                 value={settings.email || ""}
                 onChange={(e) => onFieldChange("email", e.target.value)}
-                placeholder="susan@stitchedbysusan.com"
+                placeholder="you@yourbusiness.com"
                 className="w-full px-4 py-2 border border-line rounded-xl"
               />
             </div>
@@ -164,7 +164,7 @@ export default function BusinessInfoSection({
                 type="tel"
                 value={settings.phone || ""}
                 onChange={(e) => onPhoneChange(e.target.value)}
-                placeholder="509-828-2945"
+                placeholder="555-123-4567"
                 className="w-full px-4 py-2 border border-line rounded-xl"
               />
             </div>
@@ -179,7 +179,7 @@ export default function BusinessInfoSection({
               type="url"
               value={settings.website || ""}
               onChange={(e) => onFieldChange("website", e.target.value)}
-              placeholder="https://stitchedbysusan.com"
+              placeholder="https://yourbusiness.com"
               className="w-full px-4 py-2 border border-line rounded-xl"
             />
           </div>

@@ -372,7 +372,7 @@ export default function IntakePage() {
                       onChange={(e) =>
                         updateFormData("clientCity", e.target.value)
                       }
-                      placeholder="Spokane"
+                      placeholder="Your City"
                       hasError={hasFieldError(errors, "City")}
                     />
                   </FormField>
@@ -456,7 +456,7 @@ export default function IntakePage() {
                     type="tel"
                     value={formData.clientPhone}
                     onChange={(e) => handlePhoneChange(e.target.value)}
-                    placeholder="509-828-2945"
+                    placeholder="555-123-4567"
                     hasError={hasFieldError(errors, "Phone")}
                   />
                 </FormField>

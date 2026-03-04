@@ -300,7 +300,7 @@ export default function ClientInfoSection({
             type="tel"
             value={clientPhone}
             onChange={(e) => onPhoneChange(e.target.value)}
-            placeholder="509-555-1234"
+            placeholder="555-123-4567"
             className="w-full px-4 py-2 border border-line rounded-xl"
           />
         </div>
@@ -331,7 +331,7 @@ export default function ClientInfoSection({
             type="text"
             value={clientCity}
             onChange={(e) => setClientCity(e.target.value)}
-            placeholder="Spokane"
+            placeholder="Your City"
             className="w-full px-4 py-2 border border-line rounded-xl"
           />
         </div>

@@ -259,7 +259,7 @@ export default function SignupPage() {
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               required
-              placeholder="Stitched By Susan"
+              placeholder="Your Business Name"
               style={{
                 width: "100%",
                 padding: "12px",
