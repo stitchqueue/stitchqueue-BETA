@@ -14,7 +14,10 @@ export default function OverheadSection({ items, onChange, total }: Props) {
     const updated = items.map((item, i) => {
       if (i !== index) return item;
       if (field === "label") return { ...item, label: value };
-      return { ...item, amount: parseFloat(value) || 0 };
+      let num = parseFloat(value) || 0;
+      if (num < 0) num = 0;
+      if (num > 999999) num = 999999;
+      return { ...item, amount: num };
     });
     onChange(updated);
   };
@@ -52,6 +55,7 @@ export default function OverheadSection({ items, onChange, total }: Props) {
               <input
                 type="number"
                 min="0"
+                max="999999"
                 step="0.01"
                 value={item.amount || ""}
                 onChange={(e) => updateItem(index, "amount", e.target.value)}

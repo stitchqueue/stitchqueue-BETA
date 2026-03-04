@@ -14,7 +14,10 @@ export default function IncidentalsSection({ items, onChange, total }: Props) {
     const updated = items.map((item, i) => {
       if (i !== index) return item;
       if (field === "label") return { ...item, label: value };
-      return { ...item, minutes: parseFloat(value) || 0 };
+      let num = parseFloat(value) || 0;
+      if (num < 0) num = 0;
+      if (num > 999999) num = 999999;
+      return { ...item, minutes: num };
     });
     onChange(updated);
   };
@@ -56,6 +59,7 @@ export default function IncidentalsSection({ items, onChange, total }: Props) {
               <input
                 type="number"
                 min="0"
+                max="999999"
                 step="1"
                 value={item.minutes || ""}
                 onChange={(e) => updateItem(index, "minutes", e.target.value)}

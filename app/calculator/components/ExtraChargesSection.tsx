@@ -77,7 +77,15 @@ export default function ExtraChargesSection({
               inputMode="decimal"
               placeholder="Amount"
               value={newChargeAmount}
-              onChange={(e) => setNewChargeAmount(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                const num = parseFloat(val);
+                if (val !== "" && !isNaN(num)) {
+                  if (num < 0) { setNewChargeAmount("0"); return; }
+                  if (num > 99999) { setNewChargeAmount("99999"); return; }
+                }
+                setNewChargeAmount(val);
+              }}
               className="w-full sm:w-32 pl-7 pr-3 py-2 border border-line rounded-xl bg-white"
             />
           </div>

@@ -64,8 +64,9 @@ export default function BusinessInfoSection({
             </label>
             <input
               type="text"
+              maxLength={100}
               value={settings.businessName || ""}
-              onChange={(e) => onFieldChange("businessName", e.target.value)}
+              onChange={(e) => onFieldChange("businessName", e.target.value.trimStart())}
               placeholder="Stitched By Susan"
               className="w-full px-4 py-2 border border-line rounded-xl"
             />

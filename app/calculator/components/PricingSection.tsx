@@ -143,9 +143,17 @@ export default function PricingSection({
               <input
                 type="text"
                 inputMode="decimal"
+                max="99999"
                 placeholder="Price per square inch for this estimate (e.g., 0.025)"
                 value={customQuiltingRate}
-                onChange={(e) => setCustomQuiltingRate(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val !== "" && parseFloat(val) > 99999) {
+                    setCustomQuiltingRate("99999");
+                  } else {
+                    setCustomQuiltingRate(val);
+                  }
+                }}
                 className="w-full px-4 py-2 border border-line rounded-xl bg-amber-50"
               />
             )}
@@ -163,9 +171,17 @@ export default function PricingSection({
             <input
               type="text"
               inputMode="decimal"
+              max="99999"
               placeholder="Rate per sq inch (e.g., 0.02)"
               value={quiltingRateManual}
-              onChange={(e) => setQuiltingRateManual(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val !== "" && parseFloat(val) > 99999) {
+                  setQuiltingRateManual("99999");
+                } else {
+                  setQuiltingRateManual(val);
+                }
+              }}
               className="w-full px-4 py-2 border border-line rounded-xl"
             />
           </div>
