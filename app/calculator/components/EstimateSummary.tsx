@@ -183,7 +183,7 @@ export default function EstimateSummary({
             <div className="inline-flex rounded-lg border border-line overflow-hidden text-xs">
               <button
                 type="button"
-                onClick={() => setDiscountType("percentage")}
+                onClick={() => { setDiscountType("percentage"); setDiscountValue(""); }}
                 className={`px-2 py-1 transition-colors ${
                   discountType === "percentage"
                     ? "bg-plum text-white"
@@ -194,7 +194,7 @@ export default function EstimateSummary({
               </button>
               <button
                 type="button"
-                onClick={() => setDiscountType("flat")}
+                onClick={() => { setDiscountType("flat"); setDiscountValue(""); }}
                 className={`px-2 py-1 transition-colors ${
                   discountType === "flat"
                     ? "bg-plum text-white"

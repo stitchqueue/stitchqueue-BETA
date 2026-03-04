@@ -68,7 +68,7 @@ export default function DepositSection({
       <div className="flex flex-col sm:flex-row gap-2 mb-3">
         <button
           type="button"
-          onClick={() => setDepositType("percentage")}
+          onClick={() => { setDepositType("percentage"); setDepositValue(""); }}
           className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
             depositType === "percentage"
               ? "bg-gold text-white"
@@ -79,7 +79,7 @@ export default function DepositSection({
         </button>
         <button
           type="button"
-          onClick={() => setDepositType("flat")}
+          onClick={() => { setDepositType("flat"); setDepositValue(""); }}
           className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
             depositType === "flat"
               ? "bg-gold text-white"
