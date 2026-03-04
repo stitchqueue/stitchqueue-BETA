@@ -354,7 +354,7 @@ export function SuccessToast({
   show,
   message,
   onClose,
-  duration = 3000,
+  duration = 5000,
 }: SuccessToastProps) {
   const [isVisible, setIsVisible] = useState(false);
 
