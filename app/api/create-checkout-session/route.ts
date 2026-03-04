@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         },
       },
       success_url: `${baseUrl}/onboarding?checkout=success`,
-      cancel_url: `${baseUrl}/signup?checkout=canceled`,
+      cancel_url: `${baseUrl}/signup-trial`,
       metadata: {
         user_id: auth.userId,
         organization_id: auth.organizationId,

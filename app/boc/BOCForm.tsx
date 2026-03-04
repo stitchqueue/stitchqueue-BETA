@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import Toast from "../components/Toast";
@@ -85,7 +85,15 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
   );
 
   // ── Load saved settings + mode + purchase status ────────────────────
+  const hasLoadedRef = useRef(false);
+  const loadedUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
+    // Skip reload if we already loaded for this same user (prevents tab-switch resets)
+    if (hasLoadedRef.current && user?.id === loadedUserIdRef.current) {
+      return;
+    }
+
     async function load() {
       try {
         const promises: [Promise<BOCSettings>, Promise<BOCMode>, Promise<BOCPurchaseStatus | null>] = [
@@ -98,6 +106,8 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
         applySettings(saved);
         setBocMode(mode);
         if (purchase) setPurchaseStatus(purchase);
+        hasLoadedRef.current = true;
+        loadedUserIdRef.current = user?.id || null;
       } catch (err) {
         console.error("Error loading BOC settings:", err);
       } finally {
