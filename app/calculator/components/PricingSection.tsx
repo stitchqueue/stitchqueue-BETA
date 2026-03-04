@@ -249,7 +249,15 @@ export default function PricingSection({
                   inputMode="decimal"
                   placeholder="Price per inch (e.g., 0.12)"
                   value={battingPriceManual}
-                  onChange={(e) => setBattingPriceManual(e.target.value)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "" || raw === "-") { setBattingPriceManual(""); return; }
+                    const num = parseFloat(raw);
+                    if (isNaN(num)) return;
+                    if (num < 0) { setBattingPriceManual("0"); return; }
+                    if (num > 99999) { setBattingPriceManual("99999"); return; }
+                    setBattingPriceManual(raw);
+                  }}
                   className="w-full px-4 py-2 border border-line rounded-xl"
                 />
               </div>
@@ -323,7 +331,15 @@ export default function PricingSection({
                 inputMode="decimal"
                 placeholder="Rate per inch (e.g., 0.15)"
                 value={bindingRateManual}
-                onChange={(e) => setBindingRateManual(e.target.value)}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "" || raw === "-") { setBindingRateManual(""); return; }
+                  const num = parseFloat(raw);
+                  if (isNaN(num)) return;
+                  if (num < 0) { setBindingRateManual("0"); return; }
+                  if (num > 99999) { setBindingRateManual("99999"); return; }
+                  setBindingRateManual(raw);
+                }}
                 className="w-full px-4 py-2 border border-line rounded-xl"
               />
             )}
@@ -378,7 +394,15 @@ export default function PricingSection({
               inputMode="decimal"
               placeholder="Price per bobbin (e.g., 2.50)"
               value={bobbinPriceManual}
-              onChange={(e) => setBobbinPriceManual(e.target.value)}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "" || raw === "-") { setBobbinPriceManual(""); return; }
+                const num = parseFloat(raw);
+                if (isNaN(num)) return;
+                if (num < 0) { setBobbinPriceManual("0"); return; }
+                if (num > 99999) { setBobbinPriceManual("99999"); return; }
+                setBobbinPriceManual(raw);
+              }}
               className="w-full px-4 py-2 border border-line rounded-xl"
             />
           </div>
