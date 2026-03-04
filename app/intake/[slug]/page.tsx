@@ -341,6 +341,8 @@ export default function PublicIntakeForm() {
                   <input
                     type="number"
                     min="1"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={quiltWidth}
                     onChange={(e) => setQuiltWidth(e.target.value)}
                     placeholder="e.g. 60"
@@ -354,6 +356,8 @@ export default function PublicIntakeForm() {
                   <input
                     type="number"
                     min="1"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={quiltLength}
                     onChange={(e) => setQuiltLength(e.target.value)}
                     placeholder="e.g. 80"

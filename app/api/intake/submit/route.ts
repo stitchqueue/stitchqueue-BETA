@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { escapeHtml } from "@/app/lib/sanitize";
 import { checkRateLimit } from "@/app/lib/rate-limit";
+import { validateIntake } from "@/app/lib/validation";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -62,6 +63,28 @@ export async function POST(request: NextRequest) {
     if (!emailRegex.test(clientEmail)) {
       return NextResponse.json(
         { error: "Invalid email address" },
+        { status: 400 }
+      );
+    }
+
+    // Full field validation
+    const validation = validateIntake({
+      clientFirstName,
+      clientLastName,
+      clientEmail,
+      clientPhone: clientPhone || undefined,
+      clientStreet: clientStreet || undefined,
+      clientCity: clientCity || undefined,
+      clientState: clientState || undefined,
+      clientPostalCode: clientPostalCode || undefined,
+      clientCountry: clientCountry || undefined,
+      quiltWidth: quiltWidth || undefined,
+      quiltLength: quiltLength || undefined,
+      quiltingType: serviceType || undefined,
+    });
+    if (!validation.isValid) {
+      return NextResponse.json(
+        { error: validation.errors[0].message },
         { status: 400 }
       );
     }
