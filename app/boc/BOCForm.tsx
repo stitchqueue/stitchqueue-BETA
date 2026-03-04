@@ -50,7 +50,6 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
     hasProjects: false,
     isSubscribed: false,
   });
-  const [forceStandalone, setForceStandalone] = useState(false);
   const [purchaseStatus, setPurchaseStatus] = useState<BOCPurchaseStatus>({
     hasPurchased: false,
     purchaseDate: null,
@@ -131,7 +130,6 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
     setAvgProjectSize(s.avgProjectSize ? String(s.avgProjectSize) : "6000");
     setOverheadItems(s.overheadItems.length > 0 ? s.overheadItems : DEFAULT_OVERHEAD_ITEMS);
     setIncidentalItems(s.incidentalsItems.length > 0 ? s.incidentalsItems : DEFAULT_INCIDENTAL_ITEMS);
-    setForceStandalone(s.forceStandaloneMode);
   }
 
   // ── Auto-calculate on every input change ────────────────────────────
@@ -168,7 +166,6 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
         incidentalsItems: incidentalItems,
         projectsPerMonth: parseFloat(projectsPerMonth) || 0,
         avgProjectSize: parseFloat(avgProjectSize) || 0,
-        forceStandaloneMode: forceStandalone,
       };
 
       const result = await saveBOCSettings(settings);
@@ -195,7 +192,6 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
     incidentalItems,
     projectsPerMonth,
     avgProjectSize,
-    forceStandalone,
   ]);
 
   // ── Purchase handler ────────────────────────────────────────────────
@@ -227,49 +223,13 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
     [user]
   );
 
-  // ── Derived: effective mode (respects force-standalone toggle) ──────
-  const effectiveMode: BOCMode = forceStandalone
-    ? { isConnected: false, hasProjects: false, isSubscribed: false }
-    : bocMode;
+  // ── Derived: effective mode ──────
+  const effectiveMode: BOCMode = bocMode;
 
   // ── Derived: should show dashboards ─────────────────────────────────
   // Server-side check is authoritative; client-side is a fallback for UX
   const isBetaTester = user?.email ? BETA_TESTER_EMAILS.includes(user.email) : false;
   const showDashboards = serverPurchased || purchaseStatus.hasPurchased || isBetaTester;
-
-  // ── Force-standalone toggle handler (saves immediately) ────────────
-  const isBetaMode = process.env.NEXT_PUBLIC_ENABLE_BETA_MODE === "true";
-
-  const handleForceStandaloneToggle = useCallback(async (checked: boolean) => {
-    setForceStandalone(checked);
-    try {
-      const settings: BOCSettings = {
-        targetHourlyWage: parseFloat(targetHourlyWage) || 0,
-        experienceLevel,
-        sphRate,
-        monthlyOverhead: overheadTotal,
-        overheadItems,
-        incidentalsMinutes: incidentalsTotal,
-        incidentalsItems: incidentalItems,
-        projectsPerMonth: parseFloat(projectsPerMonth) || 0,
-        avgProjectSize: parseFloat(avgProjectSize) || 0,
-        forceStandaloneMode: checked,
-      };
-      await saveBOCSettings(settings);
-    } catch (err) {
-      console.error("Error saving force standalone mode:", err);
-    }
-  }, [
-    targetHourlyWage,
-    experienceLevel,
-    sphRate,
-    overheadTotal,
-    overheadItems,
-    incidentalsTotal,
-    incidentalItems,
-    projectsPerMonth,
-    avgProjectSize,
-  ]);
 
   // ── Loading screen ──────────────────────────────────────────────────
   if (loading) {
@@ -300,28 +260,6 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
             Determine your minimum per-square-inch rate based on overhead, wage,
             and project parameters.
           </p>
-
-          {/* Beta-only: force standalone mode toggle */}
-          {isBetaMode && (
-            <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              <input
-                type="checkbox"
-                id="force-standalone"
-                checked={forceStandalone}
-                onChange={(e) => handleForceStandaloneToggle(e.target.checked)}
-                className="mt-0.5 accent-plum"
-              />
-              <label htmlFor="force-standalone" className="text-sm">
-                <span className="font-medium text-amber-800">
-                  Force standalone mode (manual entry only)
-                </span>
-                <br />
-                <span className="text-xs text-amber-600">
-                  Test the $79 standalone experience without auto-sync. For testing only.
-                </span>
-              </label>
-            </div>
-          )}
         </div>
 
         {/* Main card — always visible (rate calculator is free) */}

@@ -326,7 +326,6 @@ export interface BOCSettings {
   incidentalsItems: IncidentalItem[];
   projectsPerMonth: number;
   avgProjectSize: number;
-  forceStandaloneMode: boolean;
 }
 
 export const DEFAULT_OVERHEAD_ITEMS: OverheadItem[] = [
@@ -369,7 +368,6 @@ export const DEFAULT_BOC_SETTINGS: BOCSettings = {
   incidentalsItems: DEFAULT_INCIDENTAL_ITEMS,
   projectsPerMonth: 10,
   avgProjectSize: 6000,
-  forceStandaloneMode: false,
 };
 
 /** Manual project entry for BOC tracking (future UI) */
