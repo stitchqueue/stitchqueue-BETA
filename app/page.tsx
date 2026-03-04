@@ -141,6 +141,16 @@ export default function HomePage() {
     }
   }, [searchParams]);
 
+  // Extract revenue fetch so it can be called on visibility change
+  async function fetchRevenue() {
+    try {
+      const revenue = await getRevenueData();
+      setRevenueData(revenue);
+    } catch {
+      // Silently fail — revenue is non-critical
+    }
+  }
+
   useEffect(() => {
     async function checkAuthAndLoadData() {
       const {
@@ -172,6 +182,17 @@ export default function HomePage() {
       setLoading(false);
     });
   }, [router]);
+
+  // Refetch revenue when tab becomes visible again (QA-053)
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        fetchRevenue();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
   if (loading) {
     return (
