@@ -8,6 +8,18 @@
 
 import { supabase } from "../supabase";
 
+// In-memory cache: avoids redundant auth + profile lookups within a session.
+// Cleared automatically on sign-out via onAuthStateChange listener.
+let cachedOrgId: string | null = null;
+let cachePopulated = false;
+
+supabase.auth.onAuthStateChange((event) => {
+  if (event === "SIGNED_OUT") {
+    cachedOrgId = null;
+    cachePopulated = false;
+  }
+});
+
 /**
  * Get current authenticated user
  */
@@ -20,9 +32,13 @@ export async function getCurrentUser() {
 
 /**
  * Get organization ID for current user
- * Returns null if user not authenticated or no organization
+ * Returns null if user not authenticated or no organization.
+ * Result is cached in memory so repeated calls within a page load
+ * don't re-query auth + profiles every time.
  */
 export async function getOrganizationId(): Promise<string | null> {
+  if (cachePopulated) return cachedOrgId;
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -43,7 +59,9 @@ export async function getOrganizationId(): Promise<string | null> {
     return null;
   }
 
-  return profile?.organization_id || null;
+  cachedOrgId = profile?.organization_id || null;
+  cachePopulated = true;
+  return cachedOrgId;
 }
 
 /**
