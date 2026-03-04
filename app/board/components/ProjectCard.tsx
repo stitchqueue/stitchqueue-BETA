@@ -157,11 +157,11 @@ function CompletedStageContent({ project }: { project: Project }) {
 
     return (
       <div className="mt-2 space-y-1">
-        <div className="text-xs flex items-center gap-1">
-          <span className={project.invoiced ? "text-green-600" : "text-gray-400"}>
+        <div className="text-xs flex items-center gap-1 min-w-0">
+          <span className={`flex-shrink-0 ${project.invoiced ? "text-green-600" : "text-gray-400"}`}>
             {project.invoiced ? "✓" : "○"}
           </span>
-          <span className={project.invoiced ? "text-gray-700" : "text-gray-500"}>
+          <span className={`truncate ${project.invoiced ? "text-gray-700" : "text-gray-500"}`}>
             Job Summary
             {project.invoiced && project.invoicedAmount
               ? ` ${formatCurrency(project.invoicedAmount)}`
@@ -171,11 +171,11 @@ function CompletedStageContent({ project }: { project: Project }) {
               : ""}
           </span>
         </div>
-        <div className="text-xs flex items-center gap-1">
-          <span className={project.paid ? "text-green-600" : "text-gray-400"}>
+        <div className="text-xs flex items-center gap-1 min-w-0">
+          <span className={`flex-shrink-0 ${project.paid ? "text-green-600" : "text-gray-400"}`}>
             {project.paid ? "✓" : "○"}
           </span>
-          <span className={project.paid ? "text-gray-700" : "text-gray-500"}>
+          <span className={`truncate ${project.paid ? "text-gray-700" : "text-gray-500"}`}>
             Paid
             {project.paid && project.paidAmount
               ? ` ${formatCurrency(project.paidAmount)}`
@@ -185,11 +185,11 @@ function CompletedStageContent({ project }: { project: Project }) {
               : ""}
           </span>
         </div>
-        <div className="text-xs flex items-center gap-1">
-          <span className={project.delivered ? "text-green-600" : "text-gray-400"}>
+        <div className="text-xs flex items-center gap-1 min-w-0">
+          <span className={`flex-shrink-0 ${project.delivered ? "text-green-600" : "text-gray-400"}`}>
             {project.delivered ? "✓" : "○"}
           </span>
-          <span className={project.delivered ? "text-gray-700" : "text-gray-500"}>
+          <span className={`truncate ${project.delivered ? "text-gray-700" : "text-gray-500"}`}>
             Delivered
             {project.delivered && project.deliveryMethod
               ? ` (${project.deliveryMethod})`
@@ -366,7 +366,7 @@ export function DraggableProjectCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`w-full bg-white border rounded-xl p-3 text-left hover:shadow-md transition-shadow cursor-pointer ${cardStyle} ${leftBorderClass} ${
+      className={`w-full bg-white border rounded-xl p-3 text-left hover:shadow-md transition-shadow cursor-pointer overflow-hidden ${cardStyle} ${leftBorderClass} ${
         isDragging ? "shadow-lg ring-2 ring-plum/30 cursor-grabbing" : ""
       } ${isOver ? "ring-2 ring-plum/50 border-plum" : ""}`}
       onClick={handleClick}
@@ -375,9 +375,9 @@ export function DraggableProjectCard({
     >
       {/* Project Type Badge (Gift/Donation) */}
       {projectTypeBadge && (
-        <div className="absolute top-2 right-2 flex items-center gap-1">
-          <span className="text-xs">{projectTypeBadge.emoji}</span>
-          <span className="text-xs font-bold text-gray-600">{projectTypeBadge.label}</span>
+        <div className="absolute top-2 right-2 flex items-center gap-1 max-w-[6rem] overflow-hidden">
+          <span className="text-xs flex-shrink-0">{projectTypeBadge.emoji}</span>
+          <span className="text-xs font-bold text-gray-600 truncate">{projectTypeBadge.label}</span>
         </div>
       )}
 
@@ -408,7 +408,7 @@ export function DraggableProjectCard({
             {project.cardLabel || project.description || "No description"}
           </div>
           {project.quiltWidth && project.quiltLength && (
-            <div className="text-xs text-muted mt-1">
+            <div className="text-xs text-muted mt-1 truncate">
               {project.quiltWidth}&quot; × {project.quiltLength}&quot;
             </div>
           )}
@@ -489,13 +489,13 @@ export function ProjectCard({
   return (
     <button
       onClick={onClick}
-      className={`w-full bg-white border rounded-xl p-3 text-left hover:shadow-md transition-shadow relative ${cardStyle} ${leftBorderClass}`}
+      className={`w-full bg-white border rounded-xl p-3 text-left hover:shadow-md transition-shadow relative overflow-hidden ${cardStyle} ${leftBorderClass}`}
     >
       {/* Project Type Badge (Gift/Donation) */}
       {projectTypeBadge && (
-        <div className="absolute top-2 right-2 flex items-center gap-1">
-          <span className="text-xs">{projectTypeBadge.emoji}</span>
-          <span className="text-xs font-bold text-gray-600">{projectTypeBadge.label}</span>
+        <div className="absolute top-2 right-2 flex items-center gap-1 max-w-[6rem] overflow-hidden">
+          <span className="text-xs flex-shrink-0">{projectTypeBadge.emoji}</span>
+          <span className="text-xs font-bold text-gray-600 truncate">{projectTypeBadge.label}</span>
         </div>
       )}
 
@@ -526,7 +526,7 @@ export function ProjectCard({
             {project.cardLabel || project.description || "No description"}
           </div>
           {project.quiltWidth && project.quiltLength && (
-            <div className="text-xs text-muted mt-1">
+            <div className="text-xs text-muted mt-1 truncate">
               {project.quiltWidth}&quot; × {project.quiltLength}&quot;
             </div>
           )}
@@ -609,13 +609,13 @@ export function ProjectCardOverlay({ project }: ProjectCardOverlayProps) {
 
   return (
     <div
-      className={`w-72 bg-white border rounded-xl p-3 text-left shadow-xl ring-2 ring-plum/30 relative ${getOverlayStyle()} ${leftBorderClass}`}
+      className={`w-72 bg-white border rounded-xl p-3 text-left shadow-xl ring-2 ring-plum/30 relative overflow-hidden ${getOverlayStyle()} ${leftBorderClass}`}
     >
       {/* Project Type Badge (Gift/Donation) */}
       {projectTypeBadge && (
-        <div className="absolute top-2 right-2 flex items-center gap-1">
-          <span className="text-xs">{projectTypeBadge.emoji}</span>
-          <span className="text-xs font-bold text-gray-600">{projectTypeBadge.label}</span>
+        <div className="absolute top-2 right-2 flex items-center gap-1 max-w-[6rem] overflow-hidden">
+          <span className="text-xs flex-shrink-0">{projectTypeBadge.emoji}</span>
+          <span className="text-xs font-bold text-gray-600 truncate">{projectTypeBadge.label}</span>
         </div>
       )}
 
