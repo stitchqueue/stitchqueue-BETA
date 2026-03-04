@@ -109,6 +109,18 @@ export default function PhotoGallery({
   // Modal state
   const [viewingIndex, setViewingIndex] = useState<number | null>(null);
 
+  // Lock body scroll when full-screen viewer is open
+  useEffect(() => {
+    if (viewingIndex !== null) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [viewingIndex]);
+
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCaption, setEditCaption] = useState("");
