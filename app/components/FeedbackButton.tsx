@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "../lib/auth-context";
 import FeedbackModal from "./FeedbackModal";
 
 export default function FeedbackButton() {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+
+  if (!user) return null;
 
   return (
     <>
