@@ -72,7 +72,7 @@ export async function getProjectsByDateRange(
     .from("projects")
     .select("*")
     .eq("organization_id", orgId)
-    .gte("created_at", startDate)
+    .gte("created_at", startDate + "T00:00:00.000Z")
     .lte("created_at", endDate + "T23:59:59.999Z")
     .order("created_at", { ascending: false });
 

@@ -61,7 +61,7 @@ function ArchiveContent() {
   };
 
   const getClientFullName = (project: Project) => {
-    return `${project.clientFirstName} ${project.clientLastName}`;
+    return `${project.clientFirstName ?? ""} ${project.clientLastName ?? ""}`.trim();
   };
 
   const formatDate = (dateString?: string) => {
