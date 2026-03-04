@@ -8,7 +8,6 @@ import { getOrganizationId } from "../lib/storage/auth";
 const SERVICE_OPTIONS = [
   { key: "e2e", label: "Edge-to-edge quilting" },
   { key: "custom", label: "Custom quilting" },
-  { key: "both", label: "Both" },
 ];
 
 export default function OnboardingPage() {
@@ -17,6 +16,7 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [businessName, setBusinessName] = useState("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [triedSubmit, setTriedSubmit] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -158,6 +158,11 @@ export default function OnboardingPage() {
                 </label>
               ))}
             </div>
+            {triedSubmit && selectedServices.length === 0 && (
+              <p className="text-sm text-red-500 mt-2">
+                Please select at least one option to continue
+              </p>
+            )}
           </div>
 
           {/* Quick tip */}
@@ -174,9 +179,17 @@ export default function OnboardingPage() {
 
           {/* CTA */}
           <button
-            onClick={handleComplete}
+            onClick={() => {
+              if (selectedServices.length === 0) {
+                setTriedSubmit(true);
+                return;
+              }
+              handleComplete();
+            }}
             disabled={saving}
-            className="w-full bg-plum text-white py-3 rounded-xl font-bold text-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+            className={`w-full bg-plum text-white py-3 rounded-xl font-bold text-lg transition-opacity disabled:opacity-50 ${
+              selectedServices.length === 0 ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"
+            }`}
           >
             {saving ? "Setting up..." : "Start Using StitchQueue"}
           </button>
