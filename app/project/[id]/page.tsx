@@ -328,6 +328,21 @@ function ProjectDetailContent() {
     }
   };
 
+  const handleDeleteProject = async () => {
+    const fullName = `${project.clientFirstName || ""} ${project.clientLastName || ""}`.trim() || "this project";
+    if (!confirm(`Are you sure you want to permanently delete ${fullName}? This cannot be undone.`)) return;
+
+    setUpdating(true);
+    try {
+      await storage.deleteProject(project.id);
+      router.push("/archive");
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      alert("Failed to delete project. Please try again.");
+      setUpdating(false);
+    }
+  };
+
   const handleRecordDeposit = async () => {
     if (!project.depositAmount || project.depositAmount <= 0) {
       alert("No deposit amount set for this project.");
@@ -1906,6 +1921,17 @@ function ProjectDetailContent() {
             >
               Archive Project
             </button>
+            {project.stage === "Archived" && (
+              <button
+                onClick={handleDeleteProject}
+                disabled={updating}
+                className={`px-6 py-3 border border-red-300 text-red-600 rounded-xl font-bold hover:bg-red-50 transition-colors ${
+                  updating ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                Delete Project
+              </button>
+            )}
           </div>
         </div>
 

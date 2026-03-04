@@ -122,6 +122,7 @@ export default function HomePage() {
   const [quote, setQuote] = useState("");
   const [showWelcomeBackToast, setShowWelcomeBackToast] = useState(false);
   const [revenueData, setRevenueData] = useState<RevenueData | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const [zeroRevenueMsg, setZeroRevenueMsg] = useState("");
 
@@ -165,7 +166,11 @@ export default function HomePage() {
       setLoading(false);
     }
 
-    checkAuthAndLoadData();
+    checkAuthAndLoadData().catch((error) => {
+      console.error("Error loading dashboard data:", error);
+      setLoadError(true);
+      setLoading(false);
+    });
   }, [router]);
 
   if (loading) {
@@ -179,6 +184,62 @@ export default function HomePage() {
         }}
       >
         <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#f5f5f5",
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: "white",
+            padding: "40px",
+            borderRadius: "12px",
+            width: "100%",
+            maxWidth: "400px",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>😕</div>
+          <h1
+            style={{
+              fontSize: "20px",
+              fontWeight: "bold",
+              color: "#4e283a",
+              marginBottom: "8px",
+            }}
+          >
+            Something went wrong
+          </h1>
+          <p style={{ color: "#666", marginBottom: "24px", lineHeight: "1.5" }}>
+            We had trouble loading your data. Please refresh the page to try again.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: "12px 24px",
+              backgroundColor: "#4e283a",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              fontSize: "16px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            Refresh Page
+          </button>
+        </div>
       </div>
     );
   }
