@@ -85,11 +85,21 @@ body {
   table {
     border-collapse: collapse;
     width: 100%;
+    page-break-inside: avoid;
   }
 
   th, td {
     border: 1px solid #e5e5e5;
     padding: 6px;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
   }
 
   /* Page break controls */

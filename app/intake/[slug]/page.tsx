@@ -8,6 +8,8 @@ interface OrgInfo {
   id: string;
   name: string;
   intake_form_enabled: boolean;
+  logo_url?: string;
+  brand_primary_color?: string;
 }
 
 const SERVICE_OPTIONS = [
@@ -52,7 +54,7 @@ export default function PublicIntakeForm() {
     async function load() {
       const { data, error } = await supabase
         .from("organizations")
-        .select("id, name, intake_form_enabled")
+        .select("id, name, intake_form_enabled, logo_url, brand_primary_color")
         .eq("intake_form_slug", slug)
         .single();
 
@@ -194,10 +196,17 @@ export default function PublicIntakeForm() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-plum text-white px-4 py-4">
-        <div className="max-w-2xl mx-auto">
+      <div className="bg-plum text-white px-4 py-4" style={org?.brand_primary_color ? { backgroundColor: org.brand_primary_color } : undefined}>
+        <div className="max-w-2xl mx-auto text-center">
+          {org?.logo_url && (
+            <img
+              src={org.logo_url}
+              alt={org.name}
+              className="h-16 w-auto mx-auto mb-3 object-contain"
+            />
+          )}
           <h1 className="font-display font-bold text-xl">{org?.name}</h1>
-          <p className="text-sm opacity-90 mt-1">Quilting Request Form</p>
+          <p className="text-sm opacity-90 mt-1">Quilt Intake Request Form</p>
         </div>
       </div>
 

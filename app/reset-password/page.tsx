@@ -270,6 +270,9 @@ export default function ResetPasswordPage() {
                 {showNewPassword ? "\u{1F648}" : "\u{1F441}\uFE0F"}
               </button>
             </div>
+            <p style={{ fontSize: "12px", color: "#888", marginTop: "4px" }}>
+              Must be at least 8 characters
+            </p>
           </div>
 
           <div style={{ marginBottom: "24px" }}>
