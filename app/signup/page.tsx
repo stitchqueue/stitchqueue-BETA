@@ -13,6 +13,8 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   async function handleSignup(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -312,22 +314,44 @@ export default function SignupPage() {
             >
               Password
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              placeholder="At least 8 characters"
-              style={{
-                width: "100%",
-                padding: "12px",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                fontSize: "16px",
-                boxSizing: "border-box",
-              }}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                placeholder="At least 8 characters"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  paddingRight: "44px",
+                  border: "1px solid #ddd",
+                  borderRadius: "8px",
+                  fontSize: "16px",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "18px",
+                  padding: "0",
+                  lineHeight: "1",
+                }}
+              >
+                {showPassword ? "\u{1F648}" : "\u{1F441}\uFE0F"}
+              </button>
+            </div>
           </div>
 
           <div style={{ marginBottom: "24px" }}>
@@ -342,22 +366,44 @@ export default function SignupPage() {
             >
               Confirm Password
             </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={8}
-              placeholder="Re-enter your password"
-              style={{
-                width: "100%",
-                padding: "12px",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                fontSize: "16px",
-                boxSizing: "border-box",
-              }}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={8}
+                placeholder="Re-enter your password"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  paddingRight: "44px",
+                  border: "1px solid #ddd",
+                  borderRadius: "8px",
+                  fontSize: "16px",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "18px",
+                  padding: "0",
+                  lineHeight: "1",
+                }}
+              >
+                {showConfirmPassword ? "\u{1F648}" : "\u{1F441}\uFE0F"}
+              </button>
+            </div>
           </div>
 
           <button

@@ -162,8 +162,12 @@ export default function BusinessInfoSection({
               </label>
               <input
                 type="tel"
+                inputMode="tel"
                 value={settings.phone || ""}
-                onChange={(e) => onPhoneChange(e.target.value)}
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/[^0-9()\-+\s]/g, "");
+                  onPhoneChange(cleaned);
+                }}
                 placeholder="555-123-4567"
                 className="w-full px-4 py-2 border border-line rounded-xl"
               />

@@ -292,7 +292,7 @@ export default function HomePage() {
         <Toast
           message="Whew, glad we made it back safe & sound!"
           type="success"
-          duration={4000}
+          duration={6000}
           onClose={() => setShowWelcomeBackToast(false)}
           icon={<span className="text-lg">🧵</span>}
         />
@@ -385,7 +385,7 @@ export default function HomePage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
           <button
             onClick={() => router.push("/calculator")}
-            className="bg-plum text-white rounded-xl p-4 sm:p-6 text-center hover:bg-plum/90 transition-colors flex sm:block items-center justify-center gap-3"
+            className="bg-plum text-white rounded-xl p-4 sm:p-6 text-center hover:bg-plum/90 transition-colors flex sm:block items-center justify-center gap-3 focus-visible:ring-2 focus-visible:ring-plum focus-visible:ring-offset-2"
           >
             <div className="text-2xl sm:mb-2">➕</div>
             <div className="font-bold">New Estimate</div>
@@ -393,7 +393,7 @@ export default function HomePage() {
 
           <button
             onClick={() => router.push("/board?filter=due-this-week")}
-            className="bg-orange-100 text-orange-700 border-2 border-orange-200 rounded-xl p-4 sm:p-6 text-center hover:bg-orange-200 transition-colors flex sm:block items-center justify-center gap-3"
+            className="bg-orange-100 text-orange-700 border-2 border-orange-200 rounded-xl p-4 sm:p-6 text-center hover:bg-orange-200 transition-colors flex sm:block items-center justify-center gap-3 focus-visible:ring-2 focus-visible:ring-plum focus-visible:ring-offset-2"
           >
             <div className="text-2xl sm:mb-2">⏰</div>
             <div className="flex sm:flex-col items-center gap-2 sm:gap-0">
@@ -404,7 +404,7 @@ export default function HomePage() {
 
           <button
             onClick={() => router.push("/board")}
-            className="bg-gold text-white rounded-xl p-4 sm:p-6 text-center hover:bg-gold/90 transition-colors flex sm:block items-center justify-center gap-3"
+            className="bg-gold text-white rounded-xl p-4 sm:p-6 text-center hover:bg-gold/90 transition-colors flex sm:block items-center justify-center gap-3 focus-visible:ring-2 focus-visible:ring-plum focus-visible:ring-offset-2"
           >
             <div className="text-2xl sm:mb-2">📋</div>
             <div className="font-bold">View Board</div>

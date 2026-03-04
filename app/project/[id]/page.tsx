@@ -870,7 +870,7 @@ function ProjectDetailContent() {
                       </div>
                     )}
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Date *</label>
+                      <label className="block text-xs text-gray-600 mb-1">Invoiced Date *</label>
                       <input
                         type="date"
                         value={checklistInputs.invoicedDate}
@@ -924,7 +924,7 @@ function ProjectDetailContent() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Date *</label>
+                      <label className="block text-xs text-gray-600 mb-1">Payment Date *</label>
                       <input
                         type="date"
                         value={checklistInputs.paidDate}
@@ -981,7 +981,7 @@ function ProjectDetailContent() {
                       </div>
                     )}
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Date *</label>
+                      <label className="block text-xs text-gray-600 mb-1">Delivery Date *</label>
                       <input
                         type="date"
                         value={checklistInputs.deliveryDate}
