@@ -125,6 +125,12 @@ export default function SettingsForm() {
   const handleFieldChange = async (field: keyof Settings, value: any) => {
     const updated = { ...settings, [field]: value };
     setSettings(updated);
+    // Trim business name before saving; reject if empty after trim
+    if (field === "businessName" && typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      updated.businessName = trimmed;
+    }
     await storage.saveSettings(updated);
   };
 
