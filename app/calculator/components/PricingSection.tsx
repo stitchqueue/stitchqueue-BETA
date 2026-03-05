@@ -10,6 +10,7 @@
 "use client";
 
 import type { Settings } from "../../types";
+import { getCurrencySymbol } from "../../lib/currency";
 
 interface PricingSectionProps {
   settings: Settings;
@@ -92,6 +93,8 @@ export default function PricingSection({
   bobbinPriceManual,
   setBobbinPriceManual,
 }: PricingSectionProps) {
+  const sym = getCurrencySymbol(settings?.currencyCode || "USD");
+
   return (
     <>
       {/* ─────────────────────────────────────────────────────────────────
@@ -112,27 +115,27 @@ export default function PricingSection({
               <option value="">Select quilting type...</option>
               {(settings.pricingRates?.lightE2E ?? 0) > 0 && (
                 <option value="lightE2E">
-                  Light Edge-to-Edge (${settings.pricingRates?.lightE2E}/sq in)
+                  Light Edge-to-Edge ({sym}{settings.pricingRates?.lightE2E}/sq in)
                 </option>
               )}
               {(settings.pricingRates?.standardE2E ?? 0) > 0 && (
                 <option value="standardE2E">
-                  Standard Edge-to-Edge (${settings.pricingRates?.standardE2E}/sq in)
+                  Standard Edge-to-Edge ({sym}{settings.pricingRates?.standardE2E}/sq in)
                 </option>
               )}
               {(settings.pricingRates?.lightCustom ?? 0) > 0 && (
                 <option value="lightCustom">
-                  Light Custom (${settings.pricingRates?.lightCustom}/sq in)
+                  Light Custom ({sym}{settings.pricingRates?.lightCustom}/sq in)
                 </option>
               )}
               {(settings.pricingRates?.custom ?? 0) > 0 && (
                 <option value="custom">
-                  Custom (${settings.pricingRates?.custom}/sq in)
+                  Custom ({sym}{settings.pricingRates?.custom}/sq in)
                 </option>
               )}
               {(settings.pricingRates?.denseCustom ?? 0) > 0 && (
                 <option value="denseCustom">
-                  Dense Custom (${settings.pricingRates?.denseCustom}/sq in)
+                  Dense Custom ({sym}{settings.pricingRates?.denseCustom}/sq in)
                 </option>
               )}
               <option value="Custom Rate">Custom Rate (set price for this estimate only)</option>
@@ -204,7 +207,7 @@ export default function PricingSection({
               Client Supplies Own Batting
             </div>
             <div className="text-xs text-muted">
-              Batting cost will be $0
+              Batting cost will be {sym}0
             </div>
           </div>
         </label>
@@ -229,7 +232,7 @@ export default function PricingSection({
                 <option value="">Select batting...</option>
                 {settings.battingOptions?.map((b) => (
                   <option key={`${b.name}-${b.widthInches}`} value={b.name}>
-                    {b.name} - {b.widthInches}&quot; wide ($
+                    {b.name} - {b.widthInches}&quot; wide ({sym}
                     {b.pricePerInch.toFixed(4)}/in)
                   </option>
                 ))}
@@ -300,15 +303,15 @@ export default function PricingSection({
             className="w-full px-4 py-2 border border-line rounded-xl"
           >
             <option value="">Select binding...</option>
-            <option value="No Binding">No Binding ($0)</option>
+            <option value="No Binding">No Binding ({sym}0)</option>
             {(settings.pricingRates?.bindingTopAttached ?? 0) > 0 && (
               <option value="Top Attached Only">
-                Top Attached Only (${settings.pricingRates?.bindingTopAttached}/in)
+                Top Attached Only ({sym}{settings.pricingRates?.bindingTopAttached}/in)
               </option>
             )}
             {(settings.pricingRates?.bindingFullyAttached ?? 0) > 0 && (
               <option value="Fully Attached">
-                Fully Attached (${settings.pricingRates?.bindingFullyAttached}/in)
+                Fully Attached ({sym}{settings.pricingRates?.bindingFullyAttached}/in)
               </option>
             )}
           </select>
@@ -365,7 +368,7 @@ export default function PricingSection({
               <option value="">Select bobbin type...</option>
               {settings.bobbinOptions?.map((b) => (
                 <option key={b.name} value={b.name}>
-                  {b.name} (${b.price.toFixed(2)} each)
+                  {b.name} ({sym}{b.price.toFixed(2)} each)
                 </option>
               ))}
             </select>
