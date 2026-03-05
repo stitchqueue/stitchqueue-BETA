@@ -19,6 +19,7 @@ interface DroppableColumnProps {
   projects: Project[];
   onCardClick: (projectId: string) => void;
   stageConfig?: { label: string; tooltip: string };
+  currencyCode?: string;
 }
 
 /**
@@ -30,6 +31,7 @@ export default function DroppableColumn({
   projects,
   onCardClick,
   stageConfig,
+  currencyCode = "USD",
 }: DroppableColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage,
@@ -79,6 +81,7 @@ export default function DroppableColumn({
               key={project.id}
               project={project}
               onClick={() => onCardClick(project.id)}
+              currencyCode={currencyCode}
             />
           ))
         )}

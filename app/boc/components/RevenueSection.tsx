@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import { getRevenueData, type RevenueData } from "../../lib/storage/boc-performance";
 
-function fmtCurrency(n: number): string {
-  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+interface Props {
+  currencySymbol?: string;
 }
 
-export default function RevenueSection() {
+export default function RevenueSection({ currencySymbol = "$" }: Props) {
+  const fmtCurrency = (n: number): string =>
+    currencySymbol + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const [data, setData] = useState<RevenueData | null>(null);
   const [loading, setLoading] = useState(true);
 

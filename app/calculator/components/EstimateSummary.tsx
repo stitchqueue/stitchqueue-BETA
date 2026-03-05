@@ -59,6 +59,8 @@ interface EstimateSummaryProps {
   
   /** Currency formatter function */
   formatCurrency: (amount: number) => string;
+  /** Currency symbol (e.g. "$", "£", "S/") */
+  currencySymbol?: string;
 }
 
 /**
@@ -105,6 +107,7 @@ export default function EstimateSummary({
   depositReceivedToday,
   depositPaymentMethod,
   formatCurrency,
+  currencySymbol = "$",
 }: EstimateSummaryProps) {
   return (
     <div className="border-t border-line pt-6 mt-6">
@@ -201,14 +204,14 @@ export default function EstimateSummary({
                     : "bg-white text-muted hover:bg-gray-50"
                 }`}
               >
-                $
+                {currencySymbol}
               </button>
             </div>
             {/* Value Input */}
             <div className="relative w-24">
               {discountType === "flat" && (
                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted">
-                  $
+                  {currencySymbol}
                 </span>
               )}
               <input

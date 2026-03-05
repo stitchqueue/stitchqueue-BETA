@@ -319,6 +319,8 @@ export default function BusinessInfoSection({
               <option value="GBP">GBP - British Pound (£)</option>
               <option value="EUR">EUR - Euro (€)</option>
               <option value="AUD">AUD - Australian Dollar ($)</option>
+              <option value="MXN">MXN - Mexican Peso ($)</option>
+              <option value="PEN">PEN - Peruvian Sol (S/)</option>
             </select>
           </div>
 

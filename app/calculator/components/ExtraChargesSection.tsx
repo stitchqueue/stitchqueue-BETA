@@ -30,6 +30,8 @@ interface ExtraChargesSectionProps {
   
   /** Currency formatter function */
   formatCurrency: (amount: number) => string;
+  /** Currency symbol (e.g. "$", "£", "S/") */
+  currencySymbol?: string;
 }
 
 /**
@@ -51,6 +53,7 @@ export default function ExtraChargesSection({
   onAddCharge,
   onRemoveCharge,
   formatCurrency,
+  currencySymbol = "$",
 }: ExtraChargesSectionProps) {
   return (
     <div className="mb-6 p-4 bg-background border border-line rounded-xl">
@@ -70,7 +73,7 @@ export default function ExtraChargesSection({
           />
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
-              $
+              {currencySymbol}
             </span>
             <input
               type="text"

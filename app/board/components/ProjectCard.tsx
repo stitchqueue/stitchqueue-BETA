@@ -89,11 +89,11 @@ function formatDate(dateString?: string): string {
 /**
  * Format currency amount
  */
-function formatCurrency(amount?: number): string {
+function formatCurrency(amount?: number, currencyCode = "USD"): string {
   if (!amount) return "";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: currencyCode,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
@@ -145,7 +145,7 @@ function EstimatesStageContent({ project }: { project: Project }) {
 /**
  * Render Stage 3 (Completed) checklist content
  */
-function CompletedStageContent({ project }: { project: Project }) {
+function CompletedStageContent({ project, currencyCode = "USD" }: { project: Project; currencyCode?: string }) {
   const projectType = project.projectType || "regular";
 
   if (projectType === "regular") {
@@ -164,7 +164,7 @@ function CompletedStageContent({ project }: { project: Project }) {
           <span className={`truncate ${project.invoiced ? "text-gray-700" : "text-gray-500"}`}>
             Job Summary
             {project.invoiced && project.invoicedAmount
-              ? ` ${formatCurrency(project.invoicedAmount)}`
+              ? ` ${formatCurrency(project.invoicedAmount, currencyCode)}`
               : ""}
             {project.invoiced && project.invoicedDate
               ? ` • ${formatDate(project.invoicedDate)}`
@@ -178,7 +178,7 @@ function CompletedStageContent({ project }: { project: Project }) {
           <span className={`truncate ${project.paid ? "text-gray-700" : "text-gray-500"}`}>
             Paid
             {project.paid && project.paidAmount
-              ? ` ${formatCurrency(project.paidAmount)}`
+              ? ` ${formatCurrency(project.paidAmount, currencyCode)}`
               : ""}
             {project.paid && project.paidDate
               ? ` • ${formatDate(project.paidDate)}`
@@ -201,7 +201,7 @@ function CompletedStageContent({ project }: { project: Project }) {
         </div>
         {balance > 0 && (
           <div className="text-xs text-orange-600 font-medium mt-1">
-            Balance: {formatCurrency(balance)}
+            Balance: {formatCurrency(balance, currencyCode)}
           </div>
         )}
       </div>
@@ -276,6 +276,7 @@ interface DraggableProjectCardProps {
   project: Project;
   onClick: () => void;
   showStage?: boolean;
+  currencyCode?: string;
 }
 
 /**
@@ -286,6 +287,7 @@ export function DraggableProjectCard({
   project,
   onClick,
   showStage = false,
+  currencyCode = "USD",
 }: DraggableProjectCardProps) {
   const {
     attributes,
@@ -415,7 +417,7 @@ export function DraggableProjectCard({
 
           {/* Stage-specific content */}
           {project.stage === "Estimates" && <EstimatesStageContent project={project} />}
-          {project.stage === "Completed" && <CompletedStageContent project={project} />}
+          {project.stage === "Completed" && <CompletedStageContent project={project} currencyCode={currencyCode} />}
 
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {showStage && (
@@ -451,6 +453,7 @@ interface ProjectCardProps {
   project: Project;
   onClick: () => void;
   showStage?: boolean;
+  currencyCode?: string;
 }
 
 /**
@@ -461,6 +464,7 @@ export function ProjectCard({
   project,
   onClick,
   showStage = false,
+  currencyCode = "USD",
 }: ProjectCardProps) {
   const initials = getInitials(
     project.clientFirstName || "",
@@ -533,7 +537,7 @@ export function ProjectCard({
 
           {/* Stage-specific content */}
           {project.stage === "Estimates" && <EstimatesStageContent project={project} />}
-          {project.stage === "Completed" && <CompletedStageContent project={project} />}
+          {project.stage === "Completed" && <CompletedStageContent project={project} currencyCode={currencyCode} />}
 
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {showStage && (
@@ -567,13 +571,14 @@ export function ProjectCard({
 
 interface ProjectCardOverlayProps {
   project: Project;
+  currencyCode?: string;
 }
 
 /**
  * Floating card shown during drag operations.
  * Simplified version without interaction handlers.
  */
-export function ProjectCardOverlay({ project }: ProjectCardOverlayProps) {
+export function ProjectCardOverlay({ project, currencyCode = "USD" }: ProjectCardOverlayProps) {
   const initials = getInitials(
     project.clientFirstName || "",
     project.clientLastName || ""
@@ -648,7 +653,7 @@ export function ProjectCardOverlay({ project }: ProjectCardOverlayProps) {
 
           {/* Stage-specific content */}
           {project.stage === "Estimates" && <EstimatesStageContent project={project} />}
-          {project.stage === "Completed" && <CompletedStageContent project={project} />}
+          {project.stage === "Completed" && <CompletedStageContent project={project} currencyCode={currencyCode} />}
 
           {dueBadge && (
             <div className="flex items-center gap-2 mt-2">
