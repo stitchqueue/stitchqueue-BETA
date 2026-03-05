@@ -13,6 +13,7 @@ import SubscriptionGate from "../../components/SubscriptionGate";
 import { STAGES } from "../../types";
 import type { Project, Stage, Settings } from "../../types";
 import { getTodayDate } from "../../lib/utils";
+import { getCurrencySymbol } from "../../lib/currency";
 
 function formatDate(dateStr: string | undefined): string {
   if (!dateStr) return "—";
@@ -24,11 +25,13 @@ function formatDate(dateStr: string | undefined): string {
   });
 }
 
-function formatCurrency(amount: number | undefined): string {
-  if (amount === undefined || amount === null) return "$0.00";
+function formatCurrency(amount: number | undefined, currencyCode = "USD"): string {
+  if (amount === undefined || amount === null) {
+    return getCurrencySymbol(currencyCode) + "0.00";
+  }
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: currencyCode,
   }).format(amount);
 }
 
@@ -54,6 +57,10 @@ function ProjectDetailContent() {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [updating, setUpdating] = useState(false);
+
+  const currencyCode = settings?.currencyCode || "USD";
+  const currencySymbol = getCurrencySymbol(currencyCode);
+  const fmtCurrency = (amount: number | undefined) => formatCurrency(amount, currencyCode);
 
   // Payment recording state
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -681,7 +688,7 @@ function ProjectDetailContent() {
     if (fieldName === 'paidAmount' && project.invoicedAmount) {
       const maxPaid = project.invoicedAmount - (project.depositPaidAmount || 0);
       if (amount > maxPaid) {
-        return `Amount cannot exceed remaining balance (${formatCurrency(maxPaid)})`;
+        return `Amount cannot exceed remaining balance (${fmtCurrency(maxPaid)})`;
       }
     }
     return '';
@@ -864,7 +871,7 @@ function ProjectDetailContent() {
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">Job Summary Amount</label>
                         <div className="w-full px-3 py-2 border border-line rounded-lg text-sm bg-gray-50 font-medium text-gray-700">
-                          {formatCurrency(estimate?.total || 0)}
+                          {fmtCurrency(estimate?.total || 0)}
                         </div>
                         <p className="text-xs text-gray-500 mt-1">Auto-calculated from estimate total</p>
                       </div>
@@ -1309,15 +1316,15 @@ function ProjectDetailContent() {
               {(estimate.quiltingTotal ?? 0) > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>
-                    Quilting ({(estimate.quiltArea || 0).toLocaleString()} sq in × ${estimate.quiltingRate}/sq in)
+                    Quilting ({(estimate.quiltArea || 0).toLocaleString()} sq in × {currencySymbol}{estimate.quiltingRate}/sq in)
                   </span>
-                  <span>{formatCurrency(estimate.quiltingTotal)}</span>
+                  <span>{fmtCurrency(estimate.quiltingTotal)}</span>
                 </div>
               )}
               {(estimate.threadCost ?? 0) > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>Thread</span>
-                  <span>{formatCurrency(estimate.threadCost)}</span>
+                  <span>{fmtCurrency(estimate.threadCost)}</span>
                 </div>
               )}
               {(estimate.battingTotal ?? 0) > 0 && (
@@ -1325,29 +1332,29 @@ function ProjectDetailContent() {
                   <span>
                     Batting ({Math.round(estimate.battingLengthNeeded || 0)}" length)
                   </span>
-                  <span>{formatCurrency(estimate.battingTotal)}</span>
+                  <span>{fmtCurrency(estimate.battingTotal)}</span>
                 </div>
               )}
               {estimate.clientSuppliesBatting && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>Batting (Client Supplied)</span>
-                  <span>$0.00</span>
+                  <span>{currencySymbol}0.00</span>
                 </div>
               )}
               {(estimate.bindingTotal ?? 0) > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>
-                    Binding ({Math.round(estimate.bindingPerimeter || 0)}" × ${estimate.bindingRatePerInch}/in)
+                    Binding ({Math.round(estimate.bindingPerimeter || 0)}" × {currencySymbol}{estimate.bindingRatePerInch}/in)
                   </span>
-                  <span>{formatCurrency(estimate.bindingTotal)}</span>
+                  <span>{fmtCurrency(estimate.bindingTotal)}</span>
                 </div>
               )}
               {(estimate.bobbinTotal ?? 0) > 0 && (
                 <div className="flex justify-between py-1 border-b border-line">
                   <span>
-                    Bobbins ({estimate.bobbinCount} × ${estimate.bobbinPrice})
+                    Bobbins ({estimate.bobbinCount} × {currencySymbol}{estimate.bobbinPrice})
                   </span>
-                  <span>{formatCurrency(estimate.bobbinTotal)}</span>
+                  <span>{fmtCurrency(estimate.bobbinTotal)}</span>
                 </div>
               )}
             </div>
@@ -1355,20 +1362,20 @@ function ProjectDetailContent() {
             <div className="border-t border-line pt-2 mt-2 space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-muted">Subtotal</span>
-                <span className="font-medium">{formatCurrency(estimate.subtotal)}</span>
+                <span className="font-medium">{fmtCurrency(estimate.subtotal)}</span>
               </div>
               {/* v4.0 DEPRECATED - Tax display hidden by ENABLE_TAX_SYSTEM flag */}
               <FeatureGate flag="ENABLE_TAX_SYSTEM">
                 {(estimate.taxAmount ?? 0) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted">Tax ({estimate.taxRate}%)</span>
-                    <span className="font-medium">{formatCurrency(estimate.taxAmount)}</span>
+                    <span className="font-medium">{fmtCurrency(estimate.taxAmount)}</span>
                   </div>
                 )}
               </FeatureGate>
               <div className="flex justify-between py-1 font-bold text-base border-t border-line">
                 <span>Total</span>
-                <span className="text-plum">{formatCurrency(estimate.total)}</span>
+                <span className="text-plum">{fmtCurrency(estimate.total)}</span>
               </div>
             </div>
           </div>
@@ -1385,7 +1392,7 @@ function ProjectDetailContent() {
               {/* Invoice Total */}
               <div className="flex justify-between text-sm py-1 border-b border-line">
                 <span className="text-muted">Invoice Total</span>
-                <span className="font-bold">{formatCurrency(estimate.total)}</span>
+                <span className="font-bold">{fmtCurrency(estimate.total)}</span>
               </div>
 
               {/* Deposit Section */}
@@ -1393,7 +1400,7 @@ function ProjectDetailContent() {
                 <div className="p-2 bg-gold/10 rounded-lg space-y-1 print:bg-transparent print:border print:border-gold/30 print:p-1">
                   <div className="flex justify-between text-sm">
                     <span className="font-bold text-gold">Deposit</span>
-                    <span className="font-bold text-gold">{formatCurrency(project.depositAmount)}</span>
+                    <span className="font-bold text-gold">{fmtCurrency(project.depositAmount)}</span>
                   </div>
                   {project.depositPaid ? (
                     <div className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded print:bg-transparent print:p-0">
@@ -1421,7 +1428,7 @@ function ProjectDetailContent() {
                 <div className="p-2 bg-green-50 border border-green-200 rounded-lg space-y-1 print:bg-transparent print:p-1">
                   <div className="flex justify-between text-sm">
                     <span className="font-bold text-green-700">Final Payment</span>
-                    <span className="font-bold text-green-700">{formatCurrency(project.finalPaymentAmount)}</span>
+                    <span className="font-bold text-green-700">{fmtCurrency(project.finalPaymentAmount)}</span>
                   </div>
                   <div className="text-xs text-green-700">
                     ✓ Paid on {formatDate(project.finalPaymentDate)}{project.finalPaymentMethod && ` via ${project.finalPaymentMethod}`}
@@ -1450,7 +1457,7 @@ function ProjectDetailContent() {
                           </label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
-                              $
+                              {currencySymbol}
                             </span>
                             <input
                               type="text"
@@ -1527,7 +1534,7 @@ function ProjectDetailContent() {
                 }`}
               >
                 <span>Balance Due</span>
-                <span>{balanceDue <= 0 ? "✓ PAID IN FULL" : formatCurrency(balanceDue)}</span>
+                <span>{balanceDue <= 0 ? "✓ PAID IN FULL" : fmtCurrency(balanceDue)}</span>
               </div>
             </div>
           </div>
@@ -1646,7 +1653,7 @@ function ProjectDetailContent() {
                         </div>
                         {project.invoiced && (
                           <div className="text-sm text-green-700 mt-1">
-                            {formatCurrency(project.invoicedAmount)} • {formatDate(project.invoicedDate)}
+                            {fmtCurrency(project.invoicedAmount)} • {formatDate(project.invoicedDate)}
                           </div>
                         )}
                       </div>
@@ -1669,7 +1676,7 @@ function ProjectDetailContent() {
                         </div>
                         {project.paid && (
                           <div className="text-sm text-green-700 mt-1">
-                            {formatCurrency(project.paidAmount)} • {formatDate(project.paidDate)}
+                            {fmtCurrency(project.paidAmount)} • {formatDate(project.paidDate)}
                           </div>
                         )}
                       </div>
@@ -1715,12 +1722,12 @@ function ProjectDetailContent() {
                         }`}>
                           {(project.balanceRemaining || 0) <= 0
                             ? '✓ PAID IN FULL'
-                            : formatCurrency(project.balanceRemaining)}
+                            : fmtCurrency(project.balanceRemaining)}
                         </span>
                       </div>
                       {(project.balanceRemaining || 0) > 0 && (
                         <div className="text-xs text-orange-600 mt-1">
-                          Job Summary: {formatCurrency(project.invoicedAmount)} - Deposit: {formatCurrency(project.depositPaidAmount || 0)} - Paid: {formatCurrency(project.paidAmount || 0)}
+                          Job Summary: {fmtCurrency(project.invoicedAmount)} - Deposit: {fmtCurrency(project.depositPaidAmount || 0)} - Paid: {fmtCurrency(project.paidAmount || 0)}
                         </div>
                       )}
                     </div>
