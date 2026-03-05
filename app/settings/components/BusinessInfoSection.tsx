@@ -216,7 +216,7 @@ export default function BusinessInfoSection({
                   className="w-full px-4 py-2 border border-line rounded-xl"
                 />
                 <p className="text-xs text-muted mt-2">
-                  Max file size: 500KB. Recommended: Square image, PNG with
+                  Max file size: 2MB. Recommended: Square image, PNG with
                   transparency.
                 </p>
               </div>
