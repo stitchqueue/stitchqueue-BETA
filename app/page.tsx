@@ -9,6 +9,7 @@ import { supabase } from "./lib/supabase";
 import { getRevenueData, type RevenueData } from "./lib/storage/boc-performance";
 import type { User } from "@supabase/supabase-js";
 import type { Project, Settings } from "./types";
+import { getCurrencySymbol } from "./lib/currency";
 
 const QUOTES = [
   "Quilters never cut corners... well, actually we do!",
@@ -316,8 +317,9 @@ export default function HomePage() {
         {revenueData ? (() => {
           const diff = revenueData.thisMonthRevenue - revenueData.lastMonthRevenue;
           const diffAbs = Math.abs(diff);
+          const sym = getCurrencySymbol(settings?.currencyCode || "USD");
           const fmtCurrency = (n: number) =>
-            "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            sym + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
           return (
             <div className="bg-white border-l-4 border-plum/40 rounded-xl p-4 mb-6 shadow-sm">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

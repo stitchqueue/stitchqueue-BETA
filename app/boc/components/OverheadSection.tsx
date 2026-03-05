@@ -7,9 +7,10 @@ interface Props {
   items: OverheadItem[];
   onChange: (items: OverheadItem[]) => void;
   total: number;
+  currencySymbol?: string;
 }
 
-export default function OverheadSection({ items, onChange, total }: Props) {
+export default function OverheadSection({ items, onChange, total, currencySymbol = "$" }: Props) {
   const updateItem = (index: number, field: "label" | "amount", value: string) => {
     const updated = items.map((item, i) => {
       if (i !== index) return item;
@@ -25,7 +26,7 @@ export default function OverheadSection({ items, onChange, total }: Props) {
   return (
     <div>
       <h3 className="text-lg font-bold text-plum mb-4">
-        Monthly Overhead ($){" "}
+        Monthly Overhead ({currencySymbol}){" "}
         <Tooltip content="Fixed costs you pay every month whether you quilt or not — machine payments, insurance, rent, software, etc." position="right" />
       </h3>
 
@@ -49,7 +50,7 @@ export default function OverheadSection({ items, onChange, total }: Props) {
             <div>
               {index === 0 && (
                 <label className="block text-sm font-bold text-muted mb-2">
-                  $/month
+                  {currencySymbol}/month
                 </label>
               )}
               <input
@@ -71,7 +72,7 @@ export default function OverheadSection({ items, onChange, total }: Props) {
       <div className="mt-4 flex items-center gap-2">
         <span className="text-sm font-bold text-muted">Monthly Total:</span>
         <span className="text-lg font-bold text-plum">
-          ${total.toFixed(2)}
+          {currencySymbol}{total.toFixed(2)}
         </span>
       </div>
 

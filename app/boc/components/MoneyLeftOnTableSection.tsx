@@ -3,15 +3,14 @@
 import { useState, useEffect } from "react";
 import { getPerformanceData, type PerformanceData } from "../../lib/storage/boc-performance";
 
-function fmtCurrency(n: number): string {
-  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 interface Props {
   minimumRatePerSqIn: number;
+  currencySymbol?: string;
 }
 
-export default function MoneyLeftOnTableSection({ minimumRatePerSqIn }: Props) {
+export default function MoneyLeftOnTableSection({ minimumRatePerSqIn, currencySymbol = "$" }: Props) {
+  const fmtCurrency = (n: number): string =>
+    currencySymbol + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const [data, setData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
 

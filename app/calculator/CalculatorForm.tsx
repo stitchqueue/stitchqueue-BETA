@@ -19,6 +19,7 @@ import { storage } from "../lib/storage";
 import { supabase } from "../lib/supabase";
 import { isFeatureEnabled } from "../lib/featureFlags";
 import type { Settings, Project, ExtraCharge } from "../types";
+import { getCurrencySymbol } from "../lib/currency";
 
 interface BOCRateData {
   hasBOC: boolean;
@@ -218,6 +219,8 @@ export default function CalculatorForm() {
       currency: settings?.currencyCode || "USD",
     }).format(amount);
   };
+
+  const currencySymbol = getCurrencySymbol(settings?.currencyCode || "USD");
 
   // ─────────────────────────────────────────────────────────────────────
   // EXTRA CHARGES HANDLERS
@@ -840,6 +843,7 @@ export default function CalculatorForm() {
             onAddCharge={handleAddExtraCharge}
             onRemoveCharge={handleRemoveExtraCharge}
             formatCurrency={formatCurrency}
+            currencySymbol={currencySymbol}
           />
 
           {/* Estimate Summary (Totals, Discount, Donation Toggle) */}
@@ -876,6 +880,7 @@ export default function CalculatorForm() {
               depositReceivedToday={depositReceivedToday}
               depositPaymentMethod={depositPaymentMethod}
               formatCurrency={formatCurrency}
+              currencySymbol={currencySymbol}
             />
           )}
 
@@ -908,6 +913,7 @@ export default function CalculatorForm() {
               depositAmount={depositAmount}
               balanceDue={balanceDue}
               formatCurrency={formatCurrency}
+              currencySymbol={currencySymbol}
             />
           )}
 

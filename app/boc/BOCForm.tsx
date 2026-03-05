@@ -6,6 +6,8 @@ import Header from "../components/Header";
 import Toast from "../components/Toast";
 import { useAuth } from "../lib/auth-context";
 import { getBOCSettings, saveBOCSettings } from "../lib/storage/boc";
+import { storage } from "../lib/storage";
+import { getCurrencySymbol } from "../lib/currency";
 import { getBOCMode, type BOCMode } from "../lib/storage/boc-mode";
 import { getBOCPurchaseStatus, type BOCPurchaseStatus } from "../lib/storage/boc-stripe";
 import { BETA_TESTER_EMAILS } from "../lib/server-subscription";
@@ -55,6 +57,8 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
     purchaseDate: null,
   });
 
+  const [currencySymbol, setCurrencySymbol] = useState("$");
+
   // ── Form state ─────────────────────────────────────────────────────
   const [targetHourlyWage, setTargetHourlyWage] = useState("");
   const [sphRate, setSphRate] = useState(SPH_RATES.experienced);
@@ -102,6 +106,8 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
         ];
 
         const [saved, mode, purchase] = await Promise.all(promises);
+        const mainSettings = await storage.getSettings();
+        setCurrencySymbol(getCurrencySymbol(mainSettings?.currencyCode || "USD"));
         applySettings(saved);
         setBocMode(mode);
         if (purchase) setPurchaseStatus(purchase);
@@ -281,6 +287,7 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
             items={overheadItems}
             onChange={setOverheadItems}
             total={overheadTotal}
+            currencySymbol={currencySymbol}
           />
 
           <hr className="border-line" />
@@ -294,7 +301,7 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
           <hr className="border-line" />
 
           {/* Results */}
-          <ResultsCard results={results} />
+          <ResultsCard results={results} currencySymbol={currencySymbol} />
         </div>
 
         {/* Revenue, Rate Check, Performance, Donations — paywall gated */}
@@ -303,7 +310,7 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
             {/* Revenue Section */}
             {effectiveMode.isConnected && effectiveMode.hasProjects && (
               <div className="mt-6">
-                <RevenueSection />
+                <RevenueSection currencySymbol={currencySymbol} />
               </div>
             )}
 
@@ -312,6 +319,7 @@ export default function BOCForm({ serverPurchased = false }: BOCFormProps) {
               <div className="mt-6">
                 <MoneyLeftOnTableSection
                   minimumRatePerSqIn={results?.isValid ? results.minimumRatePerSqIn : 0}
+                  currencySymbol={currencySymbol}
                 />
               </div>
             )}

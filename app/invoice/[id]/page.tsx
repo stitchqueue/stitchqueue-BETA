@@ -7,6 +7,7 @@ import { storage } from "../../lib/storage";
 import { FeatureGate } from "../../lib/featureFlags";
 import type { Project, Settings } from "../../types";
 import { getTodayDate } from "../../lib/utils";
+import { getCurrencySymbol } from "../../lib/currency";
 
 export default function InvoicePage() {
   const router = useRouter();
@@ -626,7 +627,7 @@ export default function InvoicePage() {
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
-                        $
+                        {getCurrencySymbol(settings?.currencyCode || "USD")}
                       </span>
                       <input
                         type="text"

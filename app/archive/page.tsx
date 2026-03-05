@@ -6,7 +6,8 @@ import Header from "../components/Header";
 import EmptyState from "../components/EmptyState";
 import SubscriptionGate from "../components/SubscriptionGate";
 import { storage } from "../lib/storage";
-import type { Project } from "../types";
+import type { Project, Settings } from "../types";
+import { getCurrencySymbol } from "../lib/currency";
 
 export default function ArchivePage() {
   return (
@@ -23,6 +24,7 @@ function ArchiveContent() {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -34,6 +36,8 @@ function ArchiveContent() {
           return;
         }
         setIsAuthenticated(true);
+        const s = await storage.getSettings();
+        setSettings(s);
         await loadArchivedProjects();
       } catch (error) {
         console.error("Error initializing archive page:", error);
@@ -252,7 +256,7 @@ function ArchiveContent() {
                           <div>
                             <span className="text-muted">Total:</span>{" "}
                             <span className="font-medium font-bold text-plum">
-                              ${project.estimateData.total.toFixed(2)}
+                              {getCurrencySymbol(settings?.currencyCode || "USD")}{project.estimateData.total.toFixed(2)}
                             </span>
                           </div>
                         )}

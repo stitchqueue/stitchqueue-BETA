@@ -1294,14 +1294,6 @@ function ProjectDetailContent() {
               <div className="flex gap-2 print:hidden">
                 <button
                   onClick={() =>
-                    router.push(`/invoice/${encodeURIComponent(project.id)}`)
-                  }
-                  className="px-4 py-2 bg-gold text-white rounded-xl font-bold hover:bg-gold/90 transition-colors"
-                >
-                  View Invoice
-                </button>
-                <button
-                  onClick={() =>
                     router.push(
                       `/calculator?projectId=${encodeURIComponent(project.id)}`
                     )

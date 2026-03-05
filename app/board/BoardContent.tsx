@@ -19,7 +19,7 @@ import { storage } from "../lib/storage";
 import { supabase } from "../lib/supabase";
 import TrialBanner from "../components/TrialBanner";
 import { STAGES } from "../types";
-import type { Project, Stage } from "../types";
+import type { Project, Stage, Settings } from "../types";
 
 // Drag and drop
 import {
@@ -129,6 +129,7 @@ export default function BoardContent() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [stageError, setStageError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
 
   // Confirmation dialog for moving back to Estimates
   const [pendingEstimatesMove, setPendingEstimatesMove] = useState<{
@@ -171,8 +172,12 @@ export default function BoardContent() {
           return;
         }
 
-        const savedProjects = await storage.getProjects();
+        const [savedProjects, savedSettings] = await Promise.all([
+          storage.getProjects(),
+          storage.getSettings(),
+        ]);
         setProjects(savedProjects || []);
+        setSettings(savedSettings);
         setLoading(false);
       } catch (err) {
         console.error("Error loading board data:", err);
@@ -849,6 +854,7 @@ export default function BoardContent() {
                     key={project.id}
                     project={project}
                     onClick={() => handleCardClick(project.id)}
+                    currencyCode={settings?.currencyCode || "USD"}
                     showStage={true}
                   />
                 ))}
@@ -914,6 +920,7 @@ export default function BoardContent() {
                       projects={stageProjects}
                       onCardClick={handleCardClick}
                       stageConfig={STAGE_CONFIG[stage as Stage]}
+                      currencyCode={settings?.currencyCode || "USD"}
                     />
                   );
                 })}
@@ -921,7 +928,7 @@ export default function BoardContent() {
 
               <DragOverlay>
                 {activeProject ? (
-                  <ProjectCardOverlay project={activeProject} />
+                  <ProjectCardOverlay project={activeProject} currencyCode={settings?.currencyCode || "USD"} />
                 ) : null}
               </DragOverlay>
             </DndContext>
