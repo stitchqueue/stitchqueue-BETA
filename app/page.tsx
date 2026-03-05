@@ -28,6 +28,7 @@ const STAGE_CONFIG = [
   { stage: "Estimates", icon: "📥", color: "bg-blue-100 text-blue-700" },
   { stage: "In Progress", icon: "🧵", color: "bg-orange-100 text-orange-700" },
   { stage: "Completed", icon: "✅", color: "bg-green-100 text-green-700" },
+  { stage: "Archive", icon: "🗄️", color: "bg-gray-100 text-gray-600" },
 ];
 
 const ZERO_REVENUE_MESSAGES = [
@@ -267,6 +268,7 @@ export default function HomePage() {
   }
 
   const activeProjects = projects.filter((p) => p.stage !== "Archived");
+  const archivedProjects = projects.filter((p) => p.stage === "Archived");
   const dueThisWeekCount = activeProjects.filter(isDueThisWeek).length;
   const asapCount = activeProjects.filter(isAsap).length;
 
@@ -366,18 +368,22 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Stage stat boxes — 3-stage workflow */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        {/* Stage stat boxes — 3-stage workflow + archive */}
+        <div className="grid grid-cols-4 gap-3 mb-6">
           {STAGE_CONFIG.map(({ stage, icon, color }) => (
             <button
               key={stage}
               onClick={() =>
-                router.push(`/board?stage=${encodeURIComponent(stage)}`)
+                stage === "Archive"
+                  ? router.push("/archive")
+                  : router.push(`/board?stage=${encodeURIComponent(stage)}`)
               }
               className={`${color} rounded-xl p-3 sm:p-4 text-center hover:opacity-90 transition-opacity min-w-0`}
             >
               <div className="text-xl sm:text-2xl mb-1">{icon}</div>
-              <div className="text-xl sm:text-2xl font-bold">{getStageCount(stage)}</div>
+              <div className="text-xl sm:text-2xl font-bold">
+                {stage === "Archive" ? archivedProjects.length : getStageCount(stage)}
+              </div>
               <div className="text-[10px] sm:text-xs font-medium leading-tight truncate">{stage}</div>
             </button>
           ))}
