@@ -524,7 +524,7 @@ function ProjectDetailContent() {
     if (item === 'paid' && checked && effectiveProjectType === 'regular') {
       const invoicedAmt = project.invoicedAmount || estimate?.total || 0;
       const depositAmt = project.depositPaidAmount || 0;
-      const remainingBalance = invoicedAmt - depositAmt;
+      const remainingBalance = parseFloat((invoicedAmt - depositAmt).toFixed(2));
       if (remainingBalance > 0) {
         setChecklistInputs(prev => ({
           ...prev,
@@ -687,7 +687,7 @@ function ProjectDetailContent() {
     // Additional validation for paid amount
     if (fieldName === 'paidAmount' && project.invoicedAmount) {
       const maxPaid = project.invoicedAmount - (project.depositPaidAmount || 0);
-      if (amount > maxPaid) {
+      if (Math.round(amount * 100) > Math.round(maxPaid * 100)) {
         return `Amount cannot exceed remaining balance (${fmtCurrency(maxPaid)})`;
       }
     }
