@@ -96,6 +96,12 @@ export default function ClientInfoSection({
   const [isRepeatClient, setIsRepeatClient] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // "Other" country state — track separately so dropdown stays on "Other"
+  // while clientCountry holds the actual typed value
+  const isKnownCountry = (COUNTRY_OPTIONS as readonly string[]).includes(clientCountry);
+  const [otherCountrySelected, setOtherCountrySelected] = useState(!isKnownCountry && clientCountry !== "");
+  const [otherCountryValue, setOtherCountryValue] = useState(!isKnownCountry ? clientCountry : "");
+
   // Get location-specific labels and options based on selected country
   const regions = getRegionsForCountry(clientCountry);
   const showRegionDropdown = countryHasRegionDropdown(clientCountry);
@@ -193,7 +199,16 @@ export default function ClientInfoSection({
     setClientState(client.state || "");
     setClientPostalCode(client.postalCode || "");
     if (client.country) {
-      onCountryChange(client.country);
+      const known = (COUNTRY_OPTIONS as readonly string[]).includes(client.country);
+      if (known) {
+        setOtherCountrySelected(false);
+        setOtherCountryValue("");
+        onCountryChange(client.country);
+      } else {
+        setOtherCountrySelected(true);
+        setOtherCountryValue(client.country);
+        onCountryChange(client.country);
+      }
     }
     setIsRepeatClient(true);
     setShowSuggestions(false);
@@ -385,8 +400,19 @@ export default function ClientInfoSection({
             Country
           </label>
           <select
-            value={clientCountry}
-            onChange={(e) => onCountryChange(e.target.value)}
+            value={otherCountrySelected ? "Other" : clientCountry}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "Other") {
+                setOtherCountrySelected(true);
+                setOtherCountryValue("");
+                onCountryChange("");
+              } else {
+                setOtherCountrySelected(false);
+                setOtherCountryValue("");
+                onCountryChange(val);
+              }
+            }}
             className="w-full px-4 py-2 border border-line rounded-xl"
           >
             {COUNTRY_OPTIONS.map((country) => (
@@ -395,6 +421,18 @@ export default function ClientInfoSection({
               </option>
             ))}
           </select>
+          {otherCountrySelected && (
+            <input
+              type="text"
+              placeholder="Please specify country"
+              value={otherCountryValue}
+              onChange={(e) => {
+                setOtherCountryValue(e.target.value);
+                onCountryChange(e.target.value);
+              }}
+              className="w-full px-4 py-2 border border-line rounded-xl mt-2"
+            />
+          )}
         </div>
       </div>
     </>
