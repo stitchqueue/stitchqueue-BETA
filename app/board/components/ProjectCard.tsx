@@ -13,7 +13,7 @@
 
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type { Project } from "../../types";
 import {
@@ -307,13 +307,23 @@ export function DraggableProjectCard({
     setDropRef(node);
   };
 
+  // Track desktop vs mobile for drag handle behavior
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   const style: React.CSSProperties = {
     transform: transform
       ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
       : undefined,
     opacity: isDragging ? 0 : 1,
     visibility: isDragging ? ("hidden" as const) : ("visible" as const),
-    touchAction: "none",
+    ...(isDesktop ? { touchAction: "none" as const } : {}),
   };
 
   const initials = getInitials(
@@ -373,8 +383,21 @@ export function DraggableProjectCard({
       } ${isOver ? "ring-2 ring-plum/50 border-plum" : ""}`}
       onClick={handleClick}
       {...attributes}
-      {...listeners}
+      {...(isDesktop ? listeners : {})}
     >
+      {/* Mobile drag handle */}
+      <div
+        className="md:hidden -mx-3 -mt-3 mb-2 flex items-center justify-center py-1.5 bg-[#4e283a]/10 rounded-t-xl cursor-grab active:cursor-grabbing"
+        style={{ touchAction: "none" }}
+        {...listeners}
+      >
+        <svg width="20" height="12" viewBox="0 0 20 12" fill="currentColor" className="text-[#4e283a]/40">
+          <circle cx="4" cy="2" r="1.5"/><circle cx="10" cy="2" r="1.5"/><circle cx="16" cy="2" r="1.5"/>
+          <circle cx="4" cy="6" r="1.5"/><circle cx="10" cy="6" r="1.5"/><circle cx="16" cy="6" r="1.5"/>
+          <circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="16" cy="10" r="1.5"/>
+        </svg>
+      </div>
+
       {/* Project Type Badge (Gift/Donation) */}
       {projectTypeBadge && (
         <div className="absolute top-2 right-2 flex items-center gap-1 max-w-[6rem] overflow-hidden">
