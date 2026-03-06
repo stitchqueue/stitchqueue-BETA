@@ -157,6 +157,17 @@ export default function Header() {
                 <span className="font-medium">Contact Support</span>
               </a>
 
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  window.location.reload();
+                }}
+                className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-plum/5 hover:text-plum transition-colors flex items-center gap-3 md:hidden"
+              >
+                <span className="text-base">🔄</span>
+                <span className="font-medium">Refresh App</span>
+              </button>
+
               <div className="border-t border-line" />
 
               <button

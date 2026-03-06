@@ -5,6 +5,7 @@ import { AuthProvider } from "./lib/auth-context";
 import BetaSplash from "./components/BetaSplash";
 import Footer from "./components/Footer";
 import FeedbackButton from "./components/FeedbackButton";
+import PullToRefresh from "./components/PullToRefresh";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,6 +50,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
         <AuthProvider>
+          <PullToRefresh />
           <BetaSplash>
             <div className="flex-1">{children}</div>
             <Footer />
