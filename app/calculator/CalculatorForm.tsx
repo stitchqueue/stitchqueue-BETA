@@ -649,6 +649,17 @@ export default function CalculatorForm() {
       };
 
       if (isEditMode && existingProject) {
+        // Reset Job Summary if estimate total changed after invoicing
+        const jobSummaryNeedsReset =
+          existingProject.invoiced === true &&
+          Math.round(estimateData.total * 100) !== Math.round((existingProject.invoicedAmount || 0) * 100);
+
+        if (jobSummaryNeedsReset) {
+          (projectData as Partial<Project>).invoiced = false;
+          (projectData as Partial<Project>).invoicedAmount = undefined;
+          (projectData as Partial<Project>).invoicedDate = undefined;
+        }
+
         // UPDATE existing project
         const updatedProject: Project = {
           ...existingProject,
@@ -674,7 +685,10 @@ export default function CalculatorForm() {
           depositReceivedToday && depositAmount > 0
             ? ` Deposit of ${formatCurrency(depositAmount)} recorded.`
             : "";
-        alert(`Estimate #${estimateNumber} updated!${donationMsg}${discountMsg}${depositMsg}`);
+        const jobSummaryResetMsg = jobSummaryNeedsReset
+          ? "\n\nEstimate total changed — Job Summary has been reset. Please re-confirm it in the Completed checklist."
+          : "";
+        alert(`Estimate #${estimateNumber} updated!${donationMsg}${discountMsg}${depositMsg}${jobSummaryResetMsg}`);
       } else {
         // CREATE new project
         const newProject: Project = {
