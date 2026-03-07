@@ -390,34 +390,14 @@ export default function Home() {
             <h3 className="text-2xl font-bold mb-2">Join the Waitlist</h3>
             <p className="text-gray-600 mb-6">We'll notify you when StitchQueue launches in April 2026</p>
             
-            {/* Custom Form - Posts to ConvertKit */}
-            <div className="max-w-md mx-auto">
-              <form 
-                action="https://app.kit.com/forms/9063614/subscriptions" 
-                method="post"
-                target="_blank"
-                className="space-y-4"
-              >
-                {/* Hidden field that ConvertKit expects */}
-                <input type="hidden" name="fields[null]" value="" />
-                
-                <div>
-                  <input 
-                    type="email"
-                    name="email_address"
-                    placeholder="Enter your email address"
-                    required
-                    className="w-full px-4 py-3 border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-500 rounded-lg focus:outline-none focus:border-[#4e283a] text-base"
-                  />
-                </div>
-                <button 
-                  type="submit"
-                  className="w-full bg-[#4e283a] text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-[#3d1f2e] transition-colors"
-                >
-                  Join The Waitlist
-                </button>
-              </form>
-            </div>
+            <a
+              href="https://stitchedbysusan.myflodesk.com/stitchqueue"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block bg-[#4e283a] text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-[#3d1f2e] transition-colors"
+            >
+              Join the Waitlist
+            </a>
 
             <p className="text-sm text-gray-500 mt-6">We respect your privacy. Unsubscribe at any time.</p>
           </div>
