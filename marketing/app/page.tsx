@@ -40,7 +40,7 @@ export default function Home() {
             <span className="text-[#4e283a] font-semibold">Launching April 2026</span>
           </div>
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            Run Your Longarm Business<br />Like a <span className="text-[#4e283a]">Pro</span>
+            Run your longarm business<br />like a <span className="text-[#4e283a]">pro</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             The only business management platform built exclusively for professional longarm quilters. 
@@ -67,7 +67,7 @@ export default function Home() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Your Complete Workflow</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Your complete workflow</h2>
             <p className="text-xl text-gray-600">From inquiry to delivery, manage every stage with ease</p>
           </div>
           
@@ -96,12 +96,12 @@ export default function Home() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Built for Quilters, By a Quilter</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Built for quilters, by a quilter</h2>
           </div>
           
           <div className="space-y-8">
             <div className="bg-white rounded-lg p-8 shadow-sm">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">The Problem</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">The problem</h3>
               <p className="text-gray-600 leading-relaxed">
                 You're juggling spreadsheets, paper notebooks, and sticky notes. Calculating prices by hand. 
                 Wondering if you charged enough. Losing track of deposits. Unable to see your true profit.
@@ -109,7 +109,7 @@ export default function Home() {
             </div>
             
             <div className="bg-[#4e283a] text-white rounded-lg p-8 shadow-lg">
-              <h3 className="text-2xl font-bold mb-4">The Solution</h3>
+              <h3 className="text-2xl font-bold mb-4">The solution</h3>
               <p className="leading-relaxed opacity-90">
                 StitchQueue's pricing calculator is your business engine. It doesn't just calculate estimates—it 
                 drives your entire workflow from inquiry through delivery. Track every project, know your true costs, 
@@ -120,7 +120,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Business Overhead Calculator Spotlight */}
+      {/* Business calculator Spotlight */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-4xl mx-auto">
           <div className="bg-gradient-to-br from-[#4e283a] to-[#3d1f2e] rounded-2xl p-12 text-white">
@@ -128,23 +128,23 @@ export default function Home() {
               <div className="inline-block px-4 py-2 bg-white/20 rounded-full mb-4">
                 <span className="text-sm font-semibold">PRO TIER EXCLUSIVE</span>
               </div>
-              <h2 className="text-4xl font-bold mb-4">Business Overhead Calculator</h2>
+              <h2 className="text-4xl font-bold mb-4">Business calculator</h2>
               <p className="text-xl opacity-90">Stop guessing. Know exactly what you need to charge.</p>
             </div>
             
             <div className="space-y-6">
               <div className="bg-white/10 rounded-lg p-6">
-                <h3 className="text-xl font-bold mb-3">📊 Rate Calculator</h3>
+                <h3 className="text-xl font-bold mb-3">📊 Rate calculator</h3>
                 <p className="opacity-90">Work backwards from your desired hourly wage. Factor in experience level, monthly overhead, and per-project incidentals. Get your minimum $/sq inch needed to hit your target.</p>
               </div>
               
               <div className="bg-white/10 rounded-lg p-6">
-                <h3 className="text-xl font-bold mb-3">📈 Performance Dashboard</h3>
+                <h3 className="text-xl font-bold mb-3">📈 Performance dashboard</h3>
                 <p className="opacity-90">See your actual hourly rate from completed projects. Compare against your goal. Discover which services are most profitable.</p>
               </div>
               
               <div className="bg-white/10 rounded-lg p-6">
-                <h3 className="text-xl font-bold mb-3">💰 Reality Check</h3>
+                <h3 className="text-xl font-bold mb-3">💰 Reality check</h3>
                 <p className="opacity-90">Compare what you <em>should</em> charge vs. what you <em>do</em> charge. Stop leaving money on the table.</p>
               </div>
             </div>
@@ -156,18 +156,18 @@ export default function Home() {
       <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Everything You Need</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Everything you need</h2>
             <p className="text-xl text-gray-600">Powerful features that save you time and make you money</p>
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { title: 'Smart Pricing', desc: 'Calculate accurate estimates in seconds. Your pricing calculator becomes your business engine.' },
-              { title: 'Client Management', desc: 'Track every project from inquiry to delivery. Never lose track of a deposit again.' },
-              { title: 'Business Analytics', desc: 'See your true costs. Know your actual hourly rate. Make informed pricing decisions.' },
-              { title: 'Payment Tracking', desc: 'Record deposits and final payments. Know exactly who owes what at a glance.' },
-              { title: 'Repeat Clients', desc: 'Automatically recognize returning customers. Pre-fill their information with one click.' },
-              { title: 'Professional Invoices', desc: 'Generate polished invoices instantly. Pre-filled from your original estimate.' }
+              { title: 'Smart pricing', desc: 'Calculate accurate estimates in seconds. Your pricing calculator becomes your business engine.' },
+              { title: 'Client management', desc: 'Track every project from inquiry to delivery. Never lose track of a deposit again.' },
+              { title: 'Business analytics', desc: 'See your true costs. Know your actual hourly rate. Make informed pricing decisions.' },
+              { title: 'Payment tracking', desc: 'Record deposits and final payments. Know exactly who owes what at a glance.' },
+              { title: 'Repeat clients', desc: 'Automatically recognize returning customers. Pre-fill their information with one click.' },
+              { title: 'Professional invoices', desc: 'Generate polished invoices instantly. Pre-filled from your original estimate.' }
             ].map((feature, idx) => (
               <div key={idx} className="bg-white rounded-lg p-8 shadow-sm hover:shadow-lg transition-shadow">
                 <h3 className="text-xl font-bold text-gray-900 mb-3">{feature.title}</h3>
@@ -181,7 +181,7 @@ export default function Home() {
       {/* Testimonials */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">What Quilters Are Saying</h2>
+          <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">What quilters are saying</h2>
           <div className="grid md:grid-cols-3 gap-8">
             {[
               { name: 'Susan S.', text: 'Finally, software that understands longarm quilting!' },
@@ -201,7 +201,7 @@ export default function Home() {
       <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Simple, Transparent Pricing</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Simple, transparent pricing</h2>
             <p className="text-xl text-gray-600 mb-8">Choose the plan that fits your business</p>
             
             <div className="flex items-center justify-center gap-4 mb-8">
@@ -278,7 +278,7 @@ export default function Home() {
                 </li>
                 <li className="flex items-start">
                   <span className="text-[#4e283a] mr-2">★</span>
-                  <span className="text-gray-600">Business Overhead Calculator</span>
+                  <span className="text-gray-600">Business calculator</span>
                 </li>
                 <li className="flex items-start">
                   <span className="text-[#4e283a] mr-2">★</span>
@@ -345,7 +345,7 @@ export default function Home() {
       {/* FAQ */}
       <section id="faq" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">Frequently Asked Questions</h2>
+          <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">Frequently asked questions</h2>
           <div className="space-y-6">
             {[
               { q: 'When does StitchQueue launch?', a: 'April 2026. Join the waitlist to be notified when we go live.' },
@@ -369,11 +369,11 @@ export default function Home() {
       {/* Waitlist CTA */}
       <section id="waitlist" className="py-20 px-4 sm:px-6 lg:px-8 bg-[#4e283a] text-white">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-4">Be First to Know When We Launch</h2>
+          <h2 className="text-4xl font-bold mb-4">Be first to know when we launch</h2>
           <p className="text-xl mb-8 opacity-90">Join the waitlist to get early access, exclusive Founder pricing, and launch updates.</p>
           
           <div className="bg-white text-gray-900 rounded-lg p-8 max-w-2xl mx-auto">
-            <h3 className="text-2xl font-bold mb-2">Join the Waitlist</h3>
+            <h3 className="text-2xl font-bold mb-2">Join the waitlist</h3>
             <p className="text-gray-600 mb-6">We'll notify you when StitchQueue launches in April 2026</p>
             
             <a
